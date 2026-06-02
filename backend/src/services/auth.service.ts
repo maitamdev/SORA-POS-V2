@@ -1,8 +1,14 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { JwtPayload, UserRole } from '../types/user.type';
+
+// Helper: lấy role name từ Supabase join result
+const getRoleName = (roles: unknown): UserRole => {
+  if (Array.isArray(roles)) return (roles[0] as { name: string }).name as UserRole;
+  return (roles as { name: string }).name as UserRole;
+};
 
 export class AuthService {
   /**
@@ -36,12 +42,13 @@ export class AuthService {
     const payload: JwtPayload = {
       userId: user.id,
       email: user.email,
-      role: user.roles.name as UserRole,
+      role: getRoleName(user.roles),
     };
 
-    const token = jwt.sign(payload, env.jwtSecret, {
-      expiresIn: env.jwtExpiresIn,
-    });
+    const signOptions: SignOptions = {
+      expiresIn: env.jwtExpiresIn as string & SignOptions['expiresIn'],
+    };
+    const token = jwt.sign(payload, env.jwtSecret, signOptions);
 
     // 4. Cập nhật last_login
     await supabase
@@ -57,7 +64,7 @@ export class AuthService {
         full_name: user.full_name,
         phone: user.phone,
         avatar_url: user.avatar_url,
-        role: user.roles.name as UserRole,
+        role: getRoleName(user.roles),
         is_active: user.is_active,
         last_login: user.last_login,
       },
@@ -91,7 +98,7 @@ export class AuthService {
       full_name: user.full_name,
       phone: user.phone,
       avatar_url: user.avatar_url,
-      role: user.roles.name as UserRole,
+      role: getRoleName(user.roles),
       is_active: user.is_active,
       last_login: user.last_login,
     };

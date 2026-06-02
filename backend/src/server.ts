@@ -11,8 +11,8 @@ app.listen(PORT, () => {
   ║  Status:  ✅ Running                      ║
   ║  Port:    ${String(PORT).padEnd(33)}║
   ║  Env:     ${env.nodeEnv.padEnd(33)}║
-  ║  API:     http://localhost:${PORT}/api      ║
-  ║  Health:  http://localhost:${PORT}/api/health║
+  ║  API:     http://localhost:${PORT}/api       ║
+  ║  Health:  http://localhost:${PORT}/api/health ║
   ╚═══════════════════════════════════════════╝
   `);
 });

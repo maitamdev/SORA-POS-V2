@@ -1,0 +1,879 @@
+{
+  "_type": "Project",
+  "_id": "Project_SoraPOS_V2_UC",
+  "name": "SoraPOS_V2_UseCase",
+  "ownedElements": [
+    {
+      "_type": "UMLModel",
+      "_id": "Model_SoraPOS_V2_UC",
+      "_parent": {
+        "$ref": "Project_SoraPOS_V2_UC"
+      },
+      "name": "SoraPOS Use Case Model",
+      "ownedElements": [
+        {
+          "_type": "UMLActor",
+          "_id": "Actor_Cashier",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Thu ngân (Cashier)",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "Actor_Manager",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý (Manager)",
+          "ownedElements": [
+            {
+              "_type": "UMLGeneralization",
+              "_id": "Gen_Manager_Cashier",
+              "_parent": {
+                "$ref": "Actor_Manager"
+              },
+              "source": {
+                "$ref": "Actor_Manager"
+              },
+              "target": {
+                "$ref": "Actor_Cashier"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "Actor_Admin",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản trị viên (Admin)",
+          "ownedElements": [
+            {
+              "_type": "UMLGeneralization",
+              "_id": "Gen_Admin_Manager",
+              "_parent": {
+                "$ref": "Actor_Admin"
+              },
+              "source": {
+                "$ref": "Actor_Admin"
+              },
+              "target": {
+                "$ref": "Actor_Manager"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Auth",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Đăng nhập / Đăng xuất",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Role",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý phân quyền",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Account",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý nhân viên (Tài khoản & vai trò)",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_SysConfig",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Cấu hình tham số hệ thống",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_SystemLogs",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Xem nhật ký hệ thống (Activity Logs)",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_POS",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Bán hàng tại quầy (POS)",
+          "ownedElements": [
+            {
+              "_type": "UMLInclude",
+              "_id": "Inc_POS_Cart",
+              "_parent": {
+                "$ref": "UC_POS"
+              },
+              "source": {
+                "$ref": "UC_POS"
+              },
+              "target": {
+                "$ref": "UC_Cart"
+              }
+            },
+            {
+              "_type": "UMLInclude",
+              "_id": "Inc_POS_Payment",
+              "_parent": {
+                "$ref": "UC_POS"
+              },
+              "source": {
+                "$ref": "UC_POS"
+              },
+              "target": {
+                "$ref": "UC_Payment"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Cart",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý giỏ hàng",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_SearchStock",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Tra cứu sản phẩm & tồn kho",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_ApplyDiscount",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Áp dụng mã giảm giá",
+          "ownedElements": [
+            {
+              "_type": "UMLExtend",
+              "_id": "Ext_Discount_POS",
+              "_parent": {
+                "$ref": "UC_ApplyDiscount"
+              },
+              "source": {
+                "$ref": "UC_ApplyDiscount"
+              },
+              "target": {
+                "$ref": "UC_POS"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_QuickCustomer",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Đăng ký nhanh khách hàng mới",
+          "ownedElements": [
+            {
+              "_type": "UMLExtend",
+              "_id": "Ext_Customer_POS",
+              "_parent": {
+                "$ref": "UC_QuickCustomer"
+              },
+              "source": {
+                "$ref": "UC_QuickCustomer"
+              },
+              "target": {
+                "$ref": "UC_POS"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Payment",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Thực hiện thanh toán (Tiền mặt/Chuyển khoản/Ví)",
+          "ownedElements": [
+            {
+              "_type": "UMLInclude",
+              "_id": "Inc_Payment_Invoice",
+              "_parent": {
+                "$ref": "UC_Payment"
+              },
+              "source": {
+                "$ref": "UC_Payment"
+              },
+              "target": {
+                "$ref": "UC_PrintInvoice"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_PrintInvoice",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Tạo & In hóa đơn PDF",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_ShiftReport",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Xem báo cáo ca trực & bàn giao",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Product",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý sản phẩm & danh mục (CRUD)",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Inventory",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý nhập kho (Phiếu nhập & Lịch sử)",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_StockAdjust",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Điều chỉnh & Kiểm kho",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_Supplier",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý nhà cung cấp",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_CustomerManage",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Quản lý thông tin khách hàng",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_DiscountSet",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Thiết lập chương trình khuyến mãi",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_SalesReport",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Xem báo cáo doanh thu & chi phí",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_StockReport",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "Xem báo cáo tồn kho & cảnh báo",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "UC_AIRestock",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "name": "AI phân tích & gợi ý nhập hàng",
+          "ownedElements": []
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Admin_UC_Auth_0",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Admin_UC_Auth_0",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Auth_0"
+            },
+            "reference": {
+              "$ref": "Actor_Admin"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Admin_UC_Auth_0",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Auth_0"
+            },
+            "reference": {
+              "$ref": "UC_Auth"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Admin_UC_Role_1",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Admin_UC_Role_1",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Role_1"
+            },
+            "reference": {
+              "$ref": "Actor_Admin"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Admin_UC_Role_1",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Role_1"
+            },
+            "reference": {
+              "$ref": "UC_Role"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Admin_UC_Account_2",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Admin_UC_Account_2",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Account_2"
+            },
+            "reference": {
+              "$ref": "Actor_Admin"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Admin_UC_Account_2",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_Account_2"
+            },
+            "reference": {
+              "$ref": "UC_Account"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Admin_UC_SysConfig_3",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Admin_UC_SysConfig_3",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_SysConfig_3"
+            },
+            "reference": {
+              "$ref": "Actor_Admin"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Admin_UC_SysConfig_3",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_SysConfig_3"
+            },
+            "reference": {
+              "$ref": "UC_SysConfig"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Admin_UC_SystemLogs_4",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Admin_UC_SystemLogs_4",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_SystemLogs_4"
+            },
+            "reference": {
+              "$ref": "Actor_Admin"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Admin_UC_SystemLogs_4",
+            "_parent": {
+              "$ref": "Assoc_Actor_Admin_UC_SystemLogs_4"
+            },
+            "reference": {
+              "$ref": "UC_SystemLogs"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Cashier_UC_Auth_5",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Cashier_UC_Auth_5",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_Auth_5"
+            },
+            "reference": {
+              "$ref": "Actor_Cashier"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Cashier_UC_Auth_5",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_Auth_5"
+            },
+            "reference": {
+              "$ref": "UC_Auth"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Cashier_UC_POS_6",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Cashier_UC_POS_6",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_POS_6"
+            },
+            "reference": {
+              "$ref": "Actor_Cashier"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Cashier_UC_POS_6",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_POS_6"
+            },
+            "reference": {
+              "$ref": "UC_POS"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Cashier_UC_SearchStock_7",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Cashier_UC_SearchStock_7",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_SearchStock_7"
+            },
+            "reference": {
+              "$ref": "Actor_Cashier"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Cashier_UC_SearchStock_7",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_SearchStock_7"
+            },
+            "reference": {
+              "$ref": "UC_SearchStock"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Cashier_UC_ShiftReport_8",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Cashier_UC_ShiftReport_8",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_ShiftReport_8"
+            },
+            "reference": {
+              "$ref": "Actor_Cashier"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Cashier_UC_ShiftReport_8",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_ShiftReport_8"
+            },
+            "reference": {
+              "$ref": "UC_ShiftReport"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Cashier_UC_QuickCustomer_9",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Cashier_UC_QuickCustomer_9",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_QuickCustomer_9"
+            },
+            "reference": {
+              "$ref": "Actor_Cashier"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Cashier_UC_QuickCustomer_9",
+            "_parent": {
+              "$ref": "Assoc_Actor_Cashier_UC_QuickCustomer_9"
+            },
+            "reference": {
+              "$ref": "UC_QuickCustomer"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_Auth_10",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_Auth_10",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Auth_10"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_Auth_10",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Auth_10"
+            },
+            "reference": {
+              "$ref": "UC_Auth"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_Product_11",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_Product_11",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Product_11"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_Product_11",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Product_11"
+            },
+            "reference": {
+              "$ref": "UC_Product"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_Inventory_12",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_Inventory_12",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Inventory_12"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_Inventory_12",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Inventory_12"
+            },
+            "reference": {
+              "$ref": "UC_Inventory"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_StockAdjust_13",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_StockAdjust_13",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_StockAdjust_13"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_StockAdjust_13",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_StockAdjust_13"
+            },
+            "reference": {
+              "$ref": "UC_StockAdjust"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_Supplier_14",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_Supplier_14",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Supplier_14"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_Supplier_14",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_Supplier_14"
+            },
+            "reference": {
+              "$ref": "UC_Supplier"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_CustomerManage_15",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_CustomerManage_15",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_CustomerManage_15"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_CustomerManage_15",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_CustomerManage_15"
+            },
+            "reference": {
+              "$ref": "UC_CustomerManage"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_DiscountSet_16",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_DiscountSet_16",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_DiscountSet_16"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_DiscountSet_16",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_DiscountSet_16"
+            },
+            "reference": {
+              "$ref": "UC_DiscountSet"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_SalesReport_17",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_SalesReport_17",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_SalesReport_17"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_SalesReport_17",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_SalesReport_17"
+            },
+            "reference": {
+              "$ref": "UC_SalesReport"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_StockReport_18",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_StockReport_18",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_StockReport_18"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_StockReport_18",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_StockReport_18"
+            },
+            "reference": {
+              "$ref": "UC_StockReport"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "Assoc_Actor_Manager_UC_AIRestock_19",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_UC"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End1_Assoc_Actor_Manager_UC_AIRestock_19",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_AIRestock_19"
+            },
+            "reference": {
+              "$ref": "Actor_Manager"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "End2_Assoc_Actor_Manager_UC_AIRestock_19",
+            "_parent": {
+              "$ref": "Assoc_Actor_Manager_UC_AIRestock_19"
+            },
+            "reference": {
+              "$ref": "UC_AIRestock"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

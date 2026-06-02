@@ -1,26 +1,54 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from './auth.routes';
+import {
+  categoryRoutes,
+  customerRoutes,
+  productRoutes,
+  supplierRoutes,
+} from './catalog.routes';
+import orderRoutes from './order.routes';
+import stockRoutes from './stock.routes';
+import reportRoutes from './report.routes';
+import aiRoutes from './ai.routes';
 
 const router = Router();
 
-// Health check
+router.get('/', (_req: Request, res: Response) => {
+  res.json({
+    success: true,
+    message: 'Welcome to Sora POS API',
+    endpoints: [
+      '/api/health',
+      '/api/auth',
+      '/api/products',
+      '/api/categories',
+      '/api/suppliers',
+      '/api/customers',
+      '/api/orders',
+      '/api/stock',
+      '/api/reports',
+      '/api/ai',
+    ],
+  });
+});
+
 router.get('/health', (_req: Request, res: Response) => {
   res.json({
     success: true,
-    message: '🚀 Sora POS API is running',
+    message: 'Sora POS API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
   });
 });
 
-// Mount routes
 router.use('/auth', authRoutes);
-
-// Tuần 3: router.use('/products', productRoutes);
-// Tuần 3: router.use('/categories', categoryRoutes);
-// Tuần 5: router.use('/orders', orderRoutes);
-// Tuần 6: router.use('/stock', stockRoutes);
-// Tuần 8: router.use('/reports', reportRoutes);
-// Tuần 9: router.use('/ai', aiRoutes);
+router.use('/products', productRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/suppliers', supplierRoutes);
+router.use('/customers', customerRoutes);
+router.use('/orders', orderRoutes);
+router.use('/stock', stockRoutes);
+router.use('/reports', reportRoutes);
+router.use('/ai', aiRoutes);
 
 export default router;

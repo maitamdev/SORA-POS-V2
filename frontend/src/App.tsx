@@ -1,31 +1,31 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
-
-// Layout
 import MainLayout from './components/layout/MainLayout';
-
-// Routes
 import ProtectedRoute from './routes/ProtectedRoute';
-
-// Pages
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
-
-// Store
+import POSPage from './pages/pos/POSPage';
+import ProductsPage from './pages/products/ProductsPage';
+import CategoriesPage from './pages/categories/CategoriesPage';
+import OrdersPage from './pages/orders/OrdersPage';
+import StockPage from './pages/stock/StockPage';
+import CustomersPage from './pages/customers/CustomersPage';
+import SuppliersPage from './pages/suppliers/SuppliersPage';
+import ReportsPage from './pages/reports/ReportsPage';
+import AIRecommendationsPage from './pages/ai/AIRecommendationsPage';
+import SettingsPage from './pages/settings/SettingsPage';
 import { useAuthStore } from './stores/auth.store';
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
 
-  // Kiểm tra auth khi app load (reload trang)
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
   return (
     <BrowserRouter>
-      {/* Toast notifications */}
       <Toaster
         position="top-right"
         toastOptions={{
@@ -33,35 +33,15 @@ function App() {
           style: {
             background: '#0f172a',
             color: '#f8fafc',
-            borderRadius: '0',
+            borderRadius: '0px',
             border: '1px solid #1e293b',
             fontSize: '14px',
-          },
-          success: {
-            iconTheme: {
-              primary: '#22c55e',
-              secondary: '#f0fdf4',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fef2f2',
-            },
           },
         }}
       />
 
       <Routes>
-        {/* Public: Login */}
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
-          }
-        />
-
-        {/* Protected: Main App */}
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route
           element={
             <ProtectedRoute>
@@ -70,16 +50,18 @@ function App() {
           }
         >
           <Route path="/" element={<DashboardPage />} />
-
-          {/* Placeholder routes cho các tuần tiếp theo */}
-          {/* Tuần 3: Products & Categories */}
-          {/* Tuần 5: POS & Orders */}
-          {/* Tuần 6: Stock Management */}
-          {/* Tuần 8: Reports */}
-          {/* Tuần 9: AI Recommendations */}
+          <Route path="/pos" element={<POSPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/stock" element={<StockPage />} />
+          <Route path="/stock/alerts" element={<StockPage />} />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/ai" element={<AIRecommendationsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
-
-        {/* Fallback: redirect về dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

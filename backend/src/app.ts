@@ -30,6 +30,11 @@ if (env.nodeEnv === 'development') {
   app.use(morgan('dev'));
 }
 
+// Handle favicon requests to prevent polluting terminal logs with 404 warnings
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // ============================================
 // Routes
 // ============================================

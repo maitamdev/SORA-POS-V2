@@ -1,0 +1,945 @@
+{
+  "_type": "Project",
+  "_id": "Project_SoraPOS_V2_ACT",
+  "name": "SoraPOS_V2_Activity",
+  "ownedElements": [
+    {
+      "_type": "UMLModel",
+      "_id": "Model_SoraPOS_V2_ACT",
+      "_parent": {
+        "$ref": "Project_SoraPOS_V2_ACT"
+      },
+      "name": "SoraPOS Activity Model",
+      "ownedElements": [
+        {
+          "_type": "UMLActivity",
+          "_id": "Activity_POS_Checkout",
+          "_parent": {
+            "$ref": "Model_SoraPOS_V2_ACT"
+          },
+          "name": "POS InStore Checkout Flow",
+          "ownedElements": [],
+          "groups": [
+            {
+              "_type": "UMLActivityPartition",
+              "_id": "Partition_Cashier",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân (Cashier)",
+              "nodes": [
+                {
+                  "$ref": "init_node"
+                },
+                {
+                  "$ref": "act_login"
+                },
+                {
+                  "$ref": "act_open_pos"
+                },
+                {
+                  "$ref": "act_scan_barcode"
+                },
+                {
+                  "$ref": "act_request_other"
+                },
+                {
+                  "$ref": "act_enter_member"
+                },
+                {
+                  "$ref": "act_select_coupon"
+                },
+                {
+                  "$ref": "act_request_pay"
+                },
+                {
+                  "$ref": "act_cash_receive"
+                },
+                {
+                  "$ref": "act_qr_scan"
+                },
+                {
+                  "$ref": "act_print_invoice"
+                },
+                {
+                  "$ref": "final_node"
+                }
+              ]
+            },
+            {
+              "_type": "UMLActivityPartition",
+              "_id": "Partition_System",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống (System)",
+              "nodes": [
+                {
+                  "$ref": "act_check_stock"
+                },
+                {
+                  "$ref": "dec_in_stock"
+                },
+                {
+                  "$ref": "act_alert_out_stock"
+                },
+                {
+                  "$ref": "act_add_cart"
+                },
+                {
+                  "$ref": "act_calc_temp"
+                },
+                {
+                  "$ref": "dec_more"
+                },
+                {
+                  "$ref": "dec_member"
+                },
+                {
+                  "$ref": "act_apply_member"
+                },
+                {
+                  "$ref": "act_skip_member"
+                },
+                {
+                  "$ref": "dec_coupon"
+                },
+                {
+                  "$ref": "act_apply_coupon"
+                },
+                {
+                  "$ref": "act_calc_final"
+                },
+                {
+                  "$ref": "dec_pay_method"
+                },
+                {
+                  "$ref": "act_cash_change"
+                },
+                {
+                  "$ref": "act_qr_display"
+                },
+                {
+                  "$ref": "act_qr_verify"
+                },
+                {
+                  "$ref": "act_create_order"
+                },
+                {
+                  "$ref": "act_update_stock"
+                },
+                {
+                  "$ref": "act_log_stock"
+                },
+                {
+                  "$ref": "dec_low_stock"
+                },
+                {
+                  "$ref": "act_trigger_alert"
+                },
+                {
+                  "$ref": "act_create_pdf"
+                }
+              ]
+            }
+          ],
+          "nodes": [
+            {
+              "_type": "UMLInitialNode",
+              "_id": "init_node",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "InitialNode"
+            },
+            {
+              "_type": "UMLActivityFinalNode",
+              "_id": "final_node",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "ActivityFinalNode"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_login",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân đăng nhập hệ thống"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_open_pos",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân mở giao diện POS"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_scan_barcode",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân quét mã vạch hoặc tìm sản phẩm"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_request_other",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Yêu cầu chọn sản phẩm khác"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_enter_member",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân nhập mã/SĐT khách hàng"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_select_coupon",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân chọn mã giảm giá"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_request_pay",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân yêu cầu thanh toán"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_cash_receive",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân nhận tiền mặt và nhập số tiền"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_qr_scan",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Khách hàng quét mã thanh toán QR"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_print_invoice",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Thu ngân in hóa đơn & Giao hàng cho khách"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_check_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống kiểm tra tồn kho khả dụng"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_in_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "còn hàng?"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_alert_out_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hiển thị cảnh báo hết hàng"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_add_cart",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống thêm sản phẩm vào giỏ hàng"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_calc_temp",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Cập nhật tổng tiền tạm tính"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_more",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Tiếp tục mua hàng?"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_member",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Khách hàng thành viên?"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_apply_member",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống áp dụng tích điểm & giảm giá"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_skip_member",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Bỏ qua tích điểm"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_coupon",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Áp dụng mã giảm giá?"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_apply_coupon",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống trừ tiền chiết khấu"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_calc_final",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống tính tổng tiền thanh toán"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_pay_method",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Phương thức thanh toán?"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_cash_change",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống tính tiền thừa trả khách"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_qr_display",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống hiển thị mã QR động"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_qr_verify",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Hệ thống xác thực giao dịch"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_create_order",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Tạo đơn hàng & Chi tiết hóa đơn vào DB"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_update_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Cập nhật số lượng tồn kho (Trừ kho)"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_log_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Ghi log lịch sử giao dịch kho (stock_transactions)"
+            },
+            {
+              "_type": "UMLDecisionNode",
+              "_id": "dec_low_stock",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Tồn kho < Ngưỡng tối thiểu?"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_trigger_alert",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Tạo cảnh báo tồn kho thấp (stock_alerts)"
+            },
+            {
+              "_type": "UMLAction",
+              "_id": "act_create_pdf",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "name": "Tạo file hóa đơn PDF"
+            }
+          ],
+          "edges": [
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_1",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "init_node"
+              },
+              "target": {
+                "$ref": "act_login"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_2",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_login"
+              },
+              "target": {
+                "$ref": "act_open_pos"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_3",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_open_pos"
+              },
+              "target": {
+                "$ref": "act_scan_barcode"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_4",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_scan_barcode"
+              },
+              "target": {
+                "$ref": "act_check_stock"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_5",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_check_stock"
+              },
+              "target": {
+                "$ref": "dec_in_stock"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_6_no",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_in_stock"
+              },
+              "target": {
+                "$ref": "act_alert_out_stock"
+              },
+              "guard": "không"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_7",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_alert_out_stock"
+              },
+              "target": {
+                "$ref": "act_request_other"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_8",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_request_other"
+              },
+              "target": {
+                "$ref": "dec_more"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_6_yes",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_in_stock"
+              },
+              "target": {
+                "$ref": "act_add_cart"
+              },
+              "guard": "có"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_9",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_add_cart"
+              },
+              "target": {
+                "$ref": "act_calc_temp"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_10",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_calc_temp"
+              },
+              "target": {
+                "$ref": "dec_more"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_11_yes",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_more"
+              },
+              "target": {
+                "$ref": "act_scan_barcode"
+              },
+              "guard": "có"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_11_no",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_more"
+              },
+              "target": {
+                "$ref": "dec_member"
+              },
+              "guard": "không"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_12_yes",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_member"
+              },
+              "target": {
+                "$ref": "act_enter_member"
+              },
+              "guard": "có"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_13",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_enter_member"
+              },
+              "target": {
+                "$ref": "act_apply_member"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_14",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_apply_member"
+              },
+              "target": {
+                "$ref": "dec_coupon"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_12_no",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_member"
+              },
+              "target": {
+                "$ref": "act_skip_member"
+              },
+              "guard": "không"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_15",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_skip_member"
+              },
+              "target": {
+                "$ref": "dec_coupon"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_16_yes",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_coupon"
+              },
+              "target": {
+                "$ref": "act_select_coupon"
+              },
+              "guard": "có"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_17",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_select_coupon"
+              },
+              "target": {
+                "$ref": "act_apply_coupon"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_18",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_apply_coupon"
+              },
+              "target": {
+                "$ref": "act_calc_final"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_16_no",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_coupon"
+              },
+              "target": {
+                "$ref": "act_calc_final"
+              },
+              "guard": "không"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_19",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_calc_final"
+              },
+              "target": {
+                "$ref": "act_request_pay"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_20",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_request_pay"
+              },
+              "target": {
+                "$ref": "dec_pay_method"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_21_cash",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_pay_method"
+              },
+              "target": {
+                "$ref": "act_cash_receive"
+              },
+              "guard": "Tiền mặt"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_22",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_cash_receive"
+              },
+              "target": {
+                "$ref": "act_cash_change"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_23",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_cash_change"
+              },
+              "target": {
+                "$ref": "act_create_order"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_21_qr",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_pay_method"
+              },
+              "target": {
+                "$ref": "act_qr_display"
+              },
+              "guard": "QR / Chuyển khoản"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_24",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_qr_display"
+              },
+              "target": {
+                "$ref": "act_qr_scan"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_25",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_qr_scan"
+              },
+              "target": {
+                "$ref": "act_qr_verify"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_26",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_qr_verify"
+              },
+              "target": {
+                "$ref": "act_create_order"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_27",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_create_order"
+              },
+              "target": {
+                "$ref": "act_update_stock"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_28",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_update_stock"
+              },
+              "target": {
+                "$ref": "act_log_stock"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_29",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_log_stock"
+              },
+              "target": {
+                "$ref": "dec_low_stock"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_30_yes",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_low_stock"
+              },
+              "target": {
+                "$ref": "act_trigger_alert"
+              },
+              "guard": "có"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_31",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_trigger_alert"
+              },
+              "target": {
+                "$ref": "act_create_pdf"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_30_no",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "dec_low_stock"
+              },
+              "target": {
+                "$ref": "act_create_pdf"
+              },
+              "guard": "không"
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_32",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_create_pdf"
+              },
+              "target": {
+                "$ref": "act_print_invoice"
+              }
+            },
+            {
+              "_type": "UMLControlFlow",
+              "_id": "flow_33",
+              "_parent": {
+                "$ref": "Activity_POS_Checkout"
+              },
+              "source": {
+                "$ref": "act_print_invoice"
+              },
+              "target": {
+                "$ref": "final_node"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
