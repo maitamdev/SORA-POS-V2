@@ -7,7 +7,13 @@ const startOfDay = (date = new Date()) => {
   return value;
 };
 
-const currencyDate = (date: Date) => date.toISOString().slice(0, 10);
+const getLocalDateString = (dateInput: Date | string) => {
+  const d = new Date(dateInput);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 export class ReportService {
   static async dashboard(dateStr?: string) {
@@ -297,11 +303,12 @@ export class ReportService {
     for (let i = days - 1; i >= 0; i -= 1) {
       const date = new Date(endDate);
       date.setDate(date.getDate() - i);
-      buckets.set(currencyDate(date), { date: currencyDate(date), revenue: 0, orders: 0 });
+      const dateStr = getLocalDateString(date);
+      buckets.set(dateStr, { date: dateStr, revenue: 0, orders: 0 });
     }
 
     for (const order of data || []) {
-      const key = String(order.created_at).slice(0, 10);
+      const key = getLocalDateString(order.created_at);
       const bucket = buckets.get(key);
       if (!bucket) continue;
       bucket.revenue += Number(order.final_amount || 0);

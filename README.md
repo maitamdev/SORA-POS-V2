@@ -1,162 +1,159 @@
-# 🏪 Sora POS
+<div align="center">
+  <h1 align="center">🏪 Sora POS V2</h1>
+  <p align="center">
+    <strong>Hệ thống quản lý bán hàng tại quầy (Point of Sale) Full-Stack với công nghệ AI</strong>
+  </p>
+  <p align="center">
+    <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
+    <img src="https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express.js" />
+    <img src="https://img.shields.io/badge/Supabase-181818?style=for-the-badge&logo=supabase&logoColor=3ECF8E" alt="Supabase" />
+    <img src="https://img.shields.io/badge/Groq_AI-F55036?style=for-the-badge" alt="Groq AI" />
+  </p>
+</div>
 
-**Sora POS** là hệ thống quản lý bán hàng tại quầy (Point of Sale) tích hợp quản lý kho hàng, cảnh báo tồn kho thấp và hỗ trợ gợi ý nhập hàng thông minh bằng AI.
+<hr/>
 
-## ✨ Tính năng chính
+**Sora POS** là một hệ thống quản lý cửa hàng bán lẻ chuyên nghiệp được thiết kế theo cấu trúc Monorepo. Hệ thống không chỉ cung cấp giải pháp thanh toán tại quầy mượt mà, mà còn tích hợp bộ công cụ quản lý kho hàng mạnh mẽ với khả năng cảnh báo tồn kho tự động. Đặc biệt, Sora POS tích hợp trí tuệ nhân tạo (LLM qua **Groq API**) để tự động phân tích dữ liệu bán hàng và đưa ra gợi ý nhập hàng thông minh.
 
-- 🔐 Đăng nhập/đăng xuất, phân quyền (Admin, Manager, Cashier)
-- 📊 Dashboard thống kê doanh thu, sản phẩm bán chạy
-- 🛒 Màn hình POS bán hàng tại quầy
-- 📦 Quản lý sản phẩm, danh mục, nhà cung cấp
-- 👥 Quản lý khách hàng
-- 🧾 Tạo hóa đơn, xuất PDF
-- 💳 Quản lý thanh toán
-- 🏭 Quản lý kho hàng, nhập kho, điều chỉnh tồn kho
-- ⚠️ Cảnh báo tồn kho thấp
-- 🤖 AI gợi ý nhập hàng thông minh (Groq API)
-- 📈 Báo cáo doanh thu, sản phẩm bán chạy, tồn kho
-- 📱 Tạo QR sản phẩm
+## ✨ Các tính năng nổi bật
 
-## 🛠 Công nghệ sử dụng
+- 🛒 **Bán hàng tại quầy (POS):** Giao diện bán hàng tối ưu, tìm kiếm sản phẩm bằng mã vạch, thanh toán nhanh chóng.
+- 🔐 **Hệ thống Phân quyền (RBAC):** Cung cấp 3 cấp độ truy cập: `Admin`, `Manager`, và `Cashier`.
+- 📦 **Quản lý Kho thông minh:** Theo dõi tồn kho thực tế, lưu vết lịch sử xuất nhập, thiết lập ngưỡng tồn kho tối thiểu.
+- ⚠️ **Cảnh báo Tự động:** Tự động cảnh báo khi một sản phẩm sắp hoặc đã hết hàng.
+- 🤖 **Trợ lý AI (Groq):** Đưa ra đề xuất số lượng cần nhập kho dựa trên tốc độ bán trung bình và mục tiêu duy trì hàng hóa, tự động tạo mô tả sản phẩm và tự động gán danh mục sản phẩm.
+- 📊 **Dashboard & Báo cáo:** Cung cấp biểu đồ trực quan (Recharts) về doanh thu, xu hướng bán hàng, và danh sách sản phẩm bán chạy nhất.
+- 🖨️ **Tạo và in Hóa đơn PDF:** Xuất hóa đơn chuyên nghiệp với hỗ trợ in khổ giấy K80.
 
-### Frontend
-| Công nghệ | Mô tả |
-|---|---|
-| ReactJS + TypeScript | UI Framework |
-| Vite | Build tool |
-| Tailwind CSS | Styling |
-| React Router | Routing |
-| Axios | HTTP Client |
-| React Hook Form + Zod | Form & Validation |
-| Zustand | State Management |
-| Recharts | Charts & Reports |
+---
 
-### Backend
-| Công nghệ | Mô tả |
-|---|---|
-| NodeJS + ExpressJS | Server Framework |
-| TypeScript | Language |
-| JWT | Authentication |
-| Zod | Validation |
-| Supabase SDK | Database Client |
-| Groq SDK | AI Integration |
+## 🏗 Kiến trúc Hệ thống
 
-### Database
-| Công nghệ | Mô tả |
-|---|---|
-| Supabase PostgreSQL | Database |
-| Supabase Auth | Authentication |
-| Supabase Storage | File Storage |
+Dự án được xây dựng theo kiến trúc Monorepo, giúp quản lý cả Frontend và Backend trong cùng một repository một cách dễ dàng.
 
-## 📁 Cấu trúc thư mục
-
-```
-sora-pos/
-├── frontend/          # React + Vite frontend
-├── backend/           # Express + TypeScript backend
-├── database/          # SQL schema & seed data
-├── docs/              # Documentation (SRS, ERD, báo cáo)
-├── README.md
-└── .gitignore
+```mermaid
+graph TD
+    Client[Trình duyệt Web - ReactJS/Vite]
+    API[Backend API - Express/NodeJS]
+    DB[(Supabase PostgreSQL)]
+    AI[Groq AI - Llama 3]
+    
+    Client <-->|REST API / JSON| API
+    API <-->|Supabase Client| DB
+    API <-->|LLM Prompting| AI
 ```
 
-## 🚀 Cài đặt & Chạy dự án
+### 💻 Frontend (ReactJS)
+- **Framework:** React 19 + TypeScript, Build bằng Vite.
+- **Styling:** Tailwind CSS.
+- **State Management:** Zustand (Global State) & React Hook Form (Local Form State).
+- **Validation:** Zod.
 
-### Yêu cầu
-- Node.js >= 18
-- npm >= 9
-- Tài khoản Supabase (https://supabase.com)
-- Groq API Key (https://console.groq.com)
+### ⚙️ Backend (NodeJS)
+- **Framework:** Express + TypeScript.
+- **Cơ sở dữ liệu:** Supabase (PostgreSQL).
+- **Authentication:** JWT (JSON Web Tokens).
+- **AI Integration:** Groq API SDK (Model: llama-3.1-8b-instant).
 
-### 1. Clone repository
+---
+
+## 🚀 Hướng dẫn Cài đặt & Khởi chạy (Dành cho Người mới)
+
+Hệ thống đã được thiết lập để có thể chạy toàn bộ dự án (cả Frontend lẫn Backend) chỉ bằng **một câu lệnh duy nhất**. Hãy làm theo các bước dưới đây:
+
+### 1. Yêu cầu hệ thống
+- **Node.js**: Phiên bản >= 18
+- **Tài khoản Supabase**: Đăng ký miễn phí tại [supabase.com](https://supabase.com)
+- **Groq API Key**: Lấy API Key miễn phí tại [console.groq.com](https://console.groq.com)
+
+### 2. Thiết lập Cơ sở dữ liệu (Supabase)
+1. Đăng nhập vào Supabase và tạo một Project mới.
+2. Mở mục **SQL Editor** trong thanh công cụ bên trái.
+3. Mở file `database/schema.sql` trong dự án này, copy toàn bộ nội dung và dán vào SQL Editor, sau đó nhấn **Run**.
+4. (Tùy chọn) Để có dữ liệu mẫu ban đầu, tiếp tục copy và chạy nội dung file `database/seed.sql`.
+5. Vào **Project Settings > API** để lấy `Project URL` và `service_role secret`.
+
+### 3. Tải dự án và Cài đặt thư viện
+Mở Terminal/Command Prompt và chạy các lệnh sau:
+
 ```bash
-git clone <repo-url>
+# Clone dự án về máy
+git clone https://github.com/your-username/sora-pos.git
 cd sora-pos
-```
 
-### 2. Cài đặt Frontend
-```bash
-cd frontend
+# Cài đặt toàn bộ thư viện cho cả thư mục gốc, frontend và backend
 npm install
-cp .env.example .env
-# Cập nhật biến môi trường trong .env
-npm run dev
+npm install --prefix frontend
+npm install --prefix backend
 ```
-Frontend chạy tại: `http://localhost:5173`
 
-### 3. Cài đặt Backend
-```bash
-cd backend
-npm install
-cp .env.example .env
-# Cập nhật biến môi trường trong .env
-npm run dev
+### 4. Cấu hình biến môi trường (.env)
+
+**Tại Backend (`backend/.env`):**
+Tạo file `.env` trong thư mục `backend/` dựa trên file `.env.example`:
+
+```env
+PORT=3001
+NODE_ENV=development
+JWT_SECRET=thay-bang-chuoi-bi-mat-cua-ban
+JWT_EXPIRES_IN=7d
+SUPABASE_URL=https://<ID-CUA-BAN>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY-CUA-BAN>
+GROQ_API_KEY=<GROQ-API-KEY-CUA-BAN>
+CORS_ORIGIN=http://localhost:5173
 ```
-Backend chạy tại: `http://localhost:3001`
 
-### 4. Thiết lập Database
-- Tạo project trên Supabase
-- Chạy file `database/schema.sql` trong SQL Editor của Supabase
-- Chạy file `database/seed.sql` để thêm dữ liệu mẫu
+**Tại Frontend (`frontend/.env`):**
+Tạo file `.env` trong thư mục `frontend/` dựa trên file `.env.example`:
 
-## 🔑 Biến môi trường
-
-### Frontend (.env)
 ```env
 VITE_API_URL=http://localhost:3001/api
 VITE_APP_NAME=Sora POS
 ```
 
-### Backend (.env)
-```env
-PORT=3001
-NODE_ENV=development
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRES_IN=7d
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
-GROQ_API_KEY=your-groq-api-key
-CORS_ORIGIN=http://localhost:5173
+### 5. Khởi chạy Hệ thống
+
+Từ thư mục gốc của dự án (`sora-pos/`), chỉ cần chạy lệnh sau:
+
+```bash
+npm run dev
 ```
 
-## 📡 API Endpoints chính
+Lệnh này sẽ khởi động cả Backend và Frontend cùng một lúc:
+- **Frontend** sẽ mở tại: `http://localhost:5173`
+- **Backend API** sẽ chạy tại: `http://localhost:3001`
 
-| Method | Endpoint | Mô tả |
-|--------|----------|--------|
-| GET | `/api/health` | Health check |
-| POST | `/api/auth/login` | Đăng nhập |
-| POST | `/api/auth/logout` | Đăng xuất |
-| GET | `/api/products` | Danh sách sản phẩm |
-| POST | `/api/products` | Tạo sản phẩm |
-| GET | `/api/categories` | Danh sách danh mục |
-| GET | `/api/suppliers` | Danh sách nhà cung cấp |
-| GET | `/api/customers` | Danh sách khách hàng |
-| POST | `/api/orders` | Tạo hóa đơn |
-| GET | `/api/orders` | Danh sách hóa đơn |
-| GET | `/api/stock/alerts` | Cảnh báo tồn kho |
-| POST | `/api/stock/import` | Nhập kho |
-| GET | `/api/reports/dashboard` | Dữ liệu dashboard |
-| POST | `/api/ai/recommend-restock` | AI gợi ý nhập hàng |
+---
 
-## 👥 Phân quyền
+## 👥 Tài khoản Đăng nhập (nếu đã chạy file seed.sql)
 
-| Vai trò | Quyền hạn |
-|---------|-----------|
-| **Admin** | Toàn quyền: quản lý người dùng, sản phẩm, kho, báo cáo, phân quyền |
-| **Manager** | Quản lý sản phẩm, kho, hóa đơn, khách hàng, xem báo cáo |
-| **Cashier** | Bán hàng tại quầy, tạo hóa đơn, xem cảnh báo tồn kho |
+Nếu bạn đã chạy file `database/seed.sql`, bạn có thể đăng nhập bằng các tài khoản sau:
 
-## 🤖 Công thức AI gợi ý nhập hàng
+| Vai trò | Email / Mã đăng nhập | Mật khẩu | Quyền hạn |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin@sorapos.com` | `123456` | Toàn quyền quản trị hệ thống, cài đặt, phân quyền |
+| **Manager** | `manager@sorapos.com` | `123456` | Quản lý kho, khách hàng, báo cáo, sản phẩm |
+| **Cashier** | `cashier@sorapos.com` | `123456` | Bán hàng tại quầy, tra cứu thông tin sản phẩm |
 
-```
-recommended_quantity = average_daily_sales × target_days - current_stock
-```
+---
 
-- `average_daily_sales`: Số lượng bán trung bình mỗi ngày
-- `target_days`: Mặc định 14 ngày
-- `current_stock`: Tồn kho hiện tại
+## 🤖 Cơ chế Trí tuệ Nhân tạo (AI)
 
-## 📄 License
+Hệ thống cung cấp một module thông minh độc lập (`ai.service.ts`), sử dụng mô hình ngôn ngữ lớn để xử lý dữ liệu của cửa hàng:
 
-MIT License © 2026 Sora POS
+1. **AI Khuyến nghị Nhập hàng:**
+   Phân tích tốc độ bán trung bình trong 30 ngày qua và lượng tồn kho hiện tại để tính toán số lượng hàng cần nhập thêm, mục tiêu là để phủ đủ hàng bán trong 14 ngày tiếp theo (hoặc cấu hình tùy chỉnh). AI sẽ đưa ra thêm văn bản Insight giải thích chiến lược bằng Tiếng Việt.
+
+2. **Cơ chế Fallback An toàn:**
+   Trong trường hợp Groq API gặp sự cố hoặc bạn chưa điền `GROQ_API_KEY`, hệ thống vẫn tiếp tục hoạt động trơn tru dựa trên một bộ quy tắc cục bộ (Local Fallback Rules) sử dụng từ khóa mồi và toán học thuần túy.
+
+---
+
+## 📄 Giấy phép (License)
+
+Dự án này được cấp phép theo tiêu chuẩn **MIT License**. Bạn có toàn quyền sử dụng, sao chép, thay đổi, và phân phối dự án với mục đích cá nhân hoặc thương mại.
+
+---
+*Phát triển với ❤️ bởi đội ngũ Sora POS*

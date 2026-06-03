@@ -7,6 +7,10 @@
     "backend"
   ],
   "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
     "build": "npm run build --workspace=frontend && node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true }); fs.renameSync('frontend/dist', 'dist');\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

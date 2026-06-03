@@ -138,7 +138,7 @@ export interface StaffUser {
   full_name: string;
   phone?: string | null;
   avatar_url?: string | null;
-  role: 'cashier';
+  role: 'cashier' | 'manager' | 'admin';
   is_active: boolean;
   last_login?: string | null;
   created_at: string;
