@@ -11,6 +11,7 @@ import {
   HiOutlineChartBar,
   HiOutlineTruck,
   HiOutlineUserGroup,
+  HiOutlineIdentification,
   HiOutlineExclamationCircle,
   HiOutlineLightBulb,
   HiOutlineCog,
@@ -28,7 +29,7 @@ const menuItems = [
     label: 'Dashboard',
     icon: HiOutlineViewGrid,
     path: '/',
-    roles: ['admin', 'manager', 'cashier'],
+    roles: ['admin', 'manager'],
   },
   {
     label: 'Bán hàng (POS)',
@@ -79,6 +80,12 @@ const menuItems = [
     roles: ['admin', 'manager'],
   },
   {
+    label: 'Nhân viên',
+    icon: HiOutlineIdentification,
+    path: '/staff',
+    roles: ['admin', 'manager'],
+  },
+  {
     label: 'Báo cáo',
     icon: HiOutlineChartBar,
     path: '/reports',
@@ -94,7 +101,7 @@ const menuItems = [
     label: 'Cài đặt',
     icon: HiOutlineCog,
     path: '/settings',
-    roles: ['admin'],
+    roles: ['admin', 'manager'],
   },
 ];
 
@@ -122,16 +129,6 @@ const Sidebar = () => {
   const filteredMenu = menuItems.filter(
     (item) => user && item.roles.includes(user.role)
   );
-
-  // Role label
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'admin': return 'Quản trị viên';
-      case 'manager': return 'Quản lý';
-      case 'cashier': return 'Thu ngân';
-      default: return role;
-    }
-  };
 
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc muốn đăng xuất?')) {

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { useEffect } from 'react';
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './routes/ProtectedRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import POSPage from './pages/pos/POSPage';
@@ -15,7 +16,19 @@ import SuppliersPage from './pages/suppliers/SuppliersPage';
 import ReportsPage from './pages/reports/ReportsPage';
 import AIRecommendationsPage from './pages/ai/AIRecommendationsPage';
 import SettingsPage from './pages/settings/SettingsPage';
+import StaffPage from './pages/staff/StaffPage';
+import NotFoundPage from './pages/NotFoundPage';
 import { useAuthStore } from './stores/auth.store';
+
+const HomePage = () => {
+  const { user } = useAuthStore();
+
+  if (user?.role === 'cashier') {
+    return <Navigate to="/pos" replace />;
+  }
+
+  return <DashboardPage />;
+};
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -25,46 +38,98 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <BrowserRouter>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#0f172a',
-            color: '#f8fafc',
-            borderRadius: '0px',
-            border: '1px solid #1e293b',
-            fontSize: '14px',
-          },
-        }}
-      />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#0f172a',
+              color: '#f8fafc',
+              borderRadius: '0px',
+              border: '1px solid #1e293b',
+              fontSize: '14px',
+            },
+          }}
+        />
 
-      <Routes>
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/pos" element={<POSPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/stock" element={<StockPage />} />
-          <Route path="/stock/alerts" element={<StockPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/suppliers" element={<SuppliersPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/ai" element={<AIRecommendationsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+        <Routes>
+          <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<HomePage />} />
+            <Route path="/pos" element={<POSPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route
+              path="/categories"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <CategoriesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route
+              path="/stock"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <StockPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/stock/alerts" element={<StockPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route
+              path="/suppliers"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <SuppliersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <ReportsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ai"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <AIRecommendationsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <StaffPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
