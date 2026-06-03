@@ -1,0 +1,204 @@
+@startuml Sora_POS_Class_Diagram
+
+skinparam style strictuml
+skinparam defaultFontName "Segoe UI"
+skinparam monochrome true
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+title Class Diagram - Hệ thống Sora POS
+
+' ============================================
+' HÀNG 1: Các bảng tham chiếu
+' ============================================
+class Role {
+  - id : UUID <<PK>>
+  - name : VARCHAR(50)
+  - description : TEXT
+  - created_at : TIMESTAMP
+  - updated_at : TIMESTAMP
+}
+
+class Category {
+  - id : UUID <<PK>>
+  - name : VARCHAR(255)
+  - description : TEXT
+  - image_url : TEXT
+  - is_active : BOOLEAN
+  - created_at : TIMESTAMP
+  - updated_at : TIMESTAMP
+}
+
+class Supplier {
+  - id : UUID <<PK>>
+  - name : VARCHAR(255)
+  - contact_person : VARCHAR(255)
+  - email : VARCHAR(255)
+  - phone : VARCHAR(20)
+  - address : TEXT
+  - tax_code : VARCHAR(50)
+  - is_active : BOOLEAN
+  - created_at : TIMESTAMP
+  - updated_at : TIMESTAMP
+}
+
+' ============================================
+' HÀNG 2: Các thực thể chính
+' ============================================
+class User {
+  - id : UUID <<PK>>
+  - email : VARCHAR(255)
+  - password_hash : VARCHAR(255)
+  - full_name : VARCHAR(255)
+  - phone : VARCHAR(20)
+  - avatar_url : TEXT
+  - role_id : UUID <<FK>>
+  - is_active : BOOLEAN
+  - last_login : TIMESTAMP
+  + login() : JWT Token
+  + logout() : void
+  + getProfile() : User
+}
+
+class Product {
+  - id : UUID <<PK>>
+  - sku : VARCHAR(100)
+  - barcode : VARCHAR(100)
+  - name : VARCHAR(255)
+  - category_id : UUID <<FK>>
+  - supplier_id : UUID <<FK>>
+  - cost_price : DECIMAL(15,2)
+  - sell_price : DECIMAL(15,2)
+  - stock_quantity : INTEGER
+  - min_stock_level : INTEGER
+  - unit : VARCHAR(50)
+  - image_url : TEXT
+  - is_active : BOOLEAN
+  + deductStock(qty) : void
+  + checkLowStock() : BOOLEAN
+}
+
+class Customer {
+  - id : UUID <<PK>>
+  - name : VARCHAR(255)
+  - email : VARCHAR(255)
+  - phone : VARCHAR(20)
+  - address : TEXT
+  - points : INTEGER
+  - total_spent : DECIMAL(15,2)
+  - is_active : BOOLEAN
+}
+
+' ============================================
+' HÀNG 3: Đơn hàng & Kho
+' ============================================
+class Order {
+  - id : UUID <<PK>>
+  - order_number : VARCHAR(50)
+  - customer_id : UUID <<FK>>
+  - user_id : UUID <<FK>>
+  - total_amount : DECIMAL(15,2)
+  - discount_amount : DECIMAL(15,2)
+  - final_amount : DECIMAL(15,2)
+  - status : VARCHAR(20)
+  - payment_status : VARCHAR(20)
+  - note : TEXT
+  + createOrder() : Order
+  + cancelOrder() : void
+  + generateInvoice() : PDF
+}
+
+class OrderDetail {
+  - id : UUID <<PK>>
+  - order_id : UUID <<FK>>
+  - product_id : UUID <<FK>>
+  - product_name : VARCHAR(255)
+  - quantity : INTEGER
+  - unit_price : DECIMAL(15,2)
+  - discount : DECIMAL(15,2)
+  - subtotal : DECIMAL(15,2)
+}
+
+class Payment {
+  - id : UUID <<PK>>
+  - order_id : UUID <<FK>>
+  - method : VARCHAR(50)
+  - amount : DECIMAL(15,2)
+  - received_amount : DECIMAL(15,2)
+  - change_amount : DECIMAL(15,2)
+  - reference_code : VARCHAR(100)
+  - status : VARCHAR(20)
+}
+
+class StockTransaction {
+  - id : UUID <<PK>>
+  - product_id : UUID <<FK>>
+  - type : VARCHAR(20)
+  - quantity : INTEGER
+  - previous_stock : INTEGER
+  - new_stock : INTEGER
+  - reference_id : UUID
+  - note : TEXT
+  - user_id : UUID <<FK>>
+}
+
+class StockAlert {
+  - id : UUID <<PK>>
+  - product_id : UUID <<FK>>
+  - current_stock : INTEGER
+  - min_stock_level : INTEGER
+  - status : VARCHAR(20)
+  - resolved_at : TIMESTAMP
+  - resolved_by : UUID <<FK>>
+}
+
+class AIRecommendation {
+  - id : UUID <<PK>>
+  - product_id : UUID <<FK>>
+  - current_stock : INTEGER
+  - average_daily_sales : DECIMAL(10,2)
+  - recommended_quantity : INTEGER
+  - priority : VARCHAR(10)
+  - ai_insight : TEXT
+  - status : VARCHAR(20)
+  - created_by : UUID <<FK>>
+}
+
+' ============================================
+' BỐ CỤC: Sắp xếp vị trí class
+' ============================================
+Role -[hidden]right- Category
+Category -[hidden]right- Supplier
+
+User -[hidden]right- Product
+Product -[hidden]right- Customer
+
+Order -[hidden]right- StockTransaction
+StockTransaction -[hidden]right- StockAlert
+StockAlert -[hidden]right- AIRecommendation
+
+OrderDetail -[hidden]right- Payment
+
+' ============================================
+' QUAN HỆ
+' ============================================
+Role "1" -down- "0..*" User
+
+Category "1" -down- "0..*" Product
+Supplier "1" -down- "0..*" Product
+
+User "1" -down- "0..*" Order
+Customer "0..1" -down- "0..*" Order
+
+Order "1" -down- "1..*" OrderDetail
+Order "1" -down- "1" Payment
+
+Product "1" -down- "0..*" OrderDetail
+Product "1" -down- "0..*" StockTransaction
+Product "1" -down- "0..*" StockAlert
+Product "1" -down- "0..*" AIRecommendation
+
+User "1" -down- "0..*" StockTransaction
+
+@enduml

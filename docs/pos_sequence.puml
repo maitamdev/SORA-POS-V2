@@ -1,0 +1,93 @@
+@startuml Sora_POS_Sequence_Diagram
+
+skinparam style strictuml
+skinparam defaultFontName "Segoe UI"
+skinparam monochrome true
+skinparam shadowing false
+
+actor "Nhân viên\n(Cashier)" as Cashier
+participant "Browser\n(React)" as Browser
+participant ":POSPage" as View
+participant ":OrderRouter" as Router
+participant ":OrderController" as Controller
+participant ":OrderService" as Service
+database "Database\n(PostgreSQL)" as DB
+
+autonumber
+
+Cashier -> Browser : Chọn sản phẩm & số lượng
+Browser -> View : Click "Thanh toán"
+activate View
+View -> Router : POST /api/orders
+activate Router
+
+Router -> Router : Verify JWT Token
+
+Router -> Controller : forward(req, res)
+activate Controller
+
+Controller -> Controller : Validate Data (Zod)
+
+Controller -> Service : createOrder(userId, items, paymentMethod)
+activate Service
+
+Service -> DB : SELECT stock_quantity FROM products
+activate DB
+DB --> Service : Return Result
+deactivate DB
+
+alt Không đủ hàng
+  Service --> Controller : Throw Error (Out of Stock)
+  Controller --> Router : Return Error
+  Router --> View : HTTP 400 (Không đủ hàng)
+  View --> Browser : Render Error View
+  Browser --> Cashier : Hiển thị cảnh báo hết hàng
+
+else Đủ hàng tồn kho
+
+  Service -> DB : INSERT INTO orders, order_details
+  activate DB
+  DB --> Service : Return Order ID
+  deactivate DB
+
+  Service -> DB : UPDATE products (Trừ tồn kho)
+  activate DB
+  DB --> Service : Return Result
+  deactivate DB
+
+  Service -> DB : INSERT INTO stock_transactions
+  activate DB
+  DB --> Service : Return Result
+  deactivate DB
+
+  Service -> DB : INSERT INTO payments
+  activate DB
+  DB --> Service : Return Result
+  deactivate DB
+
+  opt Tồn kho <= min_stock_level
+    Service -> DB : INSERT INTO stock_alerts
+    activate DB
+    DB --> Service : Return Result
+    deactivate DB
+  end
+
+  Service --> Controller : Return Order Object
+  deactivate Service
+
+  Controller --> Router : Return Response
+  deactivate Controller
+
+  Router --> View : HTTP 201 (Order Created)
+  deactivate Router
+
+  View -> View : Generate Invoice (PDF)
+
+  View --> Browser : Render Success View
+  deactivate View
+
+  Browser --> Cashier : Hiển thị hóa đơn & in bill
+
+end
+
+@enduml

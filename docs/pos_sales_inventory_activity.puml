@@ -1,0 +1,60 @@
+@startuml Sales_Inventory_UML25_Clean
+skinparam Style strictuml
+skinparam DefaultFontName "Segoe UI"
+skinparam ActivityBackgroundColor #F9F9F9
+skinparam ActivityBorderColor #2B2B2B
+skinparam ActivityArrowColor #0066CC
+skinparam StartColor #228B22
+skinparam EndColor #DC143C
+
+title Quy trình Bán hàng & Cập nhật Tồn kho (Chuẩn UML 2.5)
+
+start
+
+repeat
+  :Nhân viên nhập tài khoản & mật khẩu;
+  :Hệ thống xác thực thông tin đăng nhập;
+  
+  if (Thông tin hợp lệ?) then (Có)
+    :Đăng nhập thành công vào hệ thống;
+  else (Không)
+    :Hiển thị lỗi: "Tài khoản hoặc mật khẩu sai";
+  endif
+repeat while (Đăng nhập thành công?) is (Không) not (Có)
+
+:Mở giao diện bán hàng POS;
+repeat
+  :Nhân viên chọn sản phẩm và nhập số lượng;
+  :Hệ thống kiểm tra tồn kho của sản phẩm;
+  
+  if (Số lượng tồn kho >= Số lượng yêu cầu?) then (Đủ hàng)
+    :Thêm sản phẩm vào giỏ hàng;
+    :Tính toán tổng tiền đơn hàng (Real-time);
+  else (Không đủ hàng)
+    :Hiển thị cảnh báo không đủ hàng tồn kho;
+  endif
+  
+repeat while (Tiếp tục thêm sản phẩm?) is (Có) not (Không)
+
+:Nhân viên tiến hành thanh toán;
+:Hệ thống xử lý giao dịch thanh toán;
+
+if (Thanh toán thành công?) then (Có)
+  :Tạo hóa đơn (Order & Order Details);
+  :Ghi nhận giao dịch thanh toán (Payment);
+  
+  :Trừ số lượng tồn kho sản phẩm (Deduct Stock);
+  :Lưu lịch sử biến động kho (Stock Transaction);
+  
+  if (Tồn kho thực tế <= Định mức tối thiểu?) then (Có)
+    :Tạo cảnh báo tồn kho thấp (Stock Alert);
+  else (Không)
+  endif
+  
+  :In hóa đơn bán hàng cho khách;
+else (Không)
+  :Thông báo lỗi thanh toán và giữ nguyên giỏ hàng;
+endif
+
+stop
+@enduml

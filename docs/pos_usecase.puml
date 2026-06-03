@@ -1,0 +1,78 @@
+@startuml Sora_POS_Use_Case
+left to right direction
+skinparam PackageStyle rectangle
+skinparam DefaultFontName "Segoe UI"
+skinparam ActorBackgroundColor #FEFEFE
+skinparam ActorBorderColor #0066CC
+skinparam UseCaseBackgroundColor #F0F8FF
+skinparam UseCaseBorderColor #0066CC
+skinparam UseCaseArrowColor #333333
+
+actor "Nhân viên bán hàng\n(Cashier)" as cashier
+actor "Quản lý\n(Manager)" as manager
+actor "Quản trị viên\n(Admin)" as admin
+
+' Kế thừa Actor giúp giảm đường nối chéo rườm rà
+cashier <|-- manager
+manager <|-- admin
+
+rectangle "Hệ thống Sora POS" {
+  
+  rectangle "Phân hệ Xác thực" {
+    usecase "Đăng nhập" as UC_Login
+    usecase "Đăng xuất" as UC_Logout
+    usecase "Quản lý thông tin cá nhân" as UC_Profile
+  }
+  
+  rectangle "Phân hệ Bán hàng (POS)" {
+    usecase "Thực hiện bán hàng (POS)" as UC_POS
+    usecase "Thanh toán đơn hàng" as UC_Checkout
+    usecase "In hóa đơn" as UC_Print
+    usecase "Quản lý khách hàng" as UC_Customer
+    
+    UC_POS .> UC_Checkout : <<include>>
+    UC_Checkout .> UC_Print : <<include>>
+  }
+  
+  rectangle "Phân hệ Sản phẩm & Kho hàng" {
+    usecase "Quản lý sản phẩm" as UC_Product
+    usecase "Quản lý danh mục" as UC_Category
+    usecase "Quản lý nhập kho & điều chỉnh" as UC_Stock
+    usecase "Xem cảnh báo tồn kho" as UC_StockAlert
+    usecase "Quản lý nhà cung cấp" as UC_Supplier
+  }
+  
+  rectangle "Phân hệ Báo cáo & AI" {
+    usecase "Xem Dashboard thống kê" as UC_Dashboard
+    usecase "Xem báo cáo doanh thu" as UC_Reports
+    usecase "Xem gợi ý nhập hàng bằng AI" as UC_AI
+  }
+  
+  rectangle "Phân hệ Quản trị" {
+    usecase "Quản lý nhân viên" as UC_Staff
+    usecase "Cấu hình hệ thống" as UC_Settings
+  }
+}
+
+' Kết nối từ Cashier
+cashier --> UC_Login
+cashier --> UC_Logout
+cashier --> UC_Profile
+cashier --> UC_POS
+cashier --> UC_Customer
+
+' Kết nối từ Manager (Đã tự động kế thừa quyền của Cashier)
+manager --> UC_Product
+manager --> UC_Category
+manager --> UC_Stock
+manager --> UC_StockAlert
+manager --> UC_Supplier
+manager --> UC_Dashboard
+manager --> UC_Reports
+
+' Kết nối từ Admin (Đã tự động kế thừa quyền của Manager)
+admin --> UC_Staff
+admin --> UC_AI
+admin --> UC_Settings
+
+@enduml
