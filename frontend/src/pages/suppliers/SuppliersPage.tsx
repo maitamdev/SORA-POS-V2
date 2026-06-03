@@ -21,7 +21,7 @@ const SuppliersPage = () => (
       { key: 'phone', label: 'SĐT' },
       { key: 'email', label: 'Email' },
     ]}
-    loadItems={async (search) => (await catalogAPI.suppliers.list({ search })).data.data.items}
+    loadItems={async (search) => (await catalogAPI.suppliers.list({ search, is_active: true })).data.data.items}
     createItem={async (data) => { await catalogAPI.suppliers.create(data); }}
     updateItem={async (id, data) => { await catalogAPI.suppliers.update(id, data); }}
     deleteItem={async (id) => { await catalogAPI.suppliers.remove(id); }}

@@ -3,8 +3,6 @@ import toast from 'react-hot-toast';
 import {
   HiOutlineCube,
   HiOutlineSearch,
-  HiOutlineLocationMarker,
-  HiOutlineBell,
   HiOutlinePlus,
   HiOutlineUpload,
   HiOutlineDownload,
@@ -18,39 +16,18 @@ import {
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { aiAPI } from '../../services/ai.api';
+import { defaultOperationSettings, OperationSettings, settingsAPI } from '../../services/settings.api';
+import { useAuthStore } from '../../stores/auth.store';
 import { Category, Product, Supplier } from '../../types/domain.type';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 const getProductImage = (product: Product) => {
-  if (product.image_url) return product.image_url;
-  
-  const nameLower = product.name.toLowerCase();
-  if (nameLower.includes('coca') || nameLower.includes('pepsi') || nameLower.includes('nước ngọt')) {
-    return 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('nước suối') || nameLower.includes('aquafina')) {
-    return 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('lay') || nameLower.includes('khoai tây') || nameLower.includes('bánh')) {
-    return 'https://images.unsplash.com/photo-1599490659213-e2b9527b0876?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('sữa') || nameLower.includes('vinamilk')) {
-    return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('mì hảo hảo') || nameLower.includes('mì')) {
-    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('oreo')) {
-    return 'https://images.unsplash.com/photo-1558961359-fa397c41f0a5?auto=format&fit=crop&q=80&w=200';
-  }
-  if (nameLower.includes('cafe') || nameLower.includes('nescafé')) {
-    return 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&q=80&w=200';
-  }
-  return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=200';
+  return product.image_url || '/assets/product-placeholder.svg';
 };
 
 const ProductsPage = () => {
+  const { user } = useAuthStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -81,7 +58,7 @@ const ProductsPage = () => {
   const [sellPrice, setSellPrice] = useState(0);
   const [stockQuantity, setStockQuantity] = useState(0);
   const [minStockLevel, setMinStockLevel] = useState(10);
-  const [unit, setUnit] = useState('cái');
+  const [unit, setUnit] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [description, setDescription] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -96,6 +73,7 @@ const ProductsPage = () => {
   // Delete All State
   const [deletingAll, setDeletingAll] = useState(false);
   const [confirmDeleteText, setConfirmDeleteText] = useState('');
+  const [operationSettings, setOperationSettings] = useState<OperationSettings>(defaultOperationSettings);
 
   // Table Settings
   const [showTableSettings, setShowTableSettings] = useState(false);
@@ -130,7 +108,8 @@ const ProductsPage = () => {
 
   const densityPadding = tableDensity === 'compact' ? 'py-1.5' : tableDensity === 'comfortable' ? 'py-4' : 'py-3';
   const densityPaddingTh = tableDensity === 'compact' ? 'py-2' : tableDensity === 'comfortable' ? 'py-4' : 'py-3.5';
-  const visibleColCount = Object.values(visibleColumns).filter(Boolean).length + 2; // +2 for checkbox & actions
+  const canManageProducts = user?.role === 'admin' || user?.role === 'manager';
+  const visibleColCount = Object.values(visibleColumns).filter(Boolean).length + (canManageProducts ? 2 : 0); // +2 for checkbox & actions
 
   const loadData = async () => {
     const params: Record<string, unknown> = {
@@ -161,12 +140,18 @@ const ProductsPage = () => {
     loadData();
   }, [page, limit, selectedCategoryId, search, filterActiveStatus]);
 
-  // Statistics derived from database list
+  useEffect(() => {
+    settingsAPI
+      .getOperation()
+      .then((response) => {
+        const nextSettings = { ...defaultOperationSettings, ...response.data.data.settings };
+        setOperationSettings(nextSettings);
+        setMinStockLevel(nextSettings.defaultMinStockLevel);
+      })
+      .catch(() => setOperationSettings(defaultOperationSettings));
+  }, []);
+
   const stats = useMemo(() => {
-    const totalCount = totalItems || products.length;
-    
-    // We can estimate based on currently loaded products or full count
-    // For exact dashboard stats, we iterate loaded items
     let active = 0;
     let lowStock = 0;
     let outStock = 0;
@@ -177,16 +162,13 @@ const ProductsPage = () => {
       else if (p.stock_quantity <= p.min_stock_level) lowStock++;
     });
 
-    // Scale up stats roughly based on total count if totalItems is larger
-    const multiplier = totalItems > products.length ? (totalItems / products.length) : 1;
-
     return {
-      total: totalCount,
-      active: Math.round(active * multiplier) || Math.round(totalCount * 0.9),
-      lowStock: Math.round(lowStock * multiplier) || Math.round(totalCount * 0.05),
-      outStock: Math.round(outStock * multiplier) || Math.round(totalCount * 0.03),
+      total: products.length,
+      active,
+      lowStock,
+      outStock,
     };
-  }, [products, totalItems]);
+  }, [products]);
 
   // SVG Donut chart calculations
   const donutChart = useMemo(() => {
@@ -260,22 +242,13 @@ const ProductsPage = () => {
     });
   }, [products, totalItems]);
 
-  // Top selling products list
-  const topSellers = useMemo(() => {
-    return products.slice(0, 3).map((p, index) => {
-      const salesMap = [245, 198, 156];
-      const percentMap = [18, 12, 9];
-      return {
-        product: p,
-        sales: salesMap[index] || 82,
-        percent: percentMap[index] || 5
-      };
-    });
-  }, [products]);
-
   // Modal form submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền thêm hoặc sửa sản phẩm');
+      return;
+    }
     if (!sku.trim() || !name.trim() || sellPrice <= 0) {
       toast.error('Vui lòng điền đầy đủ Mã SKU, Tên sản phẩm và Giá bán');
       return;
@@ -321,7 +294,7 @@ const ProductsPage = () => {
       sell_price: Number(sellPrice),
       stock_quantity: Number(stockQuantity),
       min_stock_level: Number(minStockLevel),
-      unit: unit.trim() || 'cái',
+      unit: unit.trim() || undefined,
       image_url: imageUrl.trim() || null,
       description: description.trim() || null,
       is_active: isActive,
@@ -343,6 +316,10 @@ const ProductsPage = () => {
   };
 
   const handleEditClick = (product: Product) => {
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền sửa sản phẩm');
+      return;
+    }
     setIsEditMode(true);
     setCurrentId(product.id);
     setSku(product.sku);
@@ -354,7 +331,7 @@ const ProductsPage = () => {
     setSellPrice(Number(product.sell_price));
     setStockQuantity(Number(product.stock_quantity));
     setMinStockLevel(Number(product.min_stock_level));
-    setUnit(product.unit || 'cái');
+    setUnit(product.unit || '');
     setImageUrl(product.image_url || '');
     setDescription(product.description || '');
     setIsActive(product.is_active);
@@ -425,6 +402,10 @@ const ProductsPage = () => {
   }, [costPrice, categoryName]);
 
   const handleCreateClick = () => {
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền thêm sản phẩm');
+      return;
+    }
     setIsEditMode(false);
     setCurrentId('');
     setSku('');
@@ -435,8 +416,8 @@ const ProductsPage = () => {
     setCostPrice(0);
     setSellPrice(0);
     setStockQuantity(0);
-    setMinStockLevel(10);
-    setUnit('cái');
+    setMinStockLevel(operationSettings.defaultMinStockLevel);
+    setUnit('');
     setImageUrl('');
     setDescription('');
     setIsActive(true);
@@ -444,6 +425,10 @@ const ProductsPage = () => {
   };
 
   const handleDeleteClick = async (product: Product) => {
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền xóa sản phẩm');
+      return;
+    }
     if (window.confirm(`Bạn có chắc chắn muốn xóa sản phẩm "${product.name}"?`)) {
       try {
         await catalogAPI.products.remove(product.id);
@@ -456,6 +441,10 @@ const ProductsPage = () => {
   };
 
   const handleDeleteAll = async () => {
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền xóa sản phẩm');
+      return;
+    }
     if (confirmDeleteText !== 'XOA TAT CA') {
       toast.error('Vui lòng nhập đúng "XOA TAT CA" để xác nhận!');
       return;
@@ -509,6 +498,10 @@ const ProductsPage = () => {
 
   // CSV Import (Excel)
   const handleImportExcelClick = () => {
+    if (!canManageProducts) {
+      toast.error('Tài khoản nhân viên không có quyền nhập sản phẩm');
+      return;
+    }
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = '.csv, .txt';
@@ -699,7 +692,7 @@ const ProductsPage = () => {
             const sell_price = cleanNumber(getVal('sell_price'));
             const stock_quantity = parseInt(getVal('stock_quantity'), 10) || 0;
             const min_stock_level = parseInt(getVal('min_stock_level'), 10) || 10;
-            const unitVal = getVal('unit') || 'cái';
+            const unitVal = getVal('unit');
 
             const isActiveStr = getVal('is_active').toLowerCase();
             const is_active = isActiveStr === 'ngừng bán' || isActiveStr === 'inactive' || isActiveStr === 'false' ? false : true;
@@ -714,7 +707,7 @@ const ProductsPage = () => {
               sell_price,
               stock_quantity,
               min_stock_level,
-              unit: unitVal,
+              unit: unitVal || undefined,
               is_active,
               description: getVal('description') || null,
             });
@@ -763,14 +756,6 @@ const ProductsPage = () => {
             <div>
               <h1 className="text-base sm:text-xl font-black text-slate-800 uppercase leading-none tracking-tight">Quản lý sản phẩm</h1>
               <p className="text-xs text-slate-400 font-bold tracking-wide mt-1">Quản lý thông tin, giá bán, tồn kho và trạng thái sản phẩm</p>
-            </div>
-          </div>
-
-          {/* Header select branch */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 shadow-sm">
-              <HiOutlineLocationMarker className="w-4 h-4 text-blue-500" />
-              <span>SORA Mart - Chi nhánh 1</span>
             </div>
           </div>
         </header>
@@ -895,26 +880,29 @@ const ProductsPage = () => {
               </select>
             </div>
 
-            {/* CTA Add Product Button */}
-            <button
-              onClick={handleCreateClick}
-              className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition"
-            >
-              <HiOutlinePlus className="w-4 h-4" />
-              <span>Thêm sản phẩm</span>
-            </button>
+            {canManageProducts && (
+              <button
+                onClick={handleCreateClick}
+                className="px-5 py-2.5 bg-blue-600 text-white hover:bg-blue-700 text-xs font-black uppercase rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition"
+              >
+                <HiOutlinePlus className="w-4 h-4" />
+                <span>Thêm sản phẩm</span>
+              </button>
+            )}
           </div>
 
           {/* Action Row: Excel import, export, advanced filters */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleImportExcelClick}
-                className="px-4 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition"
-              >
-                <HiOutlineUpload className="w-4 h-4 text-emerald-500" />
-                <span>Nhập Excel</span>
-              </button>
+              {canManageProducts && (
+                <button
+                  onClick={handleImportExcelClick}
+                  className="px-4 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition"
+                >
+                  <HiOutlineUpload className="w-4 h-4 text-emerald-500" />
+                  <span>Nhập Excel</span>
+                </button>
+              )}
 
               <button
                 onClick={handleExportCSV}
@@ -999,75 +987,6 @@ const ProductsPage = () => {
                       </div>
                     </div>
 
-                    {/* Density */}
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Mật độ hiển thị</p>
-                      <div className="flex rounded-xl bg-slate-100 p-0.5">
-                        {[
-                          { key: 'compact' as const, label: 'Thu gọn' },
-                          { key: 'normal' as const, label: 'Bình thường' },
-                          { key: 'comfortable' as const, label: 'Thoải mái' },
-                        ].map(d => (
-                          <button
-                            key={d.key}
-                            onClick={() => setTableDensity(d.key)}
-                            className={`flex-1 py-1.5 text-[10px] font-black rounded-lg transition ${
-                              tableDensity === d.key
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                          >
-                            {d.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Rows per page */}
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">Số dòng / trang</p>
-                      <div className="flex rounded-xl bg-slate-100 p-0.5">
-                        {[10, 20, 50, 100].map(n => (
-                          <button
-                            key={n}
-                            onClick={() => { setLimit(n); setPage(1); }}
-                            className={`flex-1 py-1.5 text-xs font-black rounded-lg transition ${
-                              limit === n
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                          >
-                            {n}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Danger Zone - Delete All */}
-                    <div className="border-t border-red-100 pt-3">
-                      <p className="text-[10px] font-black text-red-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                        <HiOutlineTrash className="w-3.5 h-3.5" />
-                        Vùng nguy hiểm
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-semibold mb-2">
-                        Nhập <span className="font-black text-red-600">XOA TAT CA</span> và bấm nút để xóa toàn bộ sản phẩm. Hành động này không thể hoàn tác.
-                      </p>
-                      <div className="flex gap-1.5">
-                        <input
-                          value={confirmDeleteText}
-                          onChange={(e) => setConfirmDeleteText(e.target.value)}
-                          placeholder='Nhập "XOA TAT CA"'
-                          className="flex-1 px-2.5 py-1.5 border border-red-200 rounded-lg text-xs font-bold outline-none focus:border-red-400 bg-red-50/50 text-red-700 placeholder:text-red-300"
-                        />
-                        <button
-                          onClick={handleDeleteAll}
-                          disabled={deletingAll || confirmDeleteText !== 'XOA TAT CA'}
-                          className="px-3 py-1.5 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition whitespace-nowrap"
-                        >
-                          {deletingAll ? 'Đang xóa...' : 'Xóa tất cả'}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -1129,9 +1048,11 @@ const ProductsPage = () => {
             <table className="w-full min-w-[900px] text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                  <th className={`${densityPaddingTh} px-4 w-10`}>
-                    <input type="checkbox" className="rounded" />
-                  </th>
+                  {canManageProducts && (
+                    <th className={`${densityPaddingTh} px-4 w-10`}>
+                      <input type="checkbox" className="rounded" />
+                    </th>
+                  )}
                   {visibleColumns.image && <th className={`${densityPaddingTh} px-3 w-14 text-center`}>Ảnh</th>}
                   {visibleColumns.sku && <th className={`${densityPaddingTh} px-3 w-28`}>Mã sản phẩm</th>}
                   {visibleColumns.name && <th className={`${densityPaddingTh} px-3 min-w-[200px]`}>Tên sản phẩm</th>}
@@ -1141,7 +1062,7 @@ const ProductsPage = () => {
                   {visibleColumns.stock && <th className={`${densityPaddingTh} px-3 text-center`}>Tồn kho</th>}
                   {visibleColumns.min_stock && <th className={`${densityPaddingTh} px-3 text-center`}>Cảnh báo</th>}
                   {visibleColumns.status && <th className={`${densityPaddingTh} px-3 text-center`}>Trạng thái</th>}
-                  <th className={`${densityPaddingTh} px-4 text-center w-28`}>Thao tác</th>
+                  {canManageProducts && <th className={`${densityPaddingTh} px-4 text-center w-28`}>Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
@@ -1158,9 +1079,11 @@ const ProductsPage = () => {
                     
                     return (
                       <tr key={p.id} className="hover:bg-slate-50/40 transition">
-                        <td className={`${densityPadding} px-4`}>
-                          <input type="checkbox" className="rounded" />
-                        </td>
+                        {canManageProducts && (
+                          <td className={`${densityPadding} px-4`}>
+                            <input type="checkbox" className="rounded" />
+                          </td>
+                        )}
                         
                         {/* Image column */}
                         {visibleColumns.image && (
@@ -1189,7 +1112,7 @@ const ProductsPage = () => {
                             <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
                             {tableDensity !== 'compact' && (
                               <span className="text-[10px] text-slate-400 font-bold mt-0.5 block uppercase">
-                                Đơn vị: {p.unit || 'cái'}
+                                Đơn vị: {p.unit || 'Chưa nhập'}
                               </span>
                             )}
                           </td>
@@ -1247,25 +1170,26 @@ const ProductsPage = () => {
                           </td>
                         )}
 
-                        {/* Actions */}
-                        <td className={`${densityPadding} px-4 text-center`}>
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => handleEditClick(p)}
-                              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                              title="Sửa thông tin"
-                            >
-                              <HiOutlinePencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClick(p)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
-                              title="Xóa sản phẩm"
-                            >
-                              <HiOutlineTrash className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+                        {canManageProducts && (
+                          <td className={`${densityPadding} px-4 text-center`}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleEditClick(p)}
+                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition"
+                                title="Sửa thông tin"
+                              >
+                                <HiOutlinePencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteClick(p)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition"
+                                title="Xóa sản phẩm"
+                              >
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -1407,7 +1331,7 @@ const ProductsPage = () => {
             </svg>
             <div className="absolute flex flex-col items-center leading-none text-center">
               <span className="text-lg font-black text-slate-800">{stats.total}</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Tổng SP</span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Đang xem</span>
             </div>
           </div>
 
@@ -1438,47 +1362,10 @@ const ProductsPage = () => {
           </div>
         </div>
 
-        {/* Panel 3: Top sản phẩm bán chạy */}
-        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
-              <HiOutlineExclamationCircle className="w-4.5 h-4.5 text-blue-500" />
-              <span>Top sản phẩm bán chạy</span>
-            </h3>
-            <select className="text-[9px] border border-slate-200 rounded px-1 py-0.5 bg-white font-bold">
-              <option>7 ngày qua</option>
-              <option>30 ngày qua</option>
-            </select>
-          </div>
-
-          <div className="space-y-3">
-            {topSellers.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between gap-2.5 py-1">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-xs font-black text-slate-400 w-3.5 text-center">{idx + 1}</span>
-                  <img
-                    src={getProductImage(item.product)}
-                    alt={item.product.name}
-                    className="w-8 h-8 object-contain bg-slate-50 border border-slate-100 rounded p-0.5 flex-shrink-0"
-                  />
-                  <div className="min-w-0 leading-tight">
-                    <p className="text-xs font-black text-slate-800 truncate" title={item.product.name}>{item.product.name}</p>
-                    <span className="text-[9px] font-bold text-slate-400">Đã bán: {item.sales}</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-emerald-600 flex-shrink-0">↑ {item.percent}%</span>
-              </div>
-            ))}
-            
-            <button className="w-full mt-2 py-2 border border-blue-50 hover:bg-blue-50/50 text-blue-600 text-xs font-black uppercase tracking-wider rounded-xl transition">
-              Xem báo cáo chi tiết
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* 4. ADD / EDIT PRODUCT MODAL FORM */}
-      {showModal && (
+      {showModal && canManageProducts && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
             <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
@@ -1614,7 +1501,7 @@ const ProductsPage = () => {
                     type="number"
                     value={minStockLevel}
                     onChange={(e) => setMinStockLevel(Number(e.target.value))}
-                    placeholder="10"
+                    placeholder={String(operationSettings.defaultMinStockLevel)}
                     className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>

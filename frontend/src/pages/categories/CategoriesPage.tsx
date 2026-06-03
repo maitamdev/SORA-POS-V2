@@ -17,7 +17,7 @@ const CategoriesPage = () => (
       { key: 'description', label: 'Mô tả' },
       { key: 'is_active', label: 'Trạng thái', render: (item) => (item.is_active ? 'Đang dùng' : 'Đã khóa') },
     ]}
-    loadItems={async (search) => (await catalogAPI.categories.list({ search })).data.data.items}
+    loadItems={async (search) => (await catalogAPI.categories.list({ search, is_active: true })).data.data.items}
     createItem={async (data) => { await catalogAPI.categories.create(data); }}
     updateItem={async (id, data) => { await catalogAPI.categories.update(id, data); }}
     deleteItem={async (id) => { await catalogAPI.categories.remove(id); }}

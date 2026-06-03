@@ -102,11 +102,12 @@ const LoginPage = () => {
         className="hidden lg:flex lg:w-[55%] relative overflow-hidden"
         style={{ backgroundColor: '#050d22', borderRight: `1px solid ${C.cardBorder}` }}
       >
-        {/* Photo */}
+        {/* Brand visual */}
         <div
-          className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-[30s] hover:scale-110"
+          className="absolute inset-0 bg-center bg-no-repeat opacity-20"
           style={{
-            backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuClwZAK9UfYLwEhsnpA1wI4CJ0J-aRqx3e2hnlkck172_QYAc0wKCl9Chli0C4II5Y_LzoNWdljEBhzk1CtMTQ9q6sXsKFavPOJZHAGfmxmDHK852KEbw5a-ORdtRnD562TlbD58N6A_7AqRe59cy0joQpZeKH5mXDhVmkGiW4eVzk6epLyAlE-Gy1voPmUny6H0U6oJlFFyl36-zvXeycld6mqkMW55CC2q1veXCtqHzlg77q30AvsQjhdz4K04esn79YHj9QW0Sk')`,
+            backgroundImage: `url('/assets/logo.png')`,
+            backgroundSize: 'min(360px, 46%)',
           }}
         />
         {/* Gradient */}
@@ -158,10 +159,10 @@ const LoginPage = () => {
               className="text-[38px] leading-[46px] font-extrabold tracking-tight"
               style={{ color: C.textPrimary }}
             >
-              Smart Stock.
+              Sora POS
               <br />
-              <span style={{ color: C.orange }}>Zero</span>{' '}
-              <span style={{ color: C.blueSky }}>Stockout.</span>
+              <span style={{ color: C.orange }}>Quản lý</span>{' '}
+              <span style={{ color: C.blueSky }}>bán hàng.</span>
             </h2>
 
             <p className="text-[15px] leading-7 max-w-md" style={{ color: C.textSecondary }}>
@@ -169,24 +170,24 @@ const LoginPage = () => {
               — tất cả trong một hệ thống.
             </p>
 
-            {/* Stats */}
-            <div className="flex gap-8 pt-4">
+            {/* Modules */}
+            <div className="flex flex-wrap gap-3 pt-4">
               {[
-                { value: '99.9%', label: 'Uptime', color: C.blueSky },
-                { value: '<0.3s', label: 'Response', color: C.blueBright },
-                { value: '256-bit', label: 'Mã hoá', color: C.orange },
-              ].map((stat) => (
-                <div key={stat.label} className="flex flex-col">
-                  <span className="text-xl font-black" style={{ color: stat.color }}>
-                    {stat.value}
-                  </span>
-                  <span
-                    className="text-[11px] font-medium uppercase tracking-wider mt-0.5"
-                    style={{ color: C.textMuted }}
-                  >
-                    {stat.label}
-                  </span>
-                </div>
+                { label: 'Bán hàng tại quầy', color: C.blueSky },
+                { label: 'Quản lý tồn kho', color: C.blueBright },
+                { label: 'Báo cáo vận hành', color: C.orange },
+              ].map((item) => (
+                <span
+                  key={item.label}
+                  className="rounded border px-3 py-2 text-[11px] font-bold uppercase tracking-wider"
+                  style={{
+                    color: item.color,
+                    borderColor: 'rgba(107,188,232,0.18)',
+                    backgroundColor: 'rgba(107,188,232,0.06)',
+                  }}
+                >
+                  {item.label}
+                </span>
               ))}
             </div>
           </div>
@@ -270,14 +271,15 @@ const LoginPage = () => {
                 className="text-[11px] font-bold uppercase tracking-[0.12em]"
                 style={{ color: C.textSecondary }}
               >
-                Email đăng nhập
+                Mã đăng nhập / Email
               </label>
               <input
                 {...register('email')}
                 id="login-email"
-                type="email"
-                placeholder="name@company.com"
-                autoComplete="email"
+                type="text"
+                inputMode="text"
+                placeholder="Nhập mã đăng nhập hoặc email"
+                autoComplete="username"
                 onFocus={() => setFocusField('email')}
                 onBlur={() => setFocusField(null)}
                 className="w-full outline-none"
@@ -470,7 +472,7 @@ const LoginPage = () => {
         {/* Footer */}
         <div className="absolute bottom-5 w-full text-center">
           <p className="text-[11px] font-medium" style={{ color: C.textMuted }}>
-            © 2024 Sora POS • Smart Stock. Zero Stockout.
+            © 2026 Sora POS
           </p>
         </div>
       </div>

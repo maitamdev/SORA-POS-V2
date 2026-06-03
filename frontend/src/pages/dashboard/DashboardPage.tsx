@@ -5,15 +5,14 @@ import {
   HiOutlineCube, 
   HiOutlineExclamationCircle, 
   HiOutlineShoppingCart,
-  HiOutlineSearch,
   HiOutlineCalendar,
-  HiOutlineBell,
   HiOutlineArrowNarrowUp,
   HiOutlineTrendingUp,
   HiOutlineArrowNarrowDown
 } from 'react-icons/hi';
 import { useAuthStore } from '../../stores/auth.store';
 import { DashboardData, reportAPI } from '../../services/report.api';
+import { getRoleLabel, getUserInitials } from '../../utils/userDisplay';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
@@ -148,21 +147,6 @@ const DashboardPage = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Search bar */}
-          <div className="relative w-full sm:w-48 md:w-56">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-              <HiOutlineSearch className="w-4 h-4" />
-            </span>
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm..." 
-              className="w-full pl-9 pr-12 py-1.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700"
-            />
-            <span className="absolute inset-y-0 right-0 flex items-center pr-2">
-              <kbd className="px-1.5 py-0.5 text-[9px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 rounded-md">Ctrl K</kbd>
-            </span>
-          </div>
-
           {/* Clickable Date Selector (Triggers Ref showPicker) */}
           <div 
             onClick={handleDateDivClick}
@@ -185,20 +169,14 @@ const DashboardPage = () => {
             <span className="font-mono tracking-wider">{formattedTime}</span>
           </div>
 
-          {/* Notification Icon */}
-          <button className="relative p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors">
-            <HiOutlineBell className="w-4.5 h-4.5" />
-            <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">5</span>
-          </button>
-
           {/* Profile Circle */}
           <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
             <div className="w-8 h-8 rounded-full bg-[#1b4d8e] text-white font-black text-xs flex items-center justify-center border border-blue-200 shadow-sm">
-              {user?.full_name ? user.full_name.split(' ').pop()?.slice(0,2).toUpperCase() : 'AD'}
+              {getUserInitials(user)}
             </div>
             <div className="leading-none text-left">
-              <p className="text-xs font-black text-slate-800">{user?.full_name || 'Admin'}</p>
-              <p className="text-[9px] font-bold text-slate-400 mt-0.5">Quản trị viên</p>
+              <p className="text-xs font-black text-slate-800">{user?.full_name || 'Người dùng'}</p>
+              <p className="text-[9px] font-bold text-slate-400 mt-0.5">{getRoleLabel(user?.role)}</p>
             </div>
           </div>
         </div>

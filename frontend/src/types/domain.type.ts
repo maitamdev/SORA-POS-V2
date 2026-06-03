@@ -131,3 +131,16 @@ export interface AIRecommendation {
   created_at: string;
   products?: Product;
 }
+
+export interface StaffUser {
+  id: string;
+  email: string;
+  full_name: string;
+  phone?: string | null;
+  avatar_url?: string | null;
+  role: 'cashier';
+  is_active: boolean;
+  last_login?: string | null;
+  created_at: string;
+  updated_at: string;
+}
