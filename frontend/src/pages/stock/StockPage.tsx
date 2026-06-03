@@ -49,12 +49,14 @@ const StockPage = () => {
       toast.error('Bạn không có quyền cập nhật kho');
       return;
     }
+    if (loading) return;
 
     const form = new FormData(event.currentTarget);
     const productId = String(form.get('product_id') || '');
     const quantity = Number(form.get('quantity') || 0);
     const note = String(form.get('note') || '');
 
+    setLoading(true);
     try {
       if (mode === 'import') await stockAPI.importStock({ product_id: productId, quantity, note });
       else await stockAPI.adjustStock({ product_id: productId, new_stock: quantity, note });
@@ -64,6 +66,8 @@ const StockPage = () => {
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Cập nhật kho thất bại');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -130,7 +134,9 @@ const StockPage = () => {
               <span className="mb-1 block text-xs font-bold uppercase text-slate-400">Ghi chú</span>
               <textarea name="note" rows={3} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold outline-none" />
             </label>
-            <button className="mt-5 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-black text-white">Lưu kho</button>
+            <button disabled={loading} className="mt-5 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-black text-white disabled:opacity-50 transition-opacity">
+              {loading ? 'Đang xử lý...' : 'Lưu kho'}
+            </button>
           </form>
         )}
 
