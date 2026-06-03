@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { CatalogService } from './catalog.service';
 import { parsePagination } from '../utils/query';
+import { AppError } from '../utils/AppError';
 
 export class StockService {
   static async inventory(queryParams: Record<string, unknown>) {
@@ -19,7 +20,7 @@ export class StockService {
     if (queryParams.category_id) query = query.eq('category_id', queryParams.category_id);
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -35,7 +36,7 @@ export class StockService {
     else query = query.in('status', ['low_stock', 'out_of_stock']);
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -51,7 +52,7 @@ export class StockService {
     if (queryParams.type) query = query.eq('type', queryParams.type);
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -61,7 +62,7 @@ export class StockService {
       .select('stock_quantity')
       .eq('id', productId)
       .single();
-    if (error || !product) throw { status: 404, message: 'Không tìm thấy sản phẩm' };
+    if (error || !product) throw new AppError(404, 'Không tìm thấy sản phẩm');
 
     const previousStock = Number(product.stock_quantity);
     const newStock = previousStock + quantity;
@@ -69,7 +70,7 @@ export class StockService {
       .from('products')
       .update({ stock_quantity: newStock })
       .eq('id', productId);
-    if (updateError) throw { status: 400, message: updateError.message };
+    if (updateError) throw new AppError(400, updateError.message);
 
     const { data: transaction, error: transactionError } = await supabase
       .from('stock_transactions')
@@ -84,7 +85,7 @@ export class StockService {
       })
       .select('*')
       .single();
-    if (transactionError) throw { status: 400, message: transactionError.message };
+    if (transactionError) throw new AppError(400, transactionError.message);
 
     await CatalogService.syncStockAlert(productId);
     return transaction;
@@ -96,7 +97,7 @@ export class StockService {
       .select('stock_quantity')
       .eq('id', productId)
       .single();
-    if (error || !product) throw { status: 404, message: 'Không tìm thấy sản phẩm' };
+    if (error || !product) throw new AppError(404, 'Không tìm thấy sản phẩm');
 
     const previousStock = Number(product.stock_quantity);
     const delta = newStock - previousStock;
@@ -104,7 +105,7 @@ export class StockService {
       .from('products')
       .update({ stock_quantity: newStock })
       .eq('id', productId);
-    if (updateError) throw { status: 400, message: updateError.message };
+    if (updateError) throw new AppError(400, updateError.message);
 
     const { data: transaction, error: transactionError } = await supabase
       .from('stock_transactions')
@@ -119,7 +120,7 @@ export class StockService {
       })
       .select('*')
       .single();
-    if (transactionError) throw { status: 400, message: transactionError.message };
+    if (transactionError) throw new AppError(400, transactionError.message);
 
     await CatalogService.syncStockAlert(productId);
     return transaction;
@@ -136,7 +137,7 @@ export class StockService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return data;
   }
 }

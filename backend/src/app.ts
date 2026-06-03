@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
 import routes from './routes';
+import { sendApiDocsPage, sendOpenApiSpec } from './docs/apiDocs';
 
 const app = express();
 
@@ -38,6 +39,8 @@ app.get('/favicon.ico', (req, res) => {
 // ============================================
 // Routes
 // ============================================
+app.get('/api-docs', sendApiDocsPage);
+app.get('/api/openapi.json', sendOpenApiSpec);
 app.use('/api', routes);
 
 // ============================================

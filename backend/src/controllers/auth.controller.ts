@@ -1,21 +1,18 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
-import { successResponse, errorResponse } from '../utils/response';
+import { successResponse } from '../utils/response';
+import { asyncHandler } from '../utils/asyncHandler';
+import { AppError } from '../utils/AppError';
 
 export class AuthController {
   /**
    * POST /api/auth/login
    */
-  static async login(req: Request, res: Response): Promise<void> {
-    try {
-      const { email, password } = req.body;
-      const result = await AuthService.login(email, password);
-      successResponse(res, result, 'Đăng nhập thành công');
-    } catch (error: unknown) {
-      const err = error as { status?: number; message?: string };
-      errorResponse(res, err.message || 'Đăng nhập thất bại', err.status || 500);
-    }
-  }
+  static login = asyncHandler(async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    const result = await AuthService.login(email, password);
+    successResponse(res, result, 'Đăng nhập thành công');
+  });
 
   /**
    * POST /api/auth/logout
@@ -30,17 +27,9 @@ export class AuthController {
    * GET /api/auth/me
    * Lấy thông tin user từ token
    */
-  static async getMe(req: Request, res: Response): Promise<void> {
-    try {
-      if (!req.user) {
-        errorResponse(res, 'Chưa xác thực', 401);
-        return;
-      }
-      const user = await AuthService.getProfile(req.user.userId);
-      successResponse(res, { user }, 'Xác thực thành công');
-    } catch (error: unknown) {
-      const err = error as { status?: number; message?: string };
-      errorResponse(res, err.message || 'Lỗi lấy thông tin', err.status || 500);
-    }
-  }
+  static getMe = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    const user = await AuthService.getProfile(req.user.userId);
+    successResponse(res, { user }, 'Xác thực thành công');
+  });
 }

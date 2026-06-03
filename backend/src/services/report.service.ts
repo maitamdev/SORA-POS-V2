@@ -1,3 +1,4 @@
+import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 
 const startOfDay = (date = new Date()) => {
@@ -24,7 +25,7 @@ export class ReportService {
       .gte('created_at', yesterday.toISOString())
       .lt('created_at', tomorrow.toISOString());
 
-    if (ordersError) throw { status: 500, message: ordersError.message };
+    if (ordersError) throw new AppError(500, ordersError.message);
 
     const todayCompletedOrders = (orders || []).filter(
       (o) => o.status === 'completed' && o.created_at >= today.toISOString()
@@ -61,7 +62,7 @@ export class ReportService {
         .select('order_id, quantity')
         .in('order_id', allCompletedOrderIds);
 
-      if (detailsError) throw { status: 500, message: detailsError.message };
+      if (detailsError) throw new AppError(500, detailsError.message);
 
       if (details) {
         todaySoldProducts = details
@@ -105,7 +106,7 @@ export class ReportService {
       .gte('created_at', sevenDaysAgo.toISOString())
       .lt('created_at', tomorrow.toISOString());
 
-    if (sevenDayOrdersError) throw { status: 500, message: sevenDayOrdersError.message };
+    if (sevenDayOrdersError) throw new AppError(500, sevenDayOrdersError.message);
     const sevenDayOrderIds = (sevenDayOrders || []).map((o) => o.id);
 
     let categorySalesMap = new Map<string, number>();
@@ -115,7 +116,7 @@ export class ReportService {
         .select('product_id, subtotal')
         .in('order_id', sevenDayOrderIds);
 
-      if (detailsError) throw { status: 500, message: detailsError.message };
+      if (detailsError) throw new AppError(500, detailsError.message);
 
       if (details && details.length > 0) {
         const productIds = Array.from(new Set(details.map((d) => d.product_id)));
@@ -124,7 +125,7 @@ export class ReportService {
           .select('id, categories(name)')
           .in('id', productIds);
 
-        if (productsError) throw { status: 500, message: productsError.message };
+        if (productsError) throw new AppError(500, productsError.message);
 
         const prodToCat = new Map<string, string>();
         for (const p of products || []) {
@@ -151,7 +152,7 @@ export class ReportService {
         .select('order_id, method, amount')
         .in('order_id', sevenDayOrderIds);
 
-      if (paymentsError) throw { status: 500, message: paymentsError.message };
+      if (paymentsError) throw new AppError(500, paymentsError.message);
 
       for (const p of payments || []) {
         const method = p.method === 'transfer' || p.method === 'momo' || p.method === 'zalopay' 
@@ -178,7 +179,7 @@ export class ReportService {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    if (recentOrdersError) throw { status: 500, message: recentOrdersError.message };
+    if (recentOrdersError) throw new AppError(500, recentOrdersError.message);
 
     const recentOrderIds = (recentOrders || []).map((o) => o.id);
     let recentPaymentsMap = new Map<string, string>();
@@ -188,7 +189,7 @@ export class ReportService {
         .select('order_id, method')
         .in('order_id', recentOrderIds);
 
-      if (pmtsError) throw { status: 500, message: pmtsError.message };
+      if (pmtsError) throw new AppError(500, pmtsError.message);
 
       for (const p of pmts || []) {
         recentPaymentsMap.set(p.order_id, p.method);
@@ -220,7 +221,7 @@ export class ReportService {
       .order('current_stock', { ascending: true })
       .limit(4);
 
-    if (alertsError) throw { status: 500, message: alertsError.message };
+    if (alertsError) throw new AppError(500, alertsError.message);
 
     const low_stock_products = (alerts || []).map((a) => {
       const p = a.products as any;
@@ -243,7 +244,7 @@ export class ReportService {
         .select('id, image_url')
         .in('id', topProductIds);
 
-      if (prodsError) throw { status: 500, message: prodsError.message };
+      if (prodsError) throw new AppError(500, prodsError.message);
 
       for (const pr of prods || []) {
         topProductsImages.set(pr.id, pr.image_url || '');
@@ -290,7 +291,7 @@ export class ReportService {
       .lt('created_at', new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString())
       .order('created_at', { ascending: true });
 
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
 
     const buckets = new Map<string, { date: string; revenue: number; orders: number }>();
     for (let i = days - 1; i >= 0; i -= 1) {
@@ -321,7 +322,7 @@ export class ReportService {
       .gte('created_at', fromDate.toISOString())
       .lt('created_at', new Date(endDate.getTime() + 24 * 60 * 60 * 1000).toISOString());
 
-    if (orderError) throw { status: 500, message: orderError.message };
+    if (orderError) throw new AppError(500, orderError.message);
     const orderIds = (orders || []).map((order) => order.id);
     if (orderIds.length === 0) return [];
 
@@ -330,7 +331,7 @@ export class ReportService {
       .select('product_id, product_name, quantity, subtotal')
       .in('order_id', orderIds);
 
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
 
     const grouped = new Map<string, { product_id: string; product_name: string; quantity: number; revenue: number }>();
     for (const detail of details || []) {

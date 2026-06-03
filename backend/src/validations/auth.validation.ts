@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z.string().email('Email không hợp lệ'),
-  password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự'),
+  email: z.string().trim().min(1, 'Vui long nhap ma dang nhap hoac email'),
+  password: z.string().min(6, 'Mat khau toi thieu 6 ky tu'),
 });

@@ -1,4 +1,5 @@
 import { env } from '../config/env';
+import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
 
@@ -25,7 +26,7 @@ export class AIService {
       .eq('status', 'completed')
       .gte('created_at', lastNDays(days));
 
-    if (orderError) throw { status: 500, message: orderError.message };
+    if (orderError) throw new AppError(500, orderError.message);
     const orderIds = (orders || []).map((order) => order.id);
     if (orderIds.length === 0) return 0;
 
@@ -35,7 +36,7 @@ export class AIService {
       .eq('product_id', productId)
       .in('order_id', orderIds);
 
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     const sold = (details || []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     return Number((sold / days).toFixed(2));
   }
@@ -86,7 +87,7 @@ export class AIService {
 
     if (productId) query = query.eq('id', productId);
     const { data: products, error } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
 
     const candidates = ((products || []) as Candidate[]).filter(
       (product) => product.stock_quantity <= product.min_stock_level || Boolean(productId)
@@ -142,7 +143,7 @@ export class AIService {
         .select('*, products(id, sku, name, unit)')
         .single();
 
-      if (insertError) throw { status: 400, message: insertError.message };
+      if (insertError) throw new AppError(400, insertError.message);
       created.push(recommendation);
     }
 
@@ -166,7 +167,7 @@ export class AIService {
     if (queryParams.priority) query = query.eq('priority', queryParams.priority);
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -177,7 +178,7 @@ export class AIService {
       .eq('id', id)
       .select('*, products(id, sku, name, unit, stock_quantity)')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return data;
   }
 

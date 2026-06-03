@@ -10,6 +10,8 @@ import orderRoutes from './order.routes';
 import stockRoutes from './stock.routes';
 import reportRoutes from './report.routes';
 import aiRoutes from './ai.routes';
+import staffRoutes from './staff.routes';
+import settingsRoutes from './settings.routes';
 
 const router = Router();
 
@@ -19,6 +21,8 @@ router.get('/', (_req: Request, res: Response) => {
     message: 'Welcome to Sora POS API',
     endpoints: [
       '/api/health',
+      '/api/openapi.json',
+      '/api-docs',
       '/api/auth',
       '/api/products',
       '/api/categories',
@@ -28,6 +32,8 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/stock',
       '/api/reports',
       '/api/ai',
+      '/api/staff',
+      '/api/settings',
     ],
   });
 });
@@ -50,5 +56,7 @@ router.use('/orders', orderRoutes);
 router.use('/stock', stockRoutes);
 router.use('/reports', reportRoutes);
 router.use('/ai', aiRoutes);
+router.use('/staff', staffRoutes);
+router.use('/settings', settingsRoutes);
 
 export default router;

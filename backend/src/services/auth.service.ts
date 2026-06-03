@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { JwtPayload, UserRole } from '../types/user.type';
@@ -15,6 +16,8 @@ export class AuthService {
    * Đăng nhập - tìm user theo email, so sánh password, tạo JWT
    */
   static async login(email: string, password: string) {
+    const loginId = email.trim().toLowerCase();
+
     // 1. Tìm user theo email (JOIN với roles)
     const { data: user, error } = await supabase
       .from('users')
@@ -24,18 +27,18 @@ export class AuthService {
           name
         )
       `)
-      .eq('email', email)
+      .eq('email', loginId)
       .eq('is_active', true)
       .single();
 
     if (error || !user) {
-      throw { status: 401, message: 'Email hoặc mật khẩu không đúng' };
+      throw new AppError(401, 'Email hoặc mật khẩu không đúng');
     }
 
     // 2. So sánh password
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
-      throw { status: 401, message: 'Email hoặc mật khẩu không đúng' };
+      throw new AppError(401, 'Email hoặc mật khẩu không đúng');
     }
 
     // 3. Tạo JWT token
@@ -89,7 +92,7 @@ export class AuthService {
       .single();
 
     if (error || !user) {
-      throw { status: 404, message: 'Không tìm thấy người dùng' };
+      throw new AppError(404, 'Không tìm thấy người dùng');
     }
 
     return {

@@ -1,3 +1,4 @@
+import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { emptyToNull, parsePagination } from '../utils/query';
 
@@ -73,7 +74,7 @@ export class CatalogService {
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -83,7 +84,7 @@ export class CatalogService {
       .insert(emptyToNull(data))
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return created;
   }
 
@@ -94,13 +95,13 @@ export class CatalogService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return updated;
   }
 
   static async deleteCategory(id: string) {
     const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return null;
   }
 
@@ -116,7 +117,7 @@ export class CatalogService {
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -126,7 +127,7 @@ export class CatalogService {
       .insert(emptyToNull(data))
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return created;
   }
 
@@ -137,13 +138,13 @@ export class CatalogService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return updated;
   }
 
   static async deleteSupplier(id: string) {
     const { error } = await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return null;
   }
 
@@ -159,7 +160,7 @@ export class CatalogService {
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -169,7 +170,7 @@ export class CatalogService {
       .insert(emptyToNull(data))
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return created;
   }
 
@@ -180,13 +181,13 @@ export class CatalogService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return updated;
   }
 
   static async deleteCustomer(id: string) {
     const { error } = await supabase.from('customers').update({ is_active: false }).eq('id', id);
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return null;
   }
 
@@ -204,7 +205,7 @@ export class CatalogService {
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
 
     const { data, error, count } = await query;
-    if (error) throw { status: 500, message: error.message };
+    if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
@@ -214,7 +215,7 @@ export class CatalogService {
       .select('*, categories(id, name), suppliers(id, name)')
       .eq('id', id)
       .single();
-    if (error || !data) throw { status: 404, message: 'Không tìm thấy sản phẩm' };
+    if (error || !data) throw new AppError(404, 'Không tìm thấy sản phẩm');
     return data;
   }
 
@@ -224,7 +225,7 @@ export class CatalogService {
       .insert(emptyToNull(data))
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     await this.syncStockAlert(created.id);
     return created;
   }
@@ -290,7 +291,7 @@ export class CatalogService {
       .select('*');
 
     if (insertError) {
-      throw { status: 400, message: insertError.message };
+      throw new AppError(400, insertError.message);
     }
 
     if (inserted) {
@@ -314,14 +315,14 @@ export class CatalogService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     await this.syncStockAlert(id);
     return updated;
   }
 
   static async deleteProduct(id: string) {
     const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id);
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return null;
   }
 
@@ -336,7 +337,7 @@ export class CatalogService {
     await supabase.from('ai_recommendations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     // Finally delete all products
     const { error } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (error) throw { status: 400, message: error.message };
+    if (error) throw new AppError(400, error.message);
     return null;
   }
 }
