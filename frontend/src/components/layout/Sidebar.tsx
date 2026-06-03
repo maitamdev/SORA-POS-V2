@@ -168,7 +168,9 @@ const Sidebar = () => {
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
-                : location.pathname.startsWith(item.path);
+                : item.path === '/stock'
+                  ? location.pathname === '/stock'
+                  : location.pathname.startsWith(item.path);
 
             return (
               <li key={item.path}>

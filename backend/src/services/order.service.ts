@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { CatalogService } from './catalog.service';
 import { parsePagination, toNumber } from '../utils/query';
 import { AppError } from '../utils/AppError';
+import { SettingsService } from './settings.service';
 
 type OrderItemInput = {
   product_id: string;
@@ -97,8 +98,26 @@ export class OrderService {
   }
 
   static async create(input: CreateOrderInput, userId: string) {
-    // 1. Lấy danh sách sản phẩm và validate
-    const productIds = input.items.map((item) => item.product_id);
+    // 1. Gộp các sản phẩm trùng lặp product_id để tính toán chính xác
+    const groupedItemsMap = new Map<string, { product_id: string; quantity: number; discount: number }>();
+    for (const item of input.items) {
+      const existing = groupedItemsMap.get(item.product_id);
+      const itemDiscount = toNumber(item.discount);
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.discount += itemDiscount;
+      } else {
+        groupedItemsMap.set(item.product_id, {
+          product_id: item.product_id,
+          quantity: item.quantity,
+          discount: itemDiscount,
+        });
+      }
+    }
+    const aggregatedItems = Array.from(groupedItemsMap.values());
+
+    // 2. Lấy danh sách sản phẩm và validate
+    const productIds = aggregatedItems.map((item) => item.product_id);
     const { data: products, error: productError } = await supabase
       .from('products')
       .select('*')
@@ -106,31 +125,36 @@ export class OrderService {
       .eq('is_active', true);
 
     if (productError) throw new AppError(500, productError.message);
-    if (!products || products.length !== new Set(productIds).size) {
+    if (!products || products.length !== productIds.length) {
       throw new AppError(400, 'Một hoặc nhiều sản phẩm không tồn tại hoặc đã ngừng bán');
     }
 
     const productMap = new Map<string, Product>(
       products.map((product) => [product.id, product as Product])
     );
+
+    // Tải cài đặt vận hành để kiểm tra việc cho phép bán vượt tồn
+    const settingsData = await SettingsService.getOperationSettings();
+    const allowSellOutOfStock = settingsData.settings.allowSellOutOfStock;
+
     let totalAmount = 0;
 
-    // 2. Kiểm tra tồn kho từng sản phẩm
-    for (const item of input.items) {
+    // 3. Kiểm tra tồn kho từng sản phẩm
+    for (const item of aggregatedItems) {
       const product = productMap.get(item.product_id);
       if (!product) throw new AppError(400, 'Sản phẩm không hợp lệ');
-      if (Number(product.stock_quantity) < item.quantity) {
+      if (!allowSellOutOfStock && Number(product.stock_quantity) < item.quantity) {
         throw new AppError(400, `Sản phẩm "${product.name}" không đủ tồn kho (còn ${product.stock_quantity})`);
       }
-      totalAmount += Number(product.sell_price) * item.quantity - toNumber(item.discount);
+      totalAmount += Number(product.sell_price) * item.quantity - item.discount;
     }
 
-    // 3. Tính toán giá trị đơn hàng
+    // 4. Tính toán giá trị đơn hàng
     const discountAmount = Math.min(toNumber(input.discount_amount), totalAmount);
     const finalAmount = Math.max(totalAmount - discountAmount, 0);
     const orderNumber = await this.generateOrderNumber();
 
-    // 4. Tạo đơn hàng
+    // 5. Ghi nhận hóa đơn vào DB
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -150,18 +174,17 @@ export class OrderService {
       throw new AppError(400, orderError?.message || 'Không tạo được hóa đơn');
     }
 
-    // 5. Tạo chi tiết đơn hàng
-    const details = input.items.map((item) => {
+    // 6. Tạo chi tiết đơn hàng
+    const details = aggregatedItems.map((item) => {
       const product = productMap.get(item.product_id)!;
-      const discount = toNumber(item.discount);
       return {
         order_id: order.id,
         product_id: item.product_id,
         product_name: product.name,
         quantity: item.quantity,
         unit_price: Number(product.sell_price),
-        discount,
-        subtotal: Number(product.sell_price) * item.quantity - discount,
+        discount: item.discount,
+        subtotal: Number(product.sell_price) * item.quantity - item.discount,
       };
     });
 
@@ -172,7 +195,7 @@ export class OrderService {
       throw new AppError(400, detailError.message);
     }
 
-    // 6. Tạo thanh toán
+    // 7. Tạo thanh toán
     const payment = input.payment || {};
     const receivedAmount = toNumber(payment.received_amount, finalAmount);
     const { error: paymentError } = await supabase.from('payments').insert({
@@ -191,8 +214,8 @@ export class OrderService {
       throw new AppError(400, paymentError.message);
     }
 
-    // 7. Trừ tồn kho + ghi log giao dịch kho
-    for (const item of input.items) {
+    // 8. Trừ tồn kho + ghi log giao dịch kho sử dụng danh sách sau khi gộp
+    for (const item of aggregatedItems) {
       const product = productMap.get(item.product_id)!;
       const previousStock = Number(product.stock_quantity);
       const newStock = previousStock - item.quantity;
@@ -221,7 +244,7 @@ export class OrderService {
       await CatalogService.syncStockAlert(item.product_id);
     }
 
-    // 8. Cộng điểm khách hàng
+    // 9. Cộng điểm khách hàng
     if (input.customer_id) {
       const { data: customer } = await supabase
         .from('customers')

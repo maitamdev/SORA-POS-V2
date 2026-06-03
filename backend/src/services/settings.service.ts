@@ -42,7 +42,7 @@ const handleMissingTable = (message: string) => {
   if (message.includes('app_settings') || message.includes('Could not find the table')) {
     throw new AppError(
       500,
-      'Chưa có bảng app_settings. Vui lòng chạy SQL trong docs/app_settings.sql trên Supabase.'
+      'Chưa có bảng app_settings. Vui lòng chạy SQL trong database/app_settings.sql trên Supabase.'
     );
   }
 };
