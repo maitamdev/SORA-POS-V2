@@ -1,0 +1,21 @@
+Mã sản phẩm (SKU),Mã vạch,Tên sản phẩm,Danh mục,Giá bán,Giá nhập,Tồn kho,Cảnh báo,Đơn vị,Trạng thái
+SKU001,8931001,Coca Cola 330ml,Nước giải khát,10000,8000,100,20,Lon,Hoạt động
+SKU002,8931002,Pepsi 330ml,Nước giải khát,10000,8000,100,20,Lon,Hoạt động
+SKU003,8931003,Bò Húc Redbull 250ml,Nước giải khát,15000,12000,50,10,Lon,Hoạt động
+SKU004,8931004,Nước suối Aquafina 500ml,Nước giải khát,5000,3500,200,50,Chai,Hoạt động
+SKU005,8931005,Nước suối Dasani 500ml,Nước giải khát,5000,3500,150,50,Chai,Hoạt động
+SKU006,8931006,Mì Hảo Hảo Tôm Chua Cay,Mì gói,4000,3200,300,50,Gói,Hoạt động
+SKU007,8931007,Mì Omachi Xốt Vang,Mì gói,8000,6500,100,20,Gói,Hoạt động
+SKU008,8931008,Phở bò Vifon,Mì gói,6000,4800,120,30,Gói,Hoạt động
+SKU009,8931009,Bánh snack Oishi Cay,Snack,5000,4000,80,20,Gói,Hoạt động
+SKU010,8931010,Snack khoai tây Lay's,Snack,12000,9500,60,15,Gói,Hoạt động
+SKU011,8931011,Sữa tươi Vinamilk có đường 180ml,Sữa,7000,5500,150,30,Hộp,Hoạt động
+SKU012,8931012,Sữa tươi TH True Milk không đường,Sữa,7500,6000,140,30,Hộp,Hoạt động
+SKU013,8931013,Sữa chua Vinamilk nha đam,Sữa,6000,4500,80,20,Hộp,Hoạt động
+SKU014,8931014,Bánh mì ngọt Kinh Đô,Bánh kẹo,15000,11000,40,10,Cái,Hoạt động
+SKU015,8931015,Kẹo singum Coolair,Bánh kẹo,4000,3000,200,50,Phong,Hoạt động
+SKU016,8931016,Kẹo dẻo Chupa Chups,Bánh kẹo,6000,4500,150,30,Dây,Hoạt động
+SKU017,8931017,Khăn giấy ướt Baby,Đồ dùng sinh hoạt,25000,18000,50,10,Gói,Hoạt động
+SKU018,8931018,Bột giặt Omo 800g,Đồ dùng sinh hoạt,45000,38000,30,5,Túi,Hoạt động
+SKU019,8931019,Nước rửa chén Sunlight chanh 750g,Đồ dùng sinh hoạt,35000,28000,45,10,Chai,Hoạt động
+SKU020,8931020,Kem đánh răng PS trà xanh 240g,Đồ dùng sinh hoạt,40000,32000,60,15,Tuýp,Hoạt động
