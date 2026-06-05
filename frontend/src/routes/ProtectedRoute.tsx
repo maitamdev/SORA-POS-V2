@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { HiOutlineLockClosed } from 'react-icons/hi';
 import { useAuthStore } from '../stores/auth.store';
 import { UserRole } from '../types/user.type';
 
@@ -40,7 +41,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRoles
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center animate-fadeIn">
-          <div className="text-8xl mb-4">🚫</div>
+          <div className="flex justify-center mb-4">
+            <HiOutlineLockClosed className="w-20 h-20 text-red-500" />
+          </div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">403 - Không có quyền truy cập</h1>
           <p className="text-slate-500 mb-6">
             Bạn không có quyền truy cập trang này.

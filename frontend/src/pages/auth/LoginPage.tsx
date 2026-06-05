@@ -61,7 +61,7 @@ const LoginPage = () => {
   const onSubmit = async (data: LoginFormData) => {
     try {
       await login(data.email, data.password);
-      toast.success('Đăng nhập thành công! 🎉');
+      toast.success('Đăng nhập thành công!');
       navigate('/', { replace: true });
     } catch (error: unknown) {
       setIsShaking(true);

@@ -473,7 +473,7 @@ const ProductsPage = () => {
         const catName = categories.find(c => c.id === suggestedId)?.name;
         if (catName) {
           setCategoryName(catName);
-          toast.success(`🤖 AI đã tự động phân loại danh mục: ${catName}`);
+          toast.success(`AI đã tự động phân loại danh mục: ${catName}`);
         }
       }
     } catch (err) {
@@ -1614,7 +1614,7 @@ const ProductsPage = () => {
                         className="text-[9px] font-black text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 transition"
                         title="Click để áp dụng giá bán đề xuất của AI"
                       >
-                        🤖 Gợi ý: {money(suggestedSellPriceInfo.price)} (+{suggestedSellPriceInfo.marginPercentStr})
+                        AI Gợi ý: {money(suggestedSellPriceInfo.price)} (+{suggestedSellPriceInfo.marginPercentStr})
                       </button>
                     )}
                   </div>
@@ -1685,7 +1685,7 @@ const ProductsPage = () => {
                       </>
                     ) : (
                       <>
-                        <span>🤖 AI Viết mô tả</span>
+                        <span>AI Viết mô tả</span>
                       </>
                     )}
                   </button>

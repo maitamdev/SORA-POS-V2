@@ -12,6 +12,10 @@ import {
   HiOutlineMenu,
   HiOutlineTag,
   HiOutlineDuplicate,
+  HiOutlineCash,
+  HiOutlineDeviceMobile,
+  HiOutlinePhone,
+  HiOutlineExclamationCircle,
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { orderAPI } from '../../services/order.api';
@@ -1353,7 +1357,7 @@ const POSPage = () => {
                           ? 'bg-amber-50 text-amber-700 border-amber-200'
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}>
-                        Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '⚠️'} {isOutOfStock && 'Hết'}
+                        Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '(Thấp)'} {isOutOfStock && 'Hết'}
                       </span>
 
                       {/* Product Thumbnail image */}
@@ -1501,8 +1505,8 @@ const POSPage = () => {
             <div className="p-4 divide-y divide-slate-100 bg-white">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center text-slate-400 py-10">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-350 mb-2">
-                    📭
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                    <HiOutlineShoppingCart className="w-6 h-6" />
                   </div>
                   <p className="text-xs font-black text-slate-500 uppercase">Giỏ hàng trống</p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Chọn sản phẩm bên trái hoặc quét mã vạch.</p>
@@ -1574,8 +1578,8 @@ const POSPage = () => {
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
                   <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none text-xs">
-                      📞
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                      <HiOutlinePhone className="w-4 h-4" />
                     </span>
                     <input
                       type="text"
@@ -1727,7 +1731,7 @@ const POSPage = () => {
                       : 'bg-slate-50 border-slate-200/60 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <span className="text-base">💵</span>
+                  <HiOutlineCash className="w-5 h-5 text-current" />
                   <span>Tiền mặt</span>
                 </button>
 
@@ -1743,7 +1747,7 @@ const POSPage = () => {
                       : 'bg-slate-50 border-slate-200/60 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
-                  <span className="text-base">📲</span>
+                  <HiOutlineDeviceMobile className="w-5 h-5 text-current" />
                   <span>Chuyển khoản QR</span>
                 </button>
 
@@ -1919,8 +1923,9 @@ const POSPage = () => {
               <div className="flex flex-col items-center justify-center bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
                 {/* Fallback warning if store hasn't configured bank details */}
                 {(!operationSettings.bankBin || !operationSettings.bankAccountNumber) && (
-                  <div className="absolute top-2 left-2 right-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2 text-[10px] font-bold text-center leading-tight">
-                    ⚠️ Chưa cấu hình ngân hàng. Đang hiển thị tài khoản demo!
+                  <div className="absolute top-2 left-2 right-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2 text-[10px] font-bold text-center leading-tight flex items-center justify-center gap-1">
+                    <HiOutlineExclamationCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                    <span>Chưa cấu hình ngân hàng. Đang hiển thị tài khoản demo!</span>
                   </div>
                 )}
                 <div className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200/60 flex items-center justify-center mt-6">

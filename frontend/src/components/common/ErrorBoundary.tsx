@@ -1,4 +1,5 @@
 import React from 'react';
+import { HiOutlineExclamation } from 'react-icons/hi';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -50,7 +51,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           fontFamily: 'Inter, system-ui, sans-serif',
         }}>
           <div style={{ textAlign: 'center', maxWidth: 480, padding: '2rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚠️</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', color: '#f59e0b' }}>
+              <HiOutlineExclamation style={{ width: '4rem', height: '4rem' }} />
+            </div>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>
               Đã xảy ra lỗi
             </h1>
