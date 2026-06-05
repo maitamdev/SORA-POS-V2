@@ -8,6 +8,17 @@ import { sendApiDocsPage, sendOpenApiSpec } from './docs/apiDocs';
 
 const app = express();
 
+const isAllowedDevOrigin = (origin: string) => {
+  try {
+    const url = new URL(origin);
+    const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+    const port = Number(url.port);
+    return isLocalHost && port >= 5173 && port <= 5199;
+  } catch {
+    return false;
+  }
+};
+
 // ============================================
 // Middlewares
 // ============================================
@@ -15,7 +26,19 @@ const app = express();
 // CORS
 app.use(
   cors({
-    origin: env.corsOrigin,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (env.corsOrigins.includes(origin) || (env.nodeEnv === 'development' && isAllowedDevOrigin(origin))) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
