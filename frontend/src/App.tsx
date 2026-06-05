@@ -14,6 +14,8 @@ import StockPage from './pages/stock/StockPage';
 import CustomersPage from './pages/customers/CustomersPage';
 import SuppliersPage from './pages/suppliers/SuppliersPage';
 import ReportsPage from './pages/reports/ReportsPage';
+import ShiftsPage from './pages/shifts/ShiftsPage';
+import MyShiftPage from './pages/shifts/MyShiftPage';
 import AIRecommendationsPage from './pages/ai/AIRecommendationsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import StaffPage from './pages/staff/StaffPage';
@@ -24,7 +26,7 @@ const HomePage = () => {
   const { user } = useAuthStore();
 
   if (user?.role === 'cashier') {
-    return <Navigate to="/pos" replace />;
+    return <Navigate to="/my-shift" replace />;
   }
 
   return <DashboardPage />;
@@ -65,6 +67,14 @@ function App() {
           >
             <Route path="/" element={<HomePage />} />
             <Route path="/pos" element={<POSPage />} />
+            <Route
+              path="/my-shift"
+              element={
+                <ProtectedRoute requiredRoles={['cashier']}>
+                  <MyShiftPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/products" element={<ProductsPage />} />
             <Route
               path="/categories"
@@ -75,21 +85,21 @@ function App() {
               }
             />
             <Route path="/orders" element={<OrdersPage />} />
-            <Route
-              path="/stock"
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                  <StockPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/stock/alerts" element={<StockPage />} />
+            <Route path="/stock" element={<StockPage />} />
             <Route path="/customers" element={<CustomersPage />} />
             <Route
               path="/suppliers"
               element={
                 <ProtectedRoute requiredRoles={['admin', 'manager']}>
                   <SuppliersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shifts"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <ShiftsPage />
                 </ProtectedRoute>
               }
             />
@@ -120,7 +130,7 @@ function App() {
             <Route
               path="/settings"
               element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                <ProtectedRoute requiredRoles={['admin']}>
                   <SettingsPage />
                 </ProtectedRoute>
               }
