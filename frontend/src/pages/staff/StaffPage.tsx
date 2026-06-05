@@ -240,6 +240,7 @@ const StaffPage = () => {
               </span>
               <input
                 type="password"
+                autoComplete={editing ? 'new-password' : 'current-password'}
                 value={form.password}
                 onChange={(event) => setForm((state) => ({ ...state, password: event.target.value }))}
                 required={!editing}
