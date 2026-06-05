@@ -3,9 +3,12 @@ import { persist } from 'zustand/middleware';
 import { User, UserRole } from '../types/user.type';
 import { authAPI } from '../services/auth.api';
 
+const AUTH_SESSION_TTL_MS = 10 * 60 * 60 * 1000;
+
 interface AuthState {
   user: User | null;
   token: string | null;
+  loginAt: number | null;
   isAuthenticated: boolean;
   isLoading: boolean;
 
@@ -23,6 +26,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      loginAt: null,
       isAuthenticated: false,
       isLoading: false,
 
@@ -30,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user,
           token,
+          loginAt: Date.now(),
           isAuthenticated: true,
           isLoading: false,
         }),
@@ -45,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             user,
             token,
+            loginAt: Date.now(),
             isAuthenticated: true,
             isLoading: false,
           });
@@ -68,6 +74,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           token: null,
+          loginAt: null,
           isAuthenticated: false,
           isLoading: false,
         });
@@ -77,9 +84,20 @@ export const useAuthStore = create<AuthState>()(
        * Kiểm tra token còn hợp lệ không (gọi khi reload trang)
        */
       checkAuth: async () => {
-        const { token } = get();
+        const { token, loginAt } = get();
         if (!token) {
-          set({ isAuthenticated: false, user: null, isLoading: false });
+          set({ isAuthenticated: false, user: null, token: null, loginAt: null, isLoading: false });
+          return;
+        }
+
+        if (!loginAt || Date.now() - loginAt > AUTH_SESSION_TTL_MS) {
+          set({
+            user: null,
+            token: null,
+            loginAt: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
           return;
         }
 
@@ -89,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
           const { user } = response.data.data;
           set({
             user,
+            loginAt,
             isAuthenticated: true,
             isLoading: false,
           });
@@ -97,6 +116,7 @@ export const useAuthStore = create<AuthState>()(
           set({
             user: null,
             token: null,
+            loginAt: null,
             isAuthenticated: false,
             isLoading: false,
           });
@@ -122,6 +142,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        loginAt: state.loginAt,
         isAuthenticated: state.isAuthenticated,
       }),
     }
