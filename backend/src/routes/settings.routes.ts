@@ -8,10 +8,9 @@ import { operationSettingsSchema } from '../validations/settings.validation';
 const router = Router();
 
 router.use(authMiddleware);
-router.use(roleMiddleware('admin', 'manager'));
 
 router.get('/operation', SettingsController.getOperation);
-router.put('/operation', validateMiddleware(operationSettingsSchema), SettingsController.updateOperation);
 router.get('/operation/defaults', SettingsController.defaults);
+router.put('/operation', roleMiddleware('admin'), validateMiddleware(operationSettingsSchema), SettingsController.updateOperation);
 
 export default router;
