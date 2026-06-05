@@ -1,93 +1,77 @@
-@startuml Sora_POS_Sequence_Diagram
+﻿@startuml Sora_POS_Sequence_Diagram
 
-skinparam style strictuml
-skinparam defaultFontName "Segoe UI"
+' Cấu hình phong cách trắng đen chuyên nghiệp (Monochrome)
 skinparam monochrome true
 skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam LineThickness 1.2
+skinparam ParticipantFontSize 13
+skinparam ActorFontSize 13
+skinparam ArrowThickness 1.2
 
-actor "Nhân viên\n(Cashier)" as Cashier
-participant "Browser\n(React)" as Browser
-participant ":POSPage" as View
-participant ":OrderRouter" as Router
-participant ":OrderController" as Controller
-participant ":OrderService" as Service
-database "Database\n(PostgreSQL)" as DB
+title Sơ đồ Tuần tự - Quy trình Thanh toán & Cập nhật Kho (POS)
+
+actor "Nhân viên thu ngân\n(Cashier)" as Cashier
+participant "Giao diện React\n(Frontend)" as Frontend
+participant "Tuyến đường API\n(OrderRouter)" as Router
+participant "Bộ điều khiển\n(OrderController)" as Controller
+participant "Nghiệp vụ đơn hàng\n(OrderService)" as Service
+database "Cơ sở dữ liệu\n(PostgreSQL)" as DB
 
 autonumber
 
-Cashier -> Browser : Chọn sản phẩm & số lượng
-Browser -> View : Click "Thanh toán"
-activate View
-View -> Router : POST /api/orders
+Cashier -> Frontend : Chọn sản phẩm & bấm "Thanh toán"
+activate Frontend
+
+Frontend -> Router : Gửi yêu cầu tạo đơn (POST /api/orders)
 activate Router
 
-Router -> Router : Verify JWT Token
+Router -> Router : Xác thực mã token (Verify JWT)
 
-Router -> Controller : forward(req, res)
+Router -> Controller : Chuyển tiếp yêu cầu (forward request)
 activate Controller
 
-Controller -> Controller : Validate Data (Zod)
+Controller -> Controller : Kiểm tra dữ liệu đầu vào (Zod validate)
 
-Controller -> Service : createOrder(userId, items, paymentMethod)
+Controller -> Service : Xử lý tạo đơn hàng (createOrder)
 activate Service
 
-Service -> DB : SELECT stock_quantity FROM products
+Service -> DB : Kiểm tra tồn kho sản phẩm (SELECT stock)
 activate DB
-DB --> Service : Return Result
+DB --> Service : Trả về số lượng tồn hiện tại
 deactivate DB
 
-alt Không đủ hàng
-  Service --> Controller : Throw Error (Out of Stock)
-  Controller --> Router : Return Error
-  Router --> View : HTTP 400 (Không đủ hàng)
-  View --> Browser : Render Error View
-  Browser --> Cashier : Hiển thị cảnh báo hết hàng
+alt Trường hợp: Không đủ hàng trong kho
+  Service --> Controller : Trả về lỗi "Không đủ hàng trong kho"
+  Controller --> Router : Chuyển tiếp thông báo lỗi
+  Router --> Frontend : Phản hồi lỗi (HTTP 400 - Bad Request)
+  Frontend --> Cashier : Hiển thị thông báo cảnh báo lỗi trên màn hình
 
-else Đủ hàng tồn kho
-
-  Service -> DB : INSERT INTO orders, order_details
+else Trường hợp: Đủ hàng trong kho
+  Service -> DB : Thực hiện Transaction (Lưu đơn, Trừ kho, Ghi nhận thanh toán)
   activate DB
-  DB --> Service : Return Order ID
+  DB --> Service : Trả về thông tin hóa đơn & kết quả thanh toán
   deactivate DB
 
-  Service -> DB : UPDATE products (Trừ tồn kho)
-  activate DB
-  DB --> Service : Return Result
-  deactivate DB
-
-  Service -> DB : INSERT INTO stock_transactions
-  activate DB
-  DB --> Service : Return Result
-  deactivate DB
-
-  Service -> DB : INSERT INTO payments
-  activate DB
-  DB --> Service : Return Result
-  deactivate DB
-
-  opt Tồn kho <= min_stock_level
-    Service -> DB : INSERT INTO stock_alerts
+  opt Số lượng tồn kho thực tế <= Ngưỡng tối thiểu
+    Service -> DB : Tạo cảnh báo tồn kho thấp (INSERT INTO stock_alerts)
     activate DB
-    DB --> Service : Return Result
+    DB --> Service : Xác nhận tạo cảnh báo thành công
     deactivate DB
   end
 
-  Service --> Controller : Return Order Object
+  Service --> Controller : Trả về thông tin hóa đơn hoàn chỉnh
   deactivate Service
 
-  Controller --> Router : Return Response
+  Controller --> Router : Trả về dữ liệu phản hồi (Response data)
   deactivate Controller
 
-  Router --> View : HTTP 201 (Order Created)
+  Router --> Frontend : Phản hồi thành công (HTTP 201 - Created)
   deactivate Router
 
-  View -> View : Generate Invoice (PDF)
-
-  View --> Browser : Render Success View
-  deactivate View
-
-  Browser --> Cashier : Hiển thị hóa đơn & in bill
-
+  Frontend -> Frontend : Tự động sinh hóa đơn PDF
+  Frontend --> Cashier : Xuất hóa đơn PDF & lệnh in hóa đơn cho khách
+  deactivate Frontend
 end
 
 @enduml
