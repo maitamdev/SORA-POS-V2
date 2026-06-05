@@ -74,14 +74,7 @@ const OrdersPage = () => {
   };
 
   const handleDeleteAll = async () => {
-    const confirmText = 'XOA TAT CA HOA DON';
-    const input = window.prompt(`CẢNH BÁO NGUY HIỂM!\nHành động này sẽ XÓA TOÀN BỘ hóa đơn, thanh toán và các lịch sử kho hàng liên quan trên hệ thống.\nHành động này không thể hoàn tác!\n\nNhập chính xác "${confirmText}" để xác nhận:`);
-    if (input !== confirmText) {
-      if (input !== null) {
-        toast.error('Nhập chuỗi xác nhận không khớp');
-      }
-      return;
-    }
+    if (!window.confirm('CẢNH BÁO NGUY HIỂM!\nHành động này sẽ XÓA TOÀN BỘ hóa đơn, thanh toán và các lịch sử kho hàng liên quan trên hệ thống.\nHành động này không thể hoàn tác!\n\nBạn có chắc chắn muốn tiếp tục?')) return;
 
     setLoading(true);
     try {
