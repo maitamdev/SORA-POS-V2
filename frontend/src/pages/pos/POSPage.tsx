@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   HiOutlineShoppingCart,
@@ -10,14 +11,19 @@ import {
   HiOutlineCheck,
   HiOutlineMenu,
   HiOutlineTag,
+  HiOutlineDuplicate,
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { orderAPI } from '../../services/order.api';
+import { shiftAPI } from '../../services/shift.api';
 import { defaultOperationSettings, OperationSettings, settingsAPI } from '../../services/settings.api';
 import { useAuthStore } from '../../stores/auth.store';
-import { Category, Customer, Product } from '../../types/domain.type';
+import { Category, Customer, Product, ShiftSession } from '../../types/domain.type';
 import { getRoleLabel, getUserInitials } from '../../utils/userDisplay';
 import html2canvas from 'html2canvas-pro';
+import { buildVietQR } from '../../utils/vietqr';
+import { POPULAR_BANKS } from '../../utils/banks';
+import QRCode from 'qrcode';
 
 interface CartItem {
   product: Product;
@@ -54,22 +60,30 @@ const POSPage = () => {
   // Checkout details
   const [customerId, setCustomerId] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [matchedCustomer, setMatchedCustomer] = useState<Customer | null>(null);
+  const [newCustName, setNewCustName] = useState('');
+  const [usedPoints, setUsedPoints] = useState(0);
+  const [isRedeemingPoints, setIsRedeemingPoints] = useState(false);
   const [discountType, setDiscountType] = useState<'percent' | 'value'>('value');
   const [discountValue, setDiscountValue] = useState(0);
   const [voucherCode, setVoucherCode] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'card'>('cash');
   const [receivedAmount, setReceivedAmount] = useState(0);
   const [showCashPayment, setShowCashPayment] = useState(false);
+  const [showTransferPayment, setShowTransferPayment] = useState(false);
+  const [showCheckoutConfirm, setShowCheckoutConfirm] = useState(false);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
+  const [transferMemo, setTransferMemo] = useState('');
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const [loading, setLoading] = useState(false);
   const [operationSettings, setOperationSettings] = useState<OperationSettings>(defaultOperationSettings);
+  const [activeShift, setActiveShift] = useState<ShiftSession | null>(null);
+  const [shiftLoading, setShiftLoading] = useState(false);
+  const [openingCash, setOpeningCash] = useState('');
   
   // Pagination
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: defaultOperationSettings.productPageSize, total: 0 });
-
-  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
-  const [newCustName, setNewCustName] = useState('');
-  const [newCustPhone, setNewCustPhone] = useState('');
 
   const [checkoutSuccessInfo, setCheckoutSuccessInfo] = useState<{
     orderNumber: string;
@@ -84,7 +98,20 @@ const POSPage = () => {
     customerPhone: string;
     cashierName: string;
     date: string;
+    pointsBefore?: number;
+    pointsUsed?: number;
+    pointsEarned?: number;
+    pointsAfter?: number;
   } | null>(null);
+  const scannerBufferRef = useRef('');
+  const scannerLastKeyAtRef = useRef(0);
+  const scannerTimerRef = useRef<number | null>(null);
+  const barcodeAutoSubmitTimerRef = useRef<number | null>(null);
+  const barcodeSubmittingRef = useRef(false);
+
+  const focusBarcodeInput = () => {
+    window.setTimeout(() => document.getElementById('barcode-search-input')?.focus(), 0);
+  };
 
   const loadData = async () => {
     const params: Record<string, unknown> = {
@@ -126,17 +153,112 @@ const POSPage = () => {
       });
   }, []);
 
-  // Sync phone number when customer selection changes
+  const loadActiveShift = async () => {
+    if (user?.role !== 'cashier') return;
+    setShiftLoading(true);
+    try {
+      const response = await shiftAPI.active();
+      setActiveShift(response.data.data);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Không tải được ca làm hiện tại');
+      setActiveShift(null);
+    } finally {
+      setShiftLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!customerId) {
-      setCustomerPhone('');
+    loadActiveShift();
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'cashier' || activeShift?.status === 'checked_in') {
+      focusBarcodeInput();
+    }
+  }, [user?.role, activeShift?.status]);
+
+  const handleCheckInShift = async () => {
+    const cash = Number(openingCash || 0);
+    if (!Number.isFinite(cash) || cash < 0) {
+      toast.error('Tiền đầu ca không hợp lệ');
       return;
     }
-    const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-      setCustomerPhone(customer.phone || '');
+
+    setShiftLoading(true);
+    try {
+      const response = await shiftAPI.checkIn(cash);
+      setActiveShift(response.data.data);
+      toast.success('Đã nhận ca, có thể bán hàng');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Nhận ca thất bại');
+    } finally {
+      setShiftLoading(false);
     }
-  }, [customerId, customers]);
+  };
+
+  const handlePhoneChange = async (value: string) => {
+    setCustomerPhone(value);
+    const normalized = value.trim().replace(/[\s.-]/g, '');
+
+    // Reset các state tích điểm nếu xóa số điện thoại
+    if (!normalized) {
+      setMatchedCustomer(null);
+      setCustomerId('');
+      setNewCustName('');
+      setUsedPoints(0);
+      setIsRedeemingPoints(false);
+      return;
+    }
+
+    // 1. Tìm kiếm trong danh sách customers có sẵn ở local
+    const localMatch = customers.find(c => {
+      const p = (c.phone || '').trim().replace(/[\s.-]/g, '');
+      return p === normalized;
+    });
+
+    if (localMatch) {
+      setMatchedCustomer(localMatch);
+      setCustomerId(localMatch.id);
+      setNewCustName('');
+      setUsedPoints(0);
+      setIsRedeemingPoints(false);
+      return;
+    }
+
+    // 2. Nếu không thấy ở local và độ dài >= 9 số, gọi API tìm kiếm dưới DB
+    if (normalized.length >= 9) {
+      try {
+        const res = await catalogAPI.customers.list({ search: value, limit: 1 });
+        const matched = res.data.data.items[0];
+        const dbPhone = (matched?.phone || '').trim().replace(/[\s.-]/g, '');
+        if (matched && dbPhone === normalized) {
+          setCustomers(prev => {
+            if (prev.some(c => c.id === matched.id)) return prev;
+            return [matched, ...prev];
+          });
+          setMatchedCustomer(matched);
+          setCustomerId(matched.id);
+          setNewCustName('');
+        } else {
+          setMatchedCustomer(null);
+          setCustomerId('');
+        }
+        setUsedPoints(0);
+        setIsRedeemingPoints(false);
+      } catch (err) {
+        console.error('Lỗi khi tìm kiếm khách hàng bằng SĐT:', err);
+        setMatchedCustomer(null);
+        setCustomerId('');
+      }
+    } else {
+      setMatchedCustomer(null);
+      setCustomerId('');
+    }
+  };
+
+
 
   const total = useMemo(
     () => cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0),
@@ -154,7 +276,16 @@ const POSPage = () => {
     return safeDiscountValue;
   }, [total, discountType, discountValue, operationSettings.maxDiscountPercent]);
 
-  const finalAmount = useMemo(() => Math.max(total - discountAmount, 0), [total, discountAmount]);
+  const pointsDiscount = useMemo(() => {
+    return isRedeemingPoints ? usedPoints * 1000 : 0;
+  }, [isRedeemingPoints, usedPoints]);
+
+  const finalAmount = useMemo(() => Math.max(total - discountAmount - pointsDiscount, 0), [total, discountAmount, pointsDiscount]);
+
+  const activeBank = useMemo(() => {
+    if (!operationSettings.bankBin) return null;
+    return POPULAR_BANKS.find((b) => b.bin === operationSettings.bankBin) || null;
+  }, [operationSettings.bankBin]);
 
   useEffect(() => {
     if (paymentMethod !== 'cash') {
@@ -191,49 +322,89 @@ const POSPage = () => {
     return items;
   }, [products, sortBy]);
 
-  // Barcode search submission
-  const handleBarcodeSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!barcodeSearch.trim()) return;
+  const submitBarcode = async (rawCode: string) => {
+    const query = rawCode.trim();
+    if (!query) return;
+    if (barcodeSubmittingRef.current) return;
+    barcodeSubmittingRef.current = true;
+    if (barcodeAutoSubmitTimerRef.current) {
+      window.clearTimeout(barcodeAutoSubmitTimerRef.current);
+      barcodeAutoSubmitTimerRef.current = null;
+    }
 
-    const query = barcodeSearch.trim();
-    // Look locally first
-    const found = products.find(p => p.barcode === query || p.sku === query);
-    if (found) {
+    if (user?.role === 'cashier' && activeShift?.status !== 'checked_in') {
+      toast.error('Vui lòng nhận ca trước khi quét bán hàng');
+      setBarcodeSearch('');
+      focusBarcodeInput();
+      barcodeSubmittingRef.current = false;
+      return;
+    }
+
+    const addOrSelectProduct = (product: Product) => {
       if (!operationSettings.barcodeAutoAdd) {
         setSearch(query);
         setPage(1);
-        setBarcodeSearch('');
-        toast.success(`Đã tìm thấy ${found.name}`);
+        toast.success(`Đã tìm thấy ${product.name}`);
         return;
       }
-      addToCart(found);
-      toast.success(`Đã thêm ${found.name} vào giỏ hàng`);
+
+      addToCart(product);
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng`);
+    };
+
+    try {
+      const localMatch = products.find((product) => product.barcode === query || product.sku === query);
+      if (localMatch) {
+        addOrSelectProduct(localMatch);
+        return;
+      }
+
+      const response = await catalogAPI.products.list({ search: query, is_active: true, limit: 5 });
+      const dbMatch = response.data.data.items.find((product) => product.barcode === query || product.sku === query);
+
+      if (dbMatch) {
+        addOrSelectProduct(dbMatch);
+      } else {
+        toast.error(`Không tìm thấy sản phẩm có mã/SKU: ${query}`);
+      }
+    } catch {
+      toast.error('Lỗi khi quét mã vạch');
+    } finally {
+      barcodeSubmittingRef.current = false;
       setBarcodeSearch('');
-    } else {
-      // Find in database via API
-      catalogAPI.products.list({ search: query, limit: 1 }).then(res => {
-        const match = res.data.data.items[0];
-        if (match && (match.barcode === query || match.sku === query)) {
-          if (!operationSettings.barcodeAutoAdd) {
-            setSearch(query);
-            setPage(1);
-            setBarcodeSearch('');
-            toast.success(`Đã tìm thấy ${match.name}`);
-            return;
-          }
-          addToCart(match);
-          toast.success(`Đã thêm ${match.name} vào giỏ hàng`);
-        } else {
-          toast.error(`Không tìm thấy sản phẩm có mã/SKU: ${query}`);
-        }
-        setBarcodeSearch('');
-      }).catch(() => {
-        toast.error('Lỗi khi quét mã vạch');
-        setBarcodeSearch('');
-      });
+      focusBarcodeInput();
     }
   };
+
+  // Barcode search submission
+  const handleBarcodeSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (barcodeAutoSubmitTimerRef.current) {
+      window.clearTimeout(barcodeAutoSubmitTimerRef.current);
+      barcodeAutoSubmitTimerRef.current = null;
+    }
+    submitBarcode(barcodeSearch);
+  };
+
+  useEffect(() => {
+    const code = barcodeSearch.trim();
+    if (!code || code.length < 6) return;
+
+    if (barcodeAutoSubmitTimerRef.current) {
+      window.clearTimeout(barcodeAutoSubmitTimerRef.current);
+    }
+
+    barcodeAutoSubmitTimerRef.current = window.setTimeout(() => {
+      submitBarcode(code);
+    }, 220);
+
+    return () => {
+      if (barcodeAutoSubmitTimerRef.current) {
+        window.clearTimeout(barcodeAutoSubmitTimerRef.current);
+        barcodeAutoSubmitTimerRef.current = null;
+      }
+    };
+  }, [barcodeSearch]);
 
   // Stepper cart modifications
   const addToCart = (product: Product) => {
@@ -278,35 +449,109 @@ const POSPage = () => {
     );
   };
 
+  // Draw QR Code to canvas
+  useEffect(() => {
+    if (showTransferPayment && qrCanvasRef.current) {
+      const qrString = buildVietQR({
+        bankBin: operationSettings.bankBin || '970416', // Fallback to ACB BIN (demo)
+        bankNumber: operationSettings.bankAccountNumber || '257678859', // Fallback to ACB STK (demo)
+        amount: String(finalAmount),
+        purpose: transferMemo,
+      });
+
+      QRCode.toCanvas(
+        qrCanvasRef.current,
+        qrString,
+        {
+          width: 240,
+          margin: 1.5,
+          color: {
+            dark: '#0f172a',
+            light: '#ffffff',
+          },
+        },
+        (err) => {
+          if (err) {
+            console.error('Lỗi tạo QR VietQR:', err);
+            toast.error('Không thể tạo mã QR thanh toán');
+          }
+        }
+      );
+    }
+  }, [showTransferPayment, operationSettings, finalAmount, transferMemo]);
+
   // Keyboard hotkey implementation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const activeInputId = target?.id || '';
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable;
+      const isBarcodeInput = activeInputId === 'barcode-search-input';
+
+      if (event.key === 'Enter' && scannerBufferRef.current && !isBarcodeInput) {
+        const scannedCode = scannerBufferRef.current;
+        scannerBufferRef.current = '';
+        if (scannerTimerRef.current) window.clearTimeout(scannerTimerRef.current);
+        if (scannedCode.length >= 4) {
+          event.preventDefault();
+          submitBarcode(scannedCode);
+          return;
+        }
+      }
+
+      if (
+        event.key.length === 1 &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !isBarcodeInput &&
+        !isEditableTarget
+      ) {
+        const now = Date.now();
+        if (now - scannerLastKeyAtRef.current > 120) {
+          scannerBufferRef.current = '';
+        }
+        scannerLastKeyAtRef.current = now;
+        scannerBufferRef.current += event.key;
+        if (scannerTimerRef.current) window.clearTimeout(scannerTimerRef.current);
+        scannerTimerRef.current = window.setTimeout(() => {
+          scannerBufferRef.current = '';
+        }, 180);
+        return;
+      }
+
       if (event.key === 'F2') {
         event.preventDefault();
-        document.getElementById('barcode-search-input')?.focus();
+        focusBarcodeInput();
       } else if (event.key === 'F3') {
         event.preventDefault();
         document.getElementById('product-search-input')?.focus();
       } else if (event.key === 'F9') {
         event.preventDefault();
-        checkout();
+        if (paymentMethod === 'transfer' && showTransferPayment) {
+          checkout(true, true);
+        } else if (showCheckoutConfirm) {
+          checkout(false, true);
+        } else {
+          checkout(false, false);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, customerId, discountAmount, finalAmount, paymentMethod, receivedAmount]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (scannerTimerRef.current) window.clearTimeout(scannerTimerRef.current);
+    };
+  }, [cart, customerId, discountAmount, finalAmount, paymentMethod, receivedAmount, showTransferPayment, transferMemo, showCheckoutConfirm, barcodeSearch, products, operationSettings, activeShift]);
 
   // Order Operations
   const handleClearCart = () => {
     if (cart.length === 0) return;
-    if (window.confirm('Bạn có chắc muốn xóa toàn bộ giỏ hàng?')) {
-      setCart([]);
-      setReceivedAmount(0);
-      setShowCashPayment(false);
-      setDiscountValue(0);
-      setVoucherCode('');
-      toast.success('Đã xóa giỏ hàng');
-    }
+    setShowClearCartConfirm(true);
   };
 
   const handlePrintInvoice = (orderNumber?: string, savedCart?: CartItem[]) => {
@@ -327,9 +572,14 @@ const POSPage = () => {
       return;
     }
 
-    const customerObj = customers.find(c => c.id === customerId);
-    const customerName = customerObj?.name || 'Khách lẻ';
-    const customerPhoneStr = customerPhone || customerObj?.phone || '';
+    const customerName = checkoutSuccessInfo?.customerName ?? (customers.find(c => c.id === customerId)?.name || 'Khách lẻ');
+    const customerPhoneStr = checkoutSuccessInfo?.customerPhone ?? (customerPhone || customers.find(c => c.id === customerId)?.phone || '');
+
+    const printPointsBefore = checkoutSuccessInfo?.pointsBefore ?? 0;
+    const printPointsUsed = checkoutSuccessInfo?.pointsUsed ?? 0;
+    const printPointsEarned = checkoutSuccessInfo?.pointsEarned ?? 0;
+    const printPointsAfter = checkoutSuccessInfo?.pointsAfter ?? 0;
+    const hasPointsInfo = customerName !== 'Khách lẻ' && (printPointsBefore > 0 || printPointsUsed > 0 || printPointsEarned > 0);
 
     const printTotal = itemsToRender.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0);
     const printFinal = checkoutSuccessInfo?.finalAmount ?? finalAmount;
@@ -637,6 +887,30 @@ const POSPage = () => {
               ` : ''}
             </div>
 
+            ${hasPointsInfo ? `
+              <!-- Điểm tích lũy CGV -->
+              <div class="payment-section" style="border-top: none; padding-top: 0;">
+                <div class="payment-row">
+                  <span class="label">Điểm tích lũy trước:</span>
+                  <span class="value">${printPointsBefore}đp</span>
+                </div>
+                ${printPointsUsed > 0 ? `
+                  <div class="payment-row">
+                    <span class="label">Điểm đã sử dụng:</span>
+                    <span class="value" style="color: #dc2626;">-${printPointsUsed}đp</span>
+                  </div>
+                ` : ''}
+                <div class="payment-row">
+                  <span class="label">Điểm tích lũy mới:</span>
+                  <span class="value" style="color: #2563eb;">+${printPointsEarned}đp</span>
+                </div>
+                <div class="payment-row" style="border-top: 1px dashed #e2e8f0; margin-top: 4px; padding-top: 6px;">
+                  <span class="label">Số dư điểm hiện tại:</span>
+                  <span class="value" style="font-weight: 800; color: #0f172a;">${printPointsAfter}đp</span>
+                </div>
+              </div>
+            ` : ''}
+
             <!-- Footer -->
             <div class="invoice-footer">
               <div class="thank-you">${operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!'}</div>
@@ -656,28 +930,78 @@ const POSPage = () => {
     printWindow.document.close();
   };
 
-  const checkout = async () => {
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`Đã sao chép ${label}`);
+  };
+
+  const checkout = async (isTransferConfirmed = false, isCheckoutConfirmed = false) => {
     if (cart.length === 0) {
       toast.error('Giỏ hàng đang trống');
+      return;
+    }
+    if (user?.role === 'cashier' && activeShift?.status !== 'checked_in') {
+      toast.error('Vui lòng nhận ca và nhập tiền đầu ca trước khi bán hàng');
       return;
     }
     if (operationSettings.requireCustomerPhone && !customerPhone.trim()) {
       toast.error('Vui lòng nhập số điện thoại khách hàng');
       return;
     }
-    if (operationSettings.confirmBeforeCheckout && !window.confirm('Xác nhận thanh toán đơn hàng này?')) {
+    
+    if (operationSettings.confirmBeforeCheckout && !isCheckoutConfirmed) {
+      setShowCheckoutConfirm(true);
       return;
     }
+
     if (paymentMethod === 'cash' && receivedAmount > 0 && receivedAmount < finalAmount) {
       toast.error('Tiền khách đưa chưa đủ để thanh toán');
       return;
     }
 
+    if (paymentMethod === 'transfer' && !isTransferConfirmed) {
+      // Generate a unique memo for this transaction
+      const datePart = new Date().toLocaleDateString('vi-VN', { month: '2-digit', day: '2-digit' }).replace(/\//g, '');
+      const timePart = new Date().toLocaleTimeString('vi-VN', { hour12: false }).replace(/:/g, '').slice(0, 4);
+      setTransferMemo(`SORA${datePart}${timePart}`);
+      setShowTransferPayment(true);
+      return;
+    }
+
     setLoading(true);
     try {
+      let finalCustomerId = matchedCustomer?.id || null;
+
+      // Tự động tạo khách hàng mới nếu nhập SĐT chưa đăng ký
+      if (customerPhone.trim() && !matchedCustomer) {
+        if (!newCustName.trim()) {
+          toast.error('Vui lòng nhập Họ và tên khách hàng mới để đăng ký tích điểm');
+          setLoading(false);
+          return;
+        }
+        try {
+          const custRes = await catalogAPI.customers.create({
+            name: newCustName.trim(),
+            phone: customerPhone.trim(),
+            is_active: true,
+          });
+          const newCust = custRes.data.data;
+          setCustomers((prev) => [newCust, ...prev]);
+          setMatchedCustomer(newCust);
+          finalCustomerId = newCust.id;
+          toast.success(`Đã tự động tạo tài khoản tích điểm cho khách hàng ${newCust.name}`);
+        } catch (err) {
+          console.error(err);
+          toast.error('Không thể tạo tài khoản khách hàng mới');
+          setLoading(false);
+          return;
+        }
+      }
+
       const response = await orderAPI.create({
-        customer_id: customerId || null,
-        discount_amount: discountAmount,
+        customer_id: finalCustomerId,
+        discount_amount: discountAmount + pointsDiscount,
+        used_points: isRedeemingPoints ? usedPoints : 0,
         note: null,
         payment: {
           method: paymentMethod,
@@ -691,12 +1015,20 @@ const POSPage = () => {
 
       const orderNumber = response.data.data.order_number;
       
-      const customerObj = customers.find(c => c.id === customerId);
+      const customerObj = finalCustomerId
+        ? (customers.find(c => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone })
+        : null;
+
+      const pBefore = matchedCustomer ? matchedCustomer.points : 0;
+      const pUsed = isRedeemingPoints ? usedPoints : 0;
+      const pEarned = Math.floor(finalAmount / 10000);
+      const pAfter = Math.max(0, pBefore - pUsed + pEarned);
+
       setCheckoutSuccessInfo({
         orderNumber,
         finalAmount,
         total,
-        discountAmount,
+        discountAmount: discountAmount + pointsDiscount,
         change: paymentMethod === 'cash' ? Math.max((receivedAmount || finalAmount) - finalAmount, 0) : 0,
         paymentMethod,
         receivedAmount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
@@ -705,14 +1037,25 @@ const POSPage = () => {
         customerPhone: customerPhone || customerObj?.phone || '',
         cashierName: user?.full_name || 'Nhân viên',
         date: new Date().toLocaleString('vi-VN'),
+        pointsBefore: pBefore,
+        pointsUsed: pUsed,
+        pointsEarned: pEarned,
+        pointsAfter: pAfter,
       });
 
       setCart([]);
       setReceivedAmount(0);
       setShowCashPayment(false);
+      setShowTransferPayment(false);
       setDiscountValue(0);
       setVoucherCode('');
+      setCustomerPhone('');
+      setMatchedCustomer(null);
+      setNewCustName('');
+      setUsedPoints(0);
+      setIsRedeemingPoints(false);
       await loadData();
+      await loadActiveShift();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Thanh toán thất bại');
@@ -721,33 +1064,103 @@ const POSPage = () => {
     }
   };
 
-  const handleAddCustomerSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCustName.trim()) {
-      toast.error('Vui lòng nhập tên khách hàng');
-      return;
-    }
-    try {
-      const res = await catalogAPI.customers.create({
-        name: newCustName.trim(),
-        phone: newCustPhone.trim() || null,
-        is_active: true,
-      });
-      const created = res.data.data;
-      setCustomers(prev => [created, ...prev]);
-      setCustomerId(created.id);
-      setShowAddCustomerModal(false);
-      setNewCustName('');
-      setNewCustPhone('');
-      toast.success(`Đã thêm khách hàng ${created.name}`);
-    } catch (err) {
-      toast.error('Lỗi khi thêm khách hàng');
-    }
-  };
+
 
   // Calculate items bounds for pagination display
   const itemsStart = (pagination.page - 1) * pagination.limit + 1;
   const itemsEnd = Math.min(pagination.page * pagination.limit, pagination.total);
+  const isCashierShiftRequired = user?.role === 'cashier';
+
+  if (isCashierShiftRequired && shiftLoading && !activeShift) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-black uppercase text-slate-400">Đang kiểm tra ca làm</p>
+          <p className="mt-2 text-slate-600">Vui lòng đợi trong giây lát...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCashierShiftRequired && !activeShift) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-lg rounded-xl border border-red-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-black uppercase text-red-600">Chưa có ca được mở</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-900">Không thể bán hàng</h1>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Quản lý cần mở ca hôm nay cho tài khoản của bạn. Sau đó đăng nhập lại để bắt đầu nhận ca.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCashierShiftRequired && activeShift?.status === 'opened') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase text-blue-600">Nhận ca bán hàng</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-900">Nhập tiền đầu ca</h1>
+          <p className="mt-2 text-sm font-semibold text-slate-500">
+            Ca hôm nay đã được quản lý mở. Hãy đếm tiền ban đầu trong ngăn kéo trước khi bán hàng.
+          </p>
+
+          <label className="mt-6 block">
+            <span className="mb-2 block text-xs font-black uppercase text-slate-500">Tiền nhận ca ban đầu</span>
+            <input
+              type="number"
+              min="0"
+              value={openingCash}
+              onChange={(event) => setOpeningCash(event.target.value)}
+              placeholder="VD: 500000"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-lg font-black outline-none focus:border-blue-500"
+            />
+          </label>
+
+          <button
+            onClick={handleCheckInShift}
+            disabled={shiftLoading}
+            className="mt-5 w-full rounded-xl bg-blue-600 py-3 text-sm font-black uppercase text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {shiftLoading ? 'Đang nhận ca...' : 'Nhận ca và bắt đầu bán hàng'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isCashierShiftRequired && activeShift?.status === 'closed') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-2xl rounded-xl border border-emerald-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase text-emerald-600">Đã chốt ca</p>
+          <h1 className="mt-2 text-2xl font-black text-slate-900">Báo cáo đã gửi quản lý</h1>
+          <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase text-slate-400">Doanh thu</p>
+              <p className="text-xl font-black text-slate-900">{money(activeShift.summary?.revenue || 0)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase text-slate-400">Số đơn</p>
+              <p className="text-xl font-black text-slate-900">{activeShift.summary?.order_count || 0}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase text-slate-400">Tiền cần có</p>
+              <p className="text-xl font-black text-slate-900">{money(activeShift.expected_cash || 0)}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-black uppercase text-slate-400">Lệch tiền</p>
+              <p className="text-xl font-black text-slate-900">{money(activeShift.cash_difference || 0)}</p>
+            </div>
+          </div>
+          <p className="mt-5 text-sm font-semibold text-slate-500">
+            Nếu cần bán tiếp, quản lý hãy mở ca mới cho nhân viên.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-50 font-sans antialiased text-slate-800">
@@ -798,11 +1211,23 @@ const POSPage = () => {
             />
             <button type="submit" className="hidden">Submit</button>
           </form>
+          <div className="hidden xl:flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Máy quét sẵn sàng
+          </div>
         </div>
 
         {/* Right Info Widgets */}
         <div className="hidden sm:flex items-center gap-2 sm:gap-4">
           {/* User profile */}
+          {isCashierShiftRequired && activeShift?.status === 'checked_in' && (
+            <Link
+              to="/my-shift"
+              className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100"
+            >
+              Ca của tôi
+            </Link>
+          )}
           <div className="flex items-center gap-2 pl-3 border-l border-slate-100">
             <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
               {getUserInitials(user)}
@@ -1140,40 +1565,101 @@ const POSPage = () => {
 
           {/* Customer & Notes Panel */}
           <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3 flex-shrink-0">
-            {/* Customer & Phone Selector Row */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Customer & Loyalty Points Section */}
+            <div className="space-y-2 border-b border-slate-100 pb-3">
               <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Khách hàng</label>
-                <div className="flex items-center gap-1.5">
-                  <select
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="flex-1 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 outline-none"
-                  >
-                    <option value="">Khách lẻ</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setShowAddCustomerModal(true)}
-                    className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg flex items-center justify-center hover:bg-blue-100 transition flex-shrink-0"
-                  >
-                    <HiOutlinePlus className="w-4.5 h-4.5" />
-                  </button>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none text-xs">
+                    📞
+                  </span>
+                  <input
+                    type="text"
+                    value={customerPhone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="Nhập SĐT để tích/tiêu điểm"
+                    className="w-full bg-white border border-slate-200 pl-8 pr-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại</label>
-                <input
-                  type="text"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="Nhập số điện thoại"
-                  className="w-full bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none"
-                />
-              </div>
+              {customerPhone.trim() && (
+                matchedCustomer ? (
+                  /* Khách hàng thành viên đã đăng ký */
+                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 space-y-2.5">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Thành viên Sora</p>
+                        <h4 className="text-xs font-black text-slate-800 mt-0.5">{matchedCustomer.name}</h4>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Điểm tích lũy</p>
+                        <p className="text-xs font-black text-blue-600 mt-0.5">{matchedCustomer.points}đp</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-blue-100/50 pt-2 flex flex-col gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isRedeemingPoints}
+                          onChange={(e) => {
+                            setIsRedeemingPoints(e.target.checked);
+                            setUsedPoints(0);
+                          }}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                        />
+                        <span className="text-[11px] font-bold text-slate-600">Đổi điểm thanh toán (1 điểm = 1.000đ)</span>
+                      </label>
+
+                      {isRedeemingPoints && (
+                        <div className="flex items-center gap-2 pl-5.5">
+                          <span className="text-[11px] text-slate-400 font-semibold">Đổi</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
+                            value={usedPoints || ''}
+                            onChange={(e) => {
+                              const points = Math.max(0, parseInt(e.target.value, 10) || 0);
+                              const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
+                              setUsedPoints(Math.min(points, maxPoints));
+                            }}
+                            placeholder="0"
+                            className="w-20 bg-white border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-800 text-center outline-none focus:border-blue-500"
+                          />
+                          <span className="text-[11px] text-slate-600 font-bold">
+                            điểm = -{money((usedPoints || 0) * 1000)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="text-[10px] font-bold text-emerald-600 flex items-center justify-between mt-1 bg-emerald-50/50 px-2.5 py-1 rounded-lg">
+                        <span>Đơn hàng này tích lũy thêm:</span>
+                        <span>+{Math.floor(finalAmount / 10000)} điểm ↗</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Đăng ký khách hàng mới nhanh */
+                  <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-3 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded uppercase tracking-wider">Khách hàng mới</span>
+                      <span className="text-[9px] font-semibold text-slate-400">SĐT chưa đăng ký tích điểm</span>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Họ và tên khách mới *</label>
+                      <input
+                        type="text"
+                        value={newCustName}
+                        onChange={(e) => setNewCustName(e.target.value)}
+                        placeholder="Nhập tên khách để tự động tạo TK"
+                        className="w-full bg-white border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition"
+                      />
+                    </div>
+                  </div>
+                )
+              )}
             </div>
 
             {/* Discount and Voucher Row */}
@@ -1310,7 +1796,7 @@ const POSPage = () => {
             {/* CTA action button */}
             <div>
               <button
-                onClick={checkout}
+                onClick={() => checkout(false)}
                 disabled={loading || cart.length === 0}
                 className="w-full py-3 bg-blue-600 text-white hover:bg-blue-700 text-xs font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition disabled:opacity-60 disabled:shadow-none"
               >
@@ -1425,7 +1911,7 @@ const POSPage = () => {
                 Xóa tiền
               </button>
               <button
-                onClick={checkout}
+                onClick={() => checkout(false)}
                 disabled={loading || cart.length === 0 || (receivedAmount > 0 && receivedAmount < finalAmount)}
                 className="py-2.5 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
               >
@@ -1436,56 +1922,252 @@ const POSPage = () => {
         </div>
       )}
 
-      {/* 3. ADD NEW CUSTOMER QUICK MODAL */}
-      {showAddCustomerModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
-            <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Thêm nhanh khách hàng</h3>
-            <p className="text-xs text-slate-400 font-semibold mt-0.5">Khách hàng được lưu trực tiếp vào cơ sở dữ liệu.</p>
-            
-            <form onSubmit={handleAddCustomerSubmit} className="mt-5 space-y-4">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Họ và tên *</label>
-                <input
-                  type="text"
-                  required
-                  value={newCustName}
-                  onChange={(e) => setNewCustName(e.target.value)}
-                  placeholder="Nhập tên khách hàng"
-                  className="w-full border border-slate-205 rounded-xl px-4 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 bg-slate-50 transition"
-                />
+      {/* 3.1. VIETQR TRANSFER MODAL */}
+      {showTransferPayment && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Thanh toán chuyển khoản VietQR</h3>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">Khách hàng quét mã QR dưới đây bằng ứng dụng Ngân hàng để thanh toán.</p>
+              </div>
+              <button
+                onClick={() => setShowTransferPayment(false)}
+                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition"
+                aria-label="Thoát"
+              >
+                <HiOutlineXCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+              {/* Left Column: QR Code canvas */}
+              <div className="flex flex-col items-center justify-center bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
+                {/* Fallback warning if store hasn't configured bank details */}
+                {(!operationSettings.bankBin || !operationSettings.bankAccountNumber) && (
+                  <div className="absolute top-2 left-2 right-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2 text-[10px] font-bold text-center leading-tight">
+                    ⚠️ Chưa cấu hình ngân hàng. Đang hiển thị tài khoản demo!
+                  </div>
+                )}
+                <div className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200/60 flex items-center justify-center mt-6">
+                  <canvas ref={qrCanvasRef} className="w-[240px] h-[240px]" />
+                </div>
+                <div className="mt-3 flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black text-blue-700 uppercase tracking-wider">
+                  <span>VietQR / Napas 247</span>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại</label>
-                <input
-                  type="text"
-                  value={newCustPhone}
-                  onChange={(e) => setNewCustPhone(e.target.value)}
-                  placeholder="Nhập số điện thoại"
-                  className="w-full border border-slate-205 rounded-xl px-4 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 bg-slate-50 transition"
-                />
-              </div>
+              {/* Right Column: Account Details Text */}
+              <div className="space-y-4">
+                {/* Store active bank details */}
+                <div className="space-y-3.5 divide-y divide-slate-100 text-sm">
+                  <div className="pb-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ngân hàng thụ hưởng</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="font-extrabold text-slate-800">
+                        {activeBank ? `${activeBank.shortName} - ${activeBank.name}` : 'Ngân hàng TMCP Á Châu (ACB) [Demo]'}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddCustomerModal(false)}
-                  className="flex-1 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 transition"
-                >
-                  Lưu lại
-                </button>
+                  <div className="pt-2.5 pb-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Số tài khoản</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="font-mono font-black text-slate-900 text-base">
+                        {operationSettings.bankAccountNumber || '257678859'}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(operationSettings.bankAccountNumber || '257678859', 'Số tài khoản')}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        title="Sao chép số tài khoản"
+                      >
+                        <HiOutlineDuplicate className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 pb-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Chủ tài khoản</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="font-black text-slate-800 uppercase">
+                        {operationSettings.bankAccountName || 'NGUYEN XUAN NGHIA'}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(operationSettings.bankAccountName || 'NGUYEN XUAN NGHIA', 'Tên chủ tài khoản')}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        title="Sao chép tên chủ tài khoản"
+                      >
+                        <HiOutlineDuplicate className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 pb-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Số tiền thanh toán</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="font-black text-blue-600 text-xl">
+                        {money(finalAmount)}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(String(finalAmount), 'Số tiền')}
+                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        title="Sao chép số tiền"
+                      >
+                        <HiOutlineDuplicate className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 pb-1">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Nội dung chuyển khoản (Memo)</p>
+                    <div className="flex items-center justify-between mt-1 bg-amber-50/50 border border-amber-100 rounded-lg p-2.5">
+                      <span className="font-mono font-black text-amber-800">
+                        {transferMemo}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(transferMemo, 'Nội dung chuyển khoản')}
+                        className="p-1 text-amber-700 hover:bg-amber-100/50 rounded transition"
+                        title="Sao chép nội dung"
+                      >
+                        <HiOutlineDuplicate className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </form>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="grid grid-cols-2 gap-3 p-5 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setShowTransferPayment(false)}
+                className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
+              >
+                Quay lại
+              </button>
+              <button
+                onClick={() => checkout(true, true)}
+                disabled={loading}
+                className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+              >
+                <HiOutlineCheck className="w-4 h-4 stroke-[3]" />
+                <span>Xác nhận đã nhận tiền (F9)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* 3.2. CUSTOM CHECKOUT CONFIRMATION MODAL */}
+      {showCheckoutConfirm && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Xác nhận thanh toán</h3>
+              <p className="text-xs font-semibold text-slate-400 mt-0.5">Vui lòng kiểm tra lại thông tin đơn hàng trước khi hoàn tất.</p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm font-semibold text-slate-600">
+                Bạn có chắc chắn muốn tiến hành thanh toán cho đơn hàng này không?
+              </p>
+
+              {/* Order Summary Box */}
+              <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-2.5 text-xs font-bold text-slate-600">
+                <div className="flex justify-between items-center">
+                  <span>Số lượng sản phẩm:</span>
+                  <span className="text-slate-800 font-extrabold">{cart.reduce((s, i) => s + i.quantity, 0)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Tạm tính:</span>
+                  <span className="text-slate-800">{money(total)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-red-500">
+                    <span>Chiết khấu:</span>
+                    <span>-{money(discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2.5 text-sm font-extrabold text-slate-800">
+                  <span>Tổng tiền thanh toán:</span>
+                  <span className="text-lg font-black text-blue-600">{money(finalAmount)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="grid grid-cols-2 gap-3 p-5 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setShowCheckoutConfirm(false)}
+                className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
+              >
+                Quay lại
+              </button>
+              <button
+                onClick={() => {
+                  setShowCheckoutConfirm(false);
+                  checkout(false, true);
+                }}
+                className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition"
+              >
+                <HiOutlineCheck className="w-4 h-4 stroke-[3]" />
+                <span>Xác nhận (F9)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3.3. CUSTOM CLEAR CART CONFIRMATION MODAL */}
+      {showClearCartConfirm && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 bg-red-50/30">
+              <h3 className="text-base font-black text-red-700 uppercase tracking-tight">Xóa giỏ hàng</h3>
+              <p className="text-xs font-semibold text-slate-400 mt-0.5">Thao tác này sẽ dọn trống toàn bộ sản phẩm hiện tại.</p>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <p className="text-sm font-semibold text-slate-600">
+                Bạn có chắc chắn muốn xóa toàn bộ sản phẩm trong giỏ hàng không? Hành động này không thể khôi phục lại.
+              </p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="grid grid-cols-2 gap-3 p-5 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setShowClearCartConfirm(false)}
+                className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  setCart([]);
+                  setReceivedAmount(0);
+                  setShowCashPayment(false);
+                  setDiscountValue(0);
+                  setVoucherCode('');
+                  setShowClearCartConfirm(false);
+                  toast.success('Đã xóa giỏ hàng');
+                }}
+                className="py-2.5 bg-red-650 hover:bg-red-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition"
+              >
+                <HiOutlineTrash className="w-4 h-4" />
+                <span>Xóa sạch</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* 4. SUCCESS — FULL INVOICE PREVIEW MODAL */}
       {checkoutSuccessInfo && (() => {
@@ -1656,6 +2338,30 @@ const POSPage = () => {
                     </>
                   )}
                 </div>
+
+                {/* ─── Loyalty Points Info (CGV Style) ─── */}
+                {info.customerName !== 'Khách lẻ' && info.pointsBefore !== undefined && (
+                  <div className="mx-7 border-t border-slate-200 py-3.5 space-y-1.5 bg-blue-50/20 px-4 rounded-xl border border-blue-100/50 mb-3">
+                    <div className="flex justify-between text-[12px]">
+                      <span className="text-blue-600/70 font-semibold">Điểm tích lũy trước:</span>
+                      <span className="font-bold text-slate-700">{info.pointsBefore} đp</span>
+                    </div>
+                    {info.pointsUsed !== undefined && info.pointsUsed > 0 && (
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-red-500 font-semibold">Điểm đã sử dụng:</span>
+                        <span className="font-bold text-red-650">-{info.pointsUsed} đp</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-[12px]">
+                      <span className="text-emerald-600 font-semibold">Điểm tích lũy mới:</span>
+                      <span className="font-bold text-emerald-600">+{info.pointsEarned} đp</span>
+                    </div>
+                    <div className="flex justify-between text-[12px] border-t border-slate-200/60 pt-1.5 mt-1 font-black">
+                      <span className="text-slate-800">Số dư điểm hiện tại:</span>
+                      <span className="text-blue-600">{info.pointsAfter} đp</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* ─── Footer ─── */}
                 <div className="text-center py-5 bg-slate-50/60 border-t border-slate-200">
