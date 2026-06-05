@@ -551,7 +551,7 @@ export class AIService {
     return null;
   }
 
-  private static generateSku(name: string, barcode: string): string {
+  private static async generateSku(name: string, barcode: string): Promise<string> {
     const cleanName = name
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -564,7 +564,34 @@ export class AIService {
     const prefix = tokens.join('-');
     const suffix = barcode.slice(-4) || Math.floor(1000 + Math.random() * 9000).toString();
     
-    return prefix ? `${prefix}-${suffix}` : `SP-${suffix}`;
+    const baseSku = prefix ? `${prefix}-${suffix}` : `SP-${suffix}`;
+    let finalSku = baseSku;
+    let exists = true;
+    let attempts = 0;
+
+    while (exists && attempts < 10) {
+      try {
+        const { data } = await supabase
+          .from('products')
+          .select('id')
+          .eq('sku', finalSku)
+          .limit(1)
+          .maybeSingle();
+
+        if (!data) {
+          exists = false;
+        } else {
+          attempts++;
+          const rand = Math.floor(100 + Math.random() * 900).toString();
+          finalSku = `${baseSku}-${rand}`;
+        }
+      } catch (err) {
+        console.error('Lỗi check SKU trùng:', err);
+        return `${baseSku}-${Date.now().toString().slice(-4)}`;
+      }
+    }
+
+    return finalSku;
   }
 
   private static localMergeResults(results: NormalizedProductInfo[], barcode: string) {
@@ -745,7 +772,7 @@ Chú ý: Trả về duy nhất đối tượng JSON, không thêm bất kỳ vă
     }
 
     const firstSourceUrl = validResults.map(r => r.source_url).find(Boolean) || '';
-    const generatedSku = this.generateSku(merged.name || `Sản phẩm ${cleanBarcode}`, cleanBarcode);
+    const generatedSku = await this.generateSku(merged.name || `Sản phẩm ${cleanBarcode}`, cleanBarcode);
 
     return {
       source: isAiProcessed ? 'ai-merged' : 'local-merged',
