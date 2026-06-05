@@ -949,7 +949,9 @@ const POSPage = () => {
       return;
     }
     
-    if (operationSettings.confirmBeforeCheckout && !isCheckoutConfirmed) {
+    const hasPoints = matchedCustomer && matchedCustomer.points > 0;
+    const needConfirm = operationSettings.confirmBeforeCheckout || hasPoints;
+    if (needConfirm && !isCheckoutConfirmed) {
       setShowCheckoutConfirm(true);
       return;
     }
@@ -1608,46 +1610,6 @@ const POSPage = () => {
                       </div>
 
                       <div className="border-t border-blue-200/50 pt-1.5 flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={isRedeemingPoints}
-                              onChange={(e) => {
-                                setIsRedeemingPoints(e.target.checked);
-                                setUsedPoints(0);
-                              }}
-                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                            />
-                            <span className="text-[11px] font-semibold text-slate-600">Đổi điểm (1đp = 1k)</span>
-                          </label>
-                          
-                          {isRedeemingPoints && (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                min={0}
-                                max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
-                                value={usedPoints || ''}
-                                onChange={(e) => {
-                                  const points = Math.max(0, parseInt(e.target.value, 10) || 0);
-                                  const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
-                                  setUsedPoints(Math.min(points, maxPoints));
-                                }}
-                                placeholder="0"
-                                className="w-14 bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 text-center outline-none focus:border-blue-500"
-                              />
-                              <span className="text-[10px] text-slate-500 font-bold">đp</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {isRedeemingPoints && usedPoints > 0 && (
-                          <p className="text-[11px] font-bold text-blue-600 text-right">
-                            Giảm trừ: -{money(usedPoints * 1000)}
-                          </p>
-                        )}
-
                         <p className="text-[10px] font-bold text-emerald-600">
                           Tích lũy thêm: +{Math.floor(finalAmount / 10000)} điểm
                         </p>
@@ -2102,17 +2064,71 @@ const POSPage = () => {
                     <span>-{money(discountAmount)}</span>
                   </div>
                 )}
+                {pointsDiscount > 0 && (
+                  <div className="flex justify-between items-center text-blue-600">
+                    <span>Đổi điểm tích lũy:</span>
+                    <span>-{money(pointsDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center border-t border-slate-200 pt-2.5 text-sm font-extrabold text-slate-800">
                   <span>Tổng tiền thanh toán:</span>
                   <span className="text-lg font-black text-blue-600">{money(finalAmount)}</span>
                 </div>
               </div>
+
+              {/* Points redemption selector (shown only if customer has points) */}
+              {matchedCustomer && matchedCustomer.points > 0 && (
+                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isRedeemingPoints}
+                      onChange={(e) => {
+                        setIsRedeemingPoints(e.target.checked);
+                        if (e.target.checked) {
+                          const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
+                          setUsedPoints(maxPoints);
+                        } else {
+                          setUsedPoints(0);
+                        }
+                      }}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <span className="text-xs font-black text-slate-700">
+                      Sử dụng điểm tích lũy ({matchedCustomer.points} đp khả dụng)
+                    </span>
+                  </label>
+                  {isRedeemingPoints && (
+                    <div className="flex items-center gap-2 pl-6">
+                      <span className="text-xs font-semibold text-slate-500">Số điểm muốn dùng:</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
+                        value={usedPoints || ''}
+                        onChange={(e) => {
+                          const points = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
+                          setUsedPoints(Math.min(points, maxPoints));
+                        }}
+                        placeholder="0"
+                        className="w-20 bg-white border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-800 text-center outline-none focus:border-blue-500"
+                      />
+                      <span className="text-xs text-slate-500 font-bold">đp (Giảm -{money(usedPoints * 1000)})</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
             <div className="grid grid-cols-2 gap-3 p-5 border-t border-slate-100 bg-slate-50">
               <button
-                onClick={() => setShowCheckoutConfirm(false)}
+                onClick={() => {
+                  setShowCheckoutConfirm(false);
+                  setIsRedeemingPoints(false);
+                  setUsedPoints(0);
+                }}
                 className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
               >
                 Quay lại
