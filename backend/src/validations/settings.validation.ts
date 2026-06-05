@@ -25,6 +25,9 @@ export const operationSettingsSchema = z.object({
   confirmBeforeCheckout: z.boolean().default(false),
   sessionLockMinutes: z.coerce.number().int().min(5).max(240).default(30),
   compactMode: z.boolean().default(false),
+  bankBin: z.string().trim().optional().default(''),
+  bankAccountNumber: z.string().trim().optional().default(''),
+  bankAccountName: z.string().trim().optional().default(''),
 });
 
 export type OperationSettings = z.infer<typeof operationSettingsSchema>;
