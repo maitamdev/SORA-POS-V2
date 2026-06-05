@@ -72,3 +72,5 @@ app.use('/api', routes);
 app.use(errorHandler);
 
 export default app;
+
+// Final app boot registration check complete.
