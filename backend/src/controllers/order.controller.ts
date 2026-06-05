@@ -27,6 +27,10 @@ export class OrderController {
     );
   });
 
+  static deleteAll = asyncHandler(async (_req: Request, res: Response) => {
+    successResponse(res, await OrderService.deleteAll(), 'Xóa toàn bộ hóa đơn thành công');
+  });
+
   static remove = asyncHandler(async (req: Request, res: Response) => {
     successResponse(res, await OrderService.delete(req.params.id), 'Xóa hóa đơn thành công');
   });
