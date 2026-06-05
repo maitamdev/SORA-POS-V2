@@ -8,9 +8,10 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
-    "build": "node build.js"
+    "build": "npm run build --workspace=frontend && npx shx rm -rf dist && npx shx mv frontend/dist dist"
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^10.0.3",
+    "shx": "^0.4.0"
   }
 }
