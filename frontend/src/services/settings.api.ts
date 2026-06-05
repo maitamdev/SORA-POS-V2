@@ -26,6 +26,9 @@ export interface OperationSettings {
   confirmBeforeCheckout: boolean;
   sessionLockMinutes: number;
   compactMode: boolean;
+  bankBin: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
 }
 
 export interface OperationSettingsResponse {
@@ -59,6 +62,9 @@ export const defaultOperationSettings: OperationSettings = {
   confirmBeforeCheckout: false,
   sessionLockMinutes: 30,
   compactMode: false,
+  bankBin: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
 };
 
 export const settingsAPI = {
