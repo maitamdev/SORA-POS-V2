@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   HiOutlineCube,
@@ -22,19 +23,52 @@ import { Category, Product, Supplier } from '../../types/domain.type';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
+const normalizeText = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const generateSku = (name: string, barcode: string): string => {
+  const cleanBarcode = barcode.replace(/\D/g, '');
+  const cleanName = name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .toUpperCase()
+    .split(/[\s-]+/)
+    .filter(Boolean);
+  
+  const tokens = cleanName.filter(t => t.length > 1 || !isNaN(Number(t))).slice(0, 3);
+  const prefix = tokens.join('-');
+  const suffix = cleanBarcode.slice(-4) || Math.floor(1000 + Math.random() * 9000).toString();
+  
+  return prefix ? `${prefix}-${suffix}` : `SP-${suffix}`;
+};
+
 const getProductImage = (product: Product) => {
   return product.image_url || '/assets/product-placeholder.svg';
 };
 
 const ProductsPage = () => {
   const { user } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  const categoryParam = searchParams.get('categoryId') || 'all';
+
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    lowStock: 0,
+    outStock: 0,
+  });
 
   // Filtering states
   const [search, setSearch] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categoryParam);
   const [stockStatus, setStockStatus] = useState('all'); // all, in_stock, low_stock, out_of_stock
   const [sortBy, setSortBy] = useState('newest');
 
@@ -65,6 +99,8 @@ const ProductsPage = () => {
   
   // AI State
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [productLookupLoading, setProductLookupLoading] = useState(false);
+  const lastLookupBarcodeRef = useRef('');
 
   // Advanced Filter Popup
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -108,7 +144,7 @@ const ProductsPage = () => {
 
   const densityPadding = tableDensity === 'compact' ? 'py-1.5' : tableDensity === 'comfortable' ? 'py-4' : 'py-3';
   const densityPaddingTh = tableDensity === 'compact' ? 'py-2' : tableDensity === 'comfortable' ? 'py-4' : 'py-3.5';
-  const canManageProducts = user?.role === 'admin' || user?.role === 'manager';
+  const canManageProducts = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'cashier';
   const visibleColCount = Object.values(visibleColumns).filter(Boolean).length + (canManageProducts ? 2 : 0); // +2 for checkbox & actions
 
   const loadData = async () => {
@@ -120,9 +156,18 @@ const ProductsPage = () => {
     if (selectedCategoryId !== 'all') params.category_id = selectedCategoryId;
     if (filterActiveStatus !== 'all') params.is_active = filterActiveStatus ? 'true' : 'false';
 
+    // Tham số tìm tất cả sản phẩm thỏa mãn bộ lọc để tính thống kê (bỏ phân trang)
+    const statsParams: Record<string, unknown> = {
+      search,
+      limit: 10000,
+    };
+    if (selectedCategoryId !== 'all') statsParams.category_id = selectedCategoryId;
+    if (filterActiveStatus !== 'all') statsParams.is_active = filterActiveStatus ? 'true' : 'false';
+
     try {
-      const [productRes, categoryRes, supplierRes] = await Promise.all([
+      const [productRes, allProductRes, categoryRes, supplierRes] = await Promise.all([
         catalogAPI.products.list(params),
+        catalogAPI.products.list(statsParams),
         catalogAPI.categories.list({ limit: 100, is_active: true }),
         catalogAPI.suppliers.list({ limit: 100, is_active: true }),
       ]);
@@ -131,6 +176,25 @@ const ProductsPage = () => {
       setTotalItems(productRes.data.data.pagination.total);
       setCategories(categoryRes.data.data.items);
       setSuppliers(supplierRes.data.data.items);
+
+      // Tính toán thống kê trên toàn bộ sản phẩm thỏa mãn bộ lọc
+      const allProducts = allProductRes.data.data.items;
+      let active = 0;
+      let lowStock = 0;
+      let outStock = 0;
+
+      allProducts.forEach(p => {
+        if (p.is_active) active++;
+        if (p.stock_quantity <= 0) outStock++;
+        else if (p.stock_quantity <= p.min_stock_level) lowStock++;
+      });
+
+      setStats({
+        total: allProductRes.data.data.pagination.total,
+        active,
+        lowStock,
+        outStock,
+      });
     } catch (err) {
       toast.error('Lỗi khi tải dữ liệu sản phẩm');
     }
@@ -139,6 +203,14 @@ const ProductsPage = () => {
   useEffect(() => {
     loadData();
   }, [page, limit, selectedCategoryId, search, filterActiveStatus]);
+
+  // Sync selectedCategoryId with URL parameters if categoryParam changes
+  useEffect(() => {
+    if (categoryParam !== selectedCategoryId) {
+      setSelectedCategoryId(categoryParam);
+      setPage(1);
+    }
+  }, [categoryParam]);
 
   useEffect(() => {
     settingsAPI
@@ -150,25 +222,6 @@ const ProductsPage = () => {
       })
       .catch(() => setOperationSettings(defaultOperationSettings));
   }, []);
-
-  const stats = useMemo(() => {
-    let active = 0;
-    let lowStock = 0;
-    let outStock = 0;
-
-    products.forEach(p => {
-      if (p.is_active) active++;
-      if (p.stock_quantity <= 0) outStock++;
-      else if (p.stock_quantity <= p.min_stock_level) lowStock++;
-    });
-
-    return {
-      total: products.length,
-      active,
-      lowStock,
-      outStock,
-    };
-  }, [products]);
 
   // SVG Donut chart calculations
   const donutChart = useMemo(() => {
@@ -254,35 +307,7 @@ const ProductsPage = () => {
       return;
     }
 
-    let resolvedCategoryId: string | null = null;
-    if (categoryName.trim()) {
-      const matched = categories.find(
-        (c) => c.name.toLowerCase().trim() === categoryName.toLowerCase().trim()
-      );
-      if (matched) {
-        resolvedCategoryId = matched.id;
-      } else {
-        try {
-          await catalogAPI.categories.create({
-            name: categoryName.trim(),
-            description: 'Được tạo tự động khi tạo sản phẩm',
-          });
-          const latestCatsRes = await catalogAPI.categories.list({ limit: 100 });
-          const latestCats = latestCatsRes.data.data.items;
-          setCategories(latestCats);
-          
-          const newCat = latestCats.find(
-            (c) => c.name.toLowerCase().trim() === categoryName.toLowerCase().trim()
-          );
-          if (newCat) {
-            resolvedCategoryId = newCat.id;
-          }
-        } catch (err) {
-          console.error('Lỗi khi tự động tạo danh mục', err);
-          toast.error('Không thể tạo danh mục mới, sản phẩm sẽ được lưu không có danh mục');
-        }
-      }
-    }
+    const resolvedCategoryId: string | null = categoryId || null;
 
     const payload = {
       sku: sku.trim(),
@@ -335,8 +360,91 @@ const ProductsPage = () => {
     setImageUrl(product.image_url || '');
     setDescription(product.description || '');
     setIsActive(product.is_active);
+    lastLookupBarcodeRef.current = product.barcode || '';
     setShowModal(true);
   };
+
+  const applySuggestedCategory = (categoryNameFromAI?: string | null) => {
+    if (!categoryNameFromAI) return;
+
+    const normalizedSuggestion = normalizeText(categoryNameFromAI);
+    const matchedCategory = categories.find((category) => {
+      const normalizedCategory = normalizeText(category.name);
+      return normalizedCategory.includes(normalizedSuggestion) || normalizedSuggestion.includes(normalizedCategory);
+    });
+
+    if (matchedCategory) {
+      setCategoryId(matchedCategory.id);
+      setCategoryName(matchedCategory.name);
+    } else if (!categoryName) {
+      setCategoryName(categoryNameFromAI);
+    }
+  };
+
+  const handleBarcodeProductLookup = async (silent = false) => {
+    const cleanBarcode = barcode.replace(/\D/g, '');
+    if (cleanBarcode.length < 6) {
+      if (!silent) toast.error('Vui lòng nhập hoặc quét mã vạch hợp lệ');
+      return;
+    }
+
+    setProductLookupLoading(true);
+    try {
+      const response = await aiAPI.identifyProductByBarcode(cleanBarcode);
+      const suggestion = response.data.data;
+
+      if (suggestion.exists && suggestion.raw) {
+        toast.error(`Sản phẩm đã tồn tại: ${suggestion.name}`, { id: 'duplicate-barcode-toast' });
+        if (window.confirm(`Sản phẩm "${suggestion.name}" đã tồn tại trong hệ thống.\n\nBạn có muốn chuyển sang chế độ CHỈNH SỬA sản phẩm này không?`)) {
+          handleEditClick(suggestion.raw);
+        }
+        return;
+      }
+
+      setBarcode(suggestion.barcode);
+      if (!sku.trim() || sku.trim() === barcode.trim()) setSku(suggestion.sku);
+      setName(suggestion.name);
+      setUnit((current) => current || suggestion.unit || 'Cái');
+      setImageUrl((current) => current || suggestion.image_url || '');
+      setDescription((current) => current || suggestion.description || '');
+      applySuggestedCategory(suggestion.category_name);
+      lastLookupBarcodeRef.current = cleanBarcode;
+
+      toast.success(`AI đã nhận diện (${suggestion.source}): ${suggestion.name}`);
+    } catch (error: any) {
+      if (!silent) {
+        toast.error(error.response?.data?.message || 'Không nhận diện được sản phẩm từ mã vạch này');
+      }
+    } finally {
+      setProductLookupLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showModal || isEditMode) return;
+
+    const cleanBarcode = barcode.replace(/\D/g, '');
+    if (cleanBarcode.length < 8 || cleanBarcode === lastLookupBarcodeRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      handleBarcodeProductLookup(true);
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+  }, [barcode, showModal, isEditMode]);
+
+  // Auto-generate SKU when name or barcode changes (if SKU is empty or is equal to the barcode)
+  useEffect(() => {
+    if (isEditMode || !showModal) return;
+    const cleanBarcode = barcode.trim();
+    const cleanSku = sku.trim();
+
+    if (!cleanSku || cleanSku === cleanBarcode) {
+      if (name.trim()) {
+        setSku(generateSku(name, barcode));
+      }
+    }
+  }, [name, barcode, isEditMode, showModal]);
 
   const handleAIGenerateDescription = async () => {
     if (!name.trim()) {
@@ -421,6 +529,7 @@ const ProductsPage = () => {
     setImageUrl('');
     setDescription('');
     setIsActive(true);
+    lastLookupBarcodeRef.current = '';
     setShowModal(true);
   };
 
@@ -1377,7 +1486,22 @@ const ProductsPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 {/* SKU */}
                 <div className="space-y-1">
-                  <label className="block font-black text-slate-500 uppercase">Mã sản phẩm (SKU) *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block font-black text-slate-500 uppercase">Mã sản phẩm (SKU) *</label>
+                    {(name.trim() || barcode.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newSku = generateSku(name, barcode);
+                          setSku(newSku);
+                          toast.success(`Đã tạo SKU: ${newSku}`);
+                        }}
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 transition"
+                      >
+                        Tự động tạo SKU
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
@@ -1390,12 +1514,24 @@ const ProductsPage = () => {
 
                 {/* Barcode */}
                 <div className="space-y-1">
-                  <label className="block font-black text-slate-500 uppercase">Mã vạch (Barcode)</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block font-black text-slate-500 uppercase">Mã vạch (Barcode)</label>
+                    <button
+                      type="button"
+                      onClick={() => handleBarcodeProductLookup(false)}
+                      disabled={productLookupLoading || barcode.replace(/\D/g, '').length < 6}
+                      className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-600 transition hover:text-blue-800 disabled:opacity-50"
+                      title="Đọc dữ liệu sản phẩm từ Open Food Facts"
+                    >
+                      <HiOutlineSearch className={productLookupLoading ? 'animate-spin' : ''} />
+                      {productLookupLoading ? 'Đang đọc...' : 'AI nhận diện'}
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
-                    placeholder="Mã vạch sản phẩm"
+                    placeholder="Quét hoặc nhập mã vạch sản phẩm"
                     className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
@@ -1427,17 +1563,27 @@ const ProductsPage = () => {
                   />
                 </div>
 
-                {/* Category text input */}
+                {/* Category select input */}
                 <div className="space-y-1">
                   <label className="block font-black text-slate-500 uppercase">Danh mục *</label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    value={categoryName}
-                    onChange={(e) => setCategoryName(e.target.value)}
-                    placeholder="Ví dụ: Nước ngọt, Bánh kẹo..."
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
-                  />
+                    value={categoryId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCategoryId(id);
+                      const cat = categories.find((c) => c.id === id);
+                      setCategoryName(cat ? cat.name : '');
+                    }}
+                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition text-slate-800"
+                  >
+                    <option value="">-- Chọn danh mục --</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
