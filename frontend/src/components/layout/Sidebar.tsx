@@ -8,6 +8,7 @@ import {
   HiOutlineCube,
   HiOutlineTag,
   HiOutlineClipboardList,
+  HiOutlineClock,
   HiOutlineChartBar,
   HiOutlineTruck,
   HiOutlineUserGroup,
@@ -38,6 +39,12 @@ const menuItems = [
     roles: ['admin', 'manager', 'cashier'],
   },
   {
+    label: 'Ca của tôi',
+    icon: HiOutlineClock,
+    path: '/my-shift',
+    roles: ['cashier'],
+  },
+  {
     label: 'Sản phẩm',
     icon: HiOutlineCube,
     path: '/products',
@@ -59,12 +66,6 @@ const menuItems = [
     label: 'Kho hàng',
     icon: HiOutlineTruck,
     path: '/stock',
-    roles: ['admin', 'manager'],
-  },
-  {
-    label: 'Cảnh báo tồn kho',
-    icon: HiOutlineExclamationCircle,
-    path: '/stock/alerts',
     roles: ['admin', 'manager', 'cashier'],
   },
   {
@@ -86,6 +87,12 @@ const menuItems = [
     roles: ['admin', 'manager'],
   },
   {
+    label: 'Ca làm',
+    icon: HiOutlineClock,
+    path: '/shifts',
+    roles: ['admin', 'manager'],
+  },
+  {
     label: 'Báo cáo',
     icon: HiOutlineChartBar,
     path: '/reports',
@@ -101,7 +108,7 @@ const menuItems = [
     label: 'Cài đặt',
     icon: HiOutlineCog,
     path: '/settings',
-    roles: ['admin', 'manager'],
+    roles: ['admin'],
   },
 ];
 
