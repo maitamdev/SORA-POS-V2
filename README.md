@@ -157,3 +157,10 @@ Dự án này được cấp phép theo tiêu chuẩn **MIT License**. Bạn có
 
 ---
 *Phát triển với ❤️ bởi đội ngũ Sora POS*
+
+
+## AI Barcode Scanning & Cashier Shift Management
+
+- Fully integrated keyless barcode search logic with iCheck fallback scan checking.
+- Designed automated role-based shifts logs, checkout bank transfer VietQR receipts.
+
