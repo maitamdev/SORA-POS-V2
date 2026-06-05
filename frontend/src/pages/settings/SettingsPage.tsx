@@ -4,6 +4,7 @@ import { HiOutlineCog, HiOutlineOfficeBuilding, HiOutlinePrinter, HiOutlineShiel
 import { defaultOperationSettings, settingsAPI, OperationSettings } from '../../services/settings.api';
 import { useAuthStore } from '../../stores/auth.store';
 import { getRoleLabel } from '../../utils/userDisplay';
+import { POPULAR_BANKS } from '../../utils/banks';
 
 const SettingsPage = () => {
   const { user } = useAuthStore();
@@ -211,6 +212,33 @@ const SettingsPage = () => {
           </div>
         </Panel>
 
+        <Panel icon={<HiOutlineCog />} title="Chuyển khoản VietQR">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <SelectField
+              label="Ngân hàng thụ hưởng"
+              value={settings.bankBin}
+              onChange={(value) => updateSetting('bankBin', value)}
+              options={[
+                { value: '', label: '-- Chọn ngân hàng --' },
+                ...POPULAR_BANKS.map((b) => ({ value: b.bin, label: `${b.shortName} - ${b.name}` })),
+              ]}
+            />
+            <TextField
+              label="Số tài khoản thụ hưởng"
+              value={settings.bankAccountNumber}
+              onChange={(value) => updateSetting('bankAccountNumber', value)}
+              placeholder="Nhập số tài khoản ngân hàng"
+            />
+            <TextField
+              className="md:col-span-2"
+              label="Tên chủ tài khoản thụ hưởng"
+              value={settings.bankAccountName}
+              onChange={(value) => updateSetting('bankAccountName', value)}
+              placeholder="Ví dụ: NGUYEN VAN A (Chữ in hoa không dấu)"
+            />
+          </div>
+        </Panel>
+
         <Panel className="xl:col-span-2" icon={<HiOutlineShieldCheck />} title="Phân quyền thao tác">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[620px] text-left text-xs">
@@ -230,7 +258,7 @@ const SettingsPage = () => {
                   ['Xóa sản phẩm', true, true, false],
                   ['Quản lý nhân viên', true, true, false],
                   ['Báo cáo doanh thu', true, true, false],
-                  ['Cài đặt vận hành', true, true, false],
+                  ['Cài đặt vận hành', true, false, false],
                 ].map(([feature, admin, manager, cashier]) => (
                   <tr key={String(feature)}>
                     <td className="px-3 py-2">{feature}</td>
