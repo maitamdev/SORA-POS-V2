@@ -17,5 +17,6 @@ router.post('/active/close', roleMiddleware('cashier'), validateMiddleware(close
 router.get('/', roleMiddleware('admin', 'manager'), ShiftController.list);
 router.post('/', roleMiddleware('admin', 'manager'), validateMiddleware(openShiftSchema), ShiftController.open);
 router.get('/:id', roleMiddleware('admin', 'manager'), ShiftController.get);
+router.post('/:id/close', roleMiddleware('admin', 'manager'), validateMiddleware(closeShiftSchema), ShiftController.closeByManager);
 
 export default router;

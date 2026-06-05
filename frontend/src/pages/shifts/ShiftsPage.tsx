@@ -43,6 +43,39 @@ const ShiftsPage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedShift, setSelectedShift] = useState<ShiftSession | null>(null);
+  const [closingShift, setClosingShift] = useState<ShiftSession | null>(null);
+  const [closingCashInput, setClosingCashInput] = useState('');
+  const [managerNoteInput, setManagerNoteInput] = useState('');
+  const [closingLoading, setClosingLoading] = useState(false);
+
+  const handleCloseShift = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!closingShift) return;
+
+    const closingCash = Number(closingCashInput);
+    if (isNaN(closingCash) || closingCash < 0) {
+      toast.error('Tiền chốt ca thực tế không hợp lệ');
+      return;
+    }
+
+    setClosingLoading(true);
+    try {
+      await shiftAPI.closeByManager(closingShift.id, {
+        closing_cash: closingCash,
+        note: managerNoteInput.trim() || null,
+      });
+      toast.success('Chốt ca nhân viên thành công');
+      setClosingShift(null);
+      setClosingCashInput('');
+      setManagerNoteInput('');
+      await loadData();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Chốt ca thất bại');
+    } finally {
+      setClosingLoading(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -255,10 +288,24 @@ const ShiftsPage = () => {
                         </p>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => viewShift(shift)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700">
-                          <HiOutlineEye className="h-4 w-4" />
-                          Xem
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button onClick={() => viewShift(shift)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 hover:bg-blue-100 transition">
+                            <HiOutlineEye className="h-4 w-4" />
+                            Xem
+                          </button>
+                          {shift.status === 'checked_in' && (
+                            <button
+                              onClick={() => {
+                                setClosingShift(shift);
+                                setClosingCashInput('');
+                                setManagerNoteInput('');
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100 transition"
+                            >
+                              Chốt ca
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -274,14 +321,29 @@ const ShiftsPage = () => {
           <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                  <p className="text-xs font-black uppercase text-slate-400">Báo cáo ca làm</p>
+                <p className="text-xs font-black uppercase text-slate-400">Báo cáo ca làm</p>
                 <h3 className="text-lg font-black text-slate-900">
                   {selectedShift.employee?.full_name} - {selectedShift.shift_name || selectedShift.shift_date}
                 </h3>
               </div>
-              <button onClick={() => setSelectedShift(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold">
-                Dong
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedShift.status === 'checked_in' && (
+                  <button
+                    onClick={() => {
+                      setClosingShift(selectedShift);
+                      setSelectedShift(null);
+                      setClosingCashInput('');
+                      setManagerNoteInput('');
+                    }}
+                    className="rounded-lg bg-red-650 px-4 py-2 text-sm font-black text-white hover:bg-red-700 transition"
+                  >
+                    Chốt ca này
+                  </button>
+                )}
+                <button onClick={() => setSelectedShift(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold bg-white text-slate-700 hover:bg-slate-50 transition">
+                  Đóng
+                </button>
+              </div>
             </div>
 
             <div className="overflow-y-auto p-5">
@@ -354,6 +416,107 @@ const ShiftsPage = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {closingShift && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-black uppercase text-red-650">Yêu cầu chốt ca nhân viên</p>
+                <h3 className="text-base font-black text-slate-900">
+                  {closingShift.employee?.full_name}
+                </h3>
+              </div>
+              <button onClick={() => setClosingShift(null)} className="text-slate-450 hover:text-slate-650 text-base font-black">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCloseShift} className="p-5 space-y-4">
+              <div className="rounded-xl bg-slate-50 p-4 space-y-2.5 text-xs font-bold text-slate-600">
+                <div className="flex justify-between items-center">
+                  <span>Mã ca / Tên ca:</span>
+                  <span className="text-slate-800 font-black">{closingShift.shift_name || 'Ca bán hàng'} ({closingShift.shift_code})</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Tiền mở ca đầu ca:</span>
+                  <span className="text-slate-800">{money(closingShift.opening_cash)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Doanh thu tiền mặt phát sinh:</span>
+                  <span className="text-slate-800">{money(closingShift.summary?.payments.cash || 0)}</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-xs text-slate-500 font-bold">
+                  <span>Doanh thu hình thức khác (CK/Thẻ):</span>
+                  <span className="text-slate-800">
+                    {money((closingShift.summary?.payments.transfer || 0) + (closingShift.summary?.payments.card || 0))}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-slate-200 pt-2.5 text-sm font-extrabold text-slate-800">
+                  <span>Tổng tiền mặt hệ thống cần thu hồi:</span>
+                  <span className="text-blue-600 font-black">
+                    {money(Number(closingShift.opening_cash) + Number(closingShift.summary?.payments.cash || 0))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-500 uppercase">Tiền mặt thực tế thu hồi</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={closingCashInput}
+                  onChange={(e) => setClosingCashInput(e.target.value)}
+                  placeholder="VD: 1500000"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-base font-black text-slate-800 outline-none focus:border-blue-500"
+                  autoFocus
+                />
+              </div>
+
+              {closingCashInput.trim() !== '' && (
+                <div className={`rounded-xl border p-3 flex justify-between items-center ${
+                  Number(closingCashInput) - (Number(closingShift.opening_cash) + Number(closingShift.summary?.payments.cash || 0)) === 0
+                    ? 'bg-emerald-50 border-emerald-100 text-emerald-800'
+                    : 'bg-amber-50 border-amber-100 text-amber-800'
+                }`}>
+                  <span className="text-xs font-black uppercase">Chênh lệch đối soát:</span>
+                  <span className="text-base font-black">
+                    {money(Number(closingCashInput) - (Number(closingShift.opening_cash) + Number(closingShift.summary?.payments.cash || 0)))}
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-500 uppercase">Ghi chú của quản lý</label>
+                <textarea
+                  value={managerNoteInput}
+                  onChange={(e) => setManagerNoteInput(e.target.value)}
+                  placeholder="Nhập lý do lệch tiền hoặc ghi chú kiểm đếm..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs font-semibold outline-none focus:border-blue-500 min-h-[60px]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setClosingShift(null)}
+                  className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="submit"
+                  disabled={closingLoading}
+                  className="py-2.5 bg-red-650 hover:bg-red-750 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                >
+                  {closingLoading ? 'Đang chốt ca...' : 'Xác nhận chốt ca'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

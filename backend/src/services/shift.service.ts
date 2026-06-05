@@ -288,6 +288,42 @@ export class ShiftService {
     return { ...mapShift(data), summary: await this.summary(data.id), orders: await this.orders(data.id) };
   }
 
+  static async closeByManager(shiftId: string, input: CloseShiftInput, managerId: string) {
+    const { data: shift, error: getErr } = await supabase
+      .from('shift_sessions')
+      .select('*')
+      .eq('id', shiftId)
+      .single();
+
+    if (getErr || !shift) throw new AppError(404, 'Không tìm thấy ca làm');
+    if (shift.status !== 'checked_in') throw new AppError(400, 'Ca này chưa được nhận hoặc đã chốt');
+
+    const summary = await this.summary(shiftId);
+    const openingCash = Number(shift.opening_cash || 0);
+    const closingCash = toNumber(input.closing_cash);
+    const expectedCash = openingCash + summary.payments.cash;
+    const cashDifference = closingCash - expectedCash;
+
+    const { data, error } = await supabase
+      .from('shift_sessions')
+      .update({
+        status: 'closed',
+        closing_cash: closingCash,
+        expected_cash: expectedCash,
+        cash_difference: cashDifference,
+        note: shift.note || `Được chốt bởi quản lý`,
+        manager_note: input.note || null,
+        closed_at: new Date().toISOString(),
+      })
+      .eq('id', shiftId)
+      .select('*')
+      .single();
+
+    if (error || !data) throw new AppError(400, error?.message || 'Không chốt được ca');
+    const [enriched] = await this.attachUsers([mapShift(data)]);
+    return { ...enriched, summary: await this.summary(data.id), orders: await this.orders(data.id) };
+  }
+
   static async requireActiveShiftForOrder(userId: string) {
     const role = await this.getUserRole(userId);
     if (role !== 'cashier') return null;

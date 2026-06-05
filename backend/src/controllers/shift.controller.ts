@@ -37,4 +37,9 @@ export class ShiftController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(res, await ShiftService.close(req.user.userId, req.body), 'Chốt ca thành công');
   });
+
+  static closeByManager = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    successResponse(res, await ShiftService.closeByManager(req.params.id, req.body, req.user.userId), 'Quản lý chốt ca thành công');
+  });
 }

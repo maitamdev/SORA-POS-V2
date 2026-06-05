@@ -21,4 +21,6 @@ export const shiftAPI = {
     api.post<ApiResponse<ShiftSession>>('/shifts/active/check-in', { opening_cash }),
   close: (data: { closing_cash: number; note?: string | null }) =>
     api.post<ApiResponse<ShiftSession>>('/shifts/active/close', data),
+  closeByManager: (id: string, data: { closing_cash: number; note?: string | null }) =>
+    api.post<ApiResponse<ShiftSession>>(`/shifts/${id}/close`, data),
 };
