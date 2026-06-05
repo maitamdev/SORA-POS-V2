@@ -32,7 +32,13 @@ app.use(
         return;
       }
 
-      if (env.corsOrigins.includes(origin) || (env.nodeEnv === 'development' && isAllowedDevOrigin(origin))) {
+      const isVercelDomain = origin.endsWith('.vercel.app');
+
+      if (
+        env.corsOrigins.includes(origin) ||
+        isVercelDomain ||
+        (env.nodeEnv === 'development' && isAllowedDevOrigin(origin))
+      ) {
         callback(null, true);
         return;
       }
