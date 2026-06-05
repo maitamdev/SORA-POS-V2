@@ -66,7 +66,7 @@ export class CatalogService {
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('categories')
-      .select('*', { count: 'exact' })
+      .select('*, products(count)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
