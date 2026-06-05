@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { JwtPayload, UserRole } from '../types/user.type';
+import { ShiftService } from './shift.service';
 
 // Helper: lấy role name từ Supabase join result
 const getRoleName = (roles: unknown): UserRole => {
@@ -41,11 +42,16 @@ export class AuthService {
       throw new AppError(401, 'Email hoặc mật khẩu không đúng');
     }
 
+    const role = getRoleName(user.roles);
+    if (role === 'cashier') {
+      await ShiftService.verifyCashierLogin(user.id);
+    }
+
     // 3. Tạo JWT token
     const payload: JwtPayload = {
       userId: user.id,
       email: user.email,
-      role: getRoleName(user.roles),
+      role,
     };
 
     const signOptions: SignOptions = {
@@ -67,7 +73,7 @@ export class AuthService {
         full_name: user.full_name,
         phone: user.phone,
         avatar_url: user.avatar_url,
-        role: getRoleName(user.roles),
+        role,
         is_active: user.is_active,
         last_login: user.last_login,
       },
