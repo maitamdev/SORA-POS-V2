@@ -1493,231 +1493,234 @@ const POSPage = () => {
             )}
           </div>
 
-          {/* Cart Items List Area */}
-          <div className="flex-1 overflow-y-auto p-4 divide-y divide-slate-100 min-h-[180px] bg-slate-50/20">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-center text-slate-400 py-10">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-350 mb-2">
-                  📭
+          {/* Scrollable Middle Container (Cart Items + Customer Panel) */}
+          <div className="flex-1 overflow-y-auto min-h-0 bg-slate-50/20 divide-y divide-slate-100">
+            {/* Cart Items List Area */}
+            <div className="p-4 divide-y divide-slate-100 bg-white">
+              {cart.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center text-slate-400 py-10">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-350 mb-2">
+                    📭
+                  </div>
+                  <p className="text-xs font-black text-slate-500 uppercase">Giỏ hàng trống</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Chọn sản phẩm bên trái hoặc quét mã vạch.</p>
                 </div>
-                <p className="text-xs font-black text-slate-500 uppercase">Giỏ hàng trống</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Chọn sản phẩm bên trái hoặc quét mã vạch.</p>
-              </div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.product.id} className="py-3 flex items-start justify-between gap-3 group">
-                  <div className="flex items-start gap-3 min-w-0">
-                    {/* Thumbnail */}
-                    <img
-                      src={getProductImage(item.product)}
-                      alt={item.product.name}
-                      className="w-11 h-11 rounded-lg border border-slate-200/60 object-contain flex-shrink-0 bg-white p-0.5"
-                    />
-                    
-                    <div className="min-w-0 leading-tight">
-                      <p className="text-xs font-black text-slate-800 truncate" title={item.product.name}>
-                        {item.product.name}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{item.product.sku}</p>
+              ) : (
+                cart.map((item) => (
+                  <div key={item.product.id} className="py-3 flex items-start justify-between gap-3 group">
+                    <div className="flex items-start gap-3 min-w-0">
+                      {/* Thumbnail */}
+                      <img
+                        src={getProductImage(item.product)}
+                        alt={item.product.name}
+                        className="w-11 h-11 rounded-lg border border-slate-200/60 object-contain flex-shrink-0 bg-white p-0.5"
+                      />
                       
-                      {/* Quantity control steppers */}
-                      <div className="flex items-center gap-1 mt-2">
-                        <button
-                          onClick={() => updateQty(item.product.id, item.quantity - 1)}
-                          className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateQty(item.product.id, Number(e.target.value))}
-                          className="w-10 h-5.5 border border-slate-200 text-center text-xs font-black text-slate-800 outline-none rounded"
-                        />
-                        <button
-                          onClick={() => updateQty(item.product.id, item.quantity + 1)}
-                          className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
-                        >
-                          +
-                        </button>
+                      <div className="min-w-0 leading-tight">
+                        <p className="text-xs font-black text-slate-800 truncate" title={item.product.name}>
+                          {item.product.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{item.product.sku}</p>
+                        
+                        {/* Quantity control steppers */}
+                        <div className="flex items-center gap-1 mt-2">
+                          <button
+                            onClick={() => updateQty(item.product.id, item.quantity - 1)}
+                            className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateQty(item.product.id, Number(e.target.value))}
+                            className="w-10 h-5.5 border border-slate-200 text-center text-xs font-black text-slate-800 outline-none rounded"
+                          />
+                          <button
+                            onClick={() => updateQty(item.product.id, item.quantity + 1)}
+                            className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                    <span className="text-xs font-black text-slate-800">
-                      {money(Number(item.product.sell_price) * item.quantity)}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      {money(item.product.sell_price)}
-                    </span>
-                    <button
-                      onClick={() => updateQty(item.product.id, 0)}
-                      className="text-xs font-bold text-slate-350 hover:text-red-500 opacity-0 group-hover:opacity-100 transition duration-150 self-end mt-1"
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Customer & Notes Panel */}
-          <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-3 flex-shrink-0">
-            {/* Customer & Loyalty Points Section */}
-            <div className="space-y-2 border-b border-slate-100 pb-3">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none text-xs">
-                    📞
-                  </span>
-                  <input
-                    type="text"
-                    value={customerPhone}
-                    onChange={(e) => handlePhoneChange(e.target.value)}
-                    placeholder="Nhập SĐT để tích/tiêu điểm"
-                    className="w-full bg-white border border-slate-200 pl-8 pr-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
-                  />
-                </div>
-              </div>
-
-              {customerPhone.trim() && (
-                matchedCustomer ? (
-                  /* Khách hàng thành viên đã đăng ký - Ultra Compact */
-                  <div className="bg-blue-50/45 border border-blue-100 rounded-lg p-2.5 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] font-bold text-blue-600 bg-blue-100/60 px-1.5 py-0.5 rounded-md flex-shrink-0">TV</span>
-                        <span className="font-extrabold text-slate-800 truncate" title={matchedCustomer.name}>
-                          {matchedCustomer.name}
-                        </span>
-                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
-                          {matchedCustomer.points}đp
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => handlePhoneChange('')} 
-                        className="text-[10px] font-bold text-red-500 hover:text-red-750 uppercase"
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <span className="text-xs font-black text-slate-800">
+                        {money(Number(item.product.sell_price) * item.quantity)}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {money(item.product.sell_price)}
+                      </span>
+                      <button
+                        onClick={() => updateQty(item.product.id, 0)}
+                        className="text-xs font-bold text-slate-350 hover:text-red-500 opacity-0 group-hover:opacity-100 transition duration-150 self-end mt-1"
                       >
-                        Hủy
+                        Xóa
                       </button>
                     </div>
-
-                    <div className="border-t border-blue-200/50 pt-1.5 flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={isRedeemingPoints}
-                            onChange={(e) => {
-                              setIsRedeemingPoints(e.target.checked);
-                              setUsedPoints(0);
-                            }}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                          />
-                          <span className="text-[11px] font-semibold text-slate-600">Đổi điểm (1đp = 1k)</span>
-                        </label>
-                        
-                        {isRedeemingPoints && (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min={0}
-                              max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
-                              value={usedPoints || ''}
-                              onChange={(e) => {
-                                const points = Math.max(0, parseInt(e.target.value, 10) || 0);
-                                const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
-                                setUsedPoints(Math.min(points, maxPoints));
-                              }}
-                              placeholder="0"
-                              className="w-14 bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 text-center outline-none focus:border-blue-500"
-                            />
-                            <span className="text-[10px] text-slate-500 font-bold">đp</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {isRedeemingPoints && usedPoints > 0 && (
-                        <p className="text-[11px] font-bold text-blue-600 text-right">
-                          Giảm trừ: -{money(usedPoints * 1000)}
-                        </p>
-                      )}
-
-                      <p className="text-[10px] font-bold text-emerald-600">
-                        Tích lũy thêm: +{Math.floor(finalAmount / 10000)} điểm
-                      </p>
-                    </div>
                   </div>
-                ) : (
-                  /* Đăng ký khách hàng mới nhanh - Ultra Compact */
-                  <div className="bg-amber-50/45 border border-amber-100 rounded-lg p-2.5 space-y-1.5">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-amber-700">
-                      <span>Khách mới (Chưa tích điểm)</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={newCustName}
-                      onChange={(e) => setNewCustName(e.target.value)}
-                      placeholder="Nhập Họ & Tên để tự động tạo TK"
-                      className="w-full bg-white border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 transition"
-                    />
-                  </div>
-                )
+                ))
               )}
             </div>
 
-            {/* Discount and Voucher Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Chiết khấu đơn</label>
-                <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden w-full">
-                  <input
-                    type="number"
-                    value={discountValue || ''}
-                    disabled={!operationSettings.allowDiscount}
-                    max={discountType === 'percent' ? operationSettings.maxDiscountPercent : undefined}
-                    onChange={(e) => {
-                      const nextValue = Number(e.target.value);
-                      setDiscountValue(
-                        discountType === 'percent'
-                          ? Math.min(nextValue, operationSettings.maxDiscountPercent)
-                          : nextValue
-                      );
-                    }}
-                    placeholder="0"
-                    className="flex-1 w-full px-2.5 py-1.5 text-xs font-semibold outline-none disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                  <button
-                    disabled={!operationSettings.allowDiscount}
-                    onClick={() => {
-                      setDiscountType(discountType === 'percent' ? 'value' : 'percent');
-                      setDiscountValue(0);
-                    }}
-                    className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 border-l border-slate-200 text-xs font-black text-slate-600 transition disabled:opacity-50"
-                  >
-                    {discountType === 'percent' ? '%' : 'đ'}
-                  </button>
+            {/* Customer & Notes Panel */}
+            <div className="p-4 bg-slate-50/50 space-y-3">
+              {/* Customer & Loyalty Points Section */}
+              <div className="space-y-2 border-b border-slate-100 pb-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none text-xs">
+                      📞
+                    </span>
+                    <input
+                      type="text"
+                      value={customerPhone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      placeholder="Nhập SĐT để tích/tiêu điểm"
+                      className="w-full bg-white border border-slate-200 pl-8 pr-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
+                    />
+                  </div>
+                </div>
+
+                {customerPhone.trim() && (
+                  matchedCustomer ? (
+                    /* Khách hàng thành viên đã đăng ký - Ultra Compact */
+                    <div className="bg-blue-50/45 border border-blue-100 rounded-lg p-2.5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[11px] font-bold text-blue-600 bg-blue-100/60 px-1.5 py-0.5 rounded-md flex-shrink-0">TV</span>
+                          <span className="font-extrabold text-slate-800 truncate" title={matchedCustomer.name}>
+                            {matchedCustomer.name}
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
+                            {matchedCustomer.points}đp
+                          </span>
+                        </div>
+                        <button 
+                          onClick={() => handlePhoneChange('')} 
+                          className="text-[10px] font-bold text-red-500 hover:text-red-750 uppercase"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+
+                      <div className="border-t border-blue-200/50 pt-1.5 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={isRedeemingPoints}
+                              onChange={(e) => {
+                                setIsRedeemingPoints(e.target.checked);
+                                setUsedPoints(0);
+                              }}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-[11px] font-semibold text-slate-600">Đổi điểm (1đp = 1k)</span>
+                          </label>
+                          
+                          {isRedeemingPoints && (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
+                                value={usedPoints || ''}
+                                onChange={(e) => {
+                                  const points = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                  const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
+                                  setUsedPoints(Math.min(points, maxPoints));
+                                }}
+                                placeholder="0"
+                                className="w-14 bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 text-center outline-none focus:border-blue-500"
+                              />
+                              <span className="text-[10px] text-slate-500 font-bold">đp</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {isRedeemingPoints && usedPoints > 0 && (
+                          <p className="text-[11px] font-bold text-blue-600 text-right">
+                            Giảm trừ: -{money(usedPoints * 1000)}
+                          </p>
+                        )}
+
+                        <p className="text-[10px] font-bold text-emerald-600">
+                          Tích lũy thêm: +{Math.floor(finalAmount / 10000)} điểm
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Đăng ký khách hàng mới nhanh - Ultra Compact */
+                    <div className="bg-amber-50/45 border border-amber-100 rounded-lg p-2.5 space-y-1.5">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-amber-700">
+                        <span>Khách mới (Chưa tích điểm)</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={newCustName}
+                        onChange={(e) => setNewCustName(e.target.value)}
+                        placeholder="Nhập Họ & Tên để tự động tạo TK"
+                        className="w-full bg-white border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 transition"
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Discount and Voucher Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Chiết khấu đơn</label>
+                  <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden w-full">
+                    <input
+                      type="number"
+                      value={discountValue || ''}
+                      disabled={!operationSettings.allowDiscount}
+                      max={discountType === 'percent' ? operationSettings.maxDiscountPercent : undefined}
+                      onChange={(e) => {
+                        const nextValue = Number(e.target.value);
+                        setDiscountValue(
+                          discountType === 'percent'
+                            ? Math.min(nextValue, operationSettings.maxDiscountPercent)
+                            : nextValue
+                        );
+                      }}
+                      placeholder="0"
+                      className="flex-1 w-full px-2.5 py-1.5 text-xs font-semibold outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                    />
+                    <button
+                      disabled={!operationSettings.allowDiscount}
+                      onClick={() => {
+                        setDiscountType(discountType === 'percent' ? 'value' : 'percent');
+                        setDiscountValue(0);
+                      }}
+                      className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 border-l border-slate-200 text-xs font-black text-slate-600 transition disabled:opacity-50"
+                    >
+                      {discountType === 'percent' ? '%' : 'đ'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã giảm giá (Voucher)</label>
+                  <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden w-full px-2">
+                    <HiOutlineTag className="text-slate-400 w-4 h-4 flex-shrink-0" />
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
+                      placeholder="Chọn hoặc nhập mã"
+                      className="flex-1 w-full px-1.5 py-1.5 text-xs font-semibold outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã giảm giá (Voucher)</label>
-                <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden w-full px-2">
-                  <HiOutlineTag className="text-slate-400 w-4 h-4 flex-shrink-0" />
-                  <input
-                    type="text"
-                    value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value)}
-                    placeholder="Chọn hoặc nhập mã"
-                    className="flex-1 w-full px-1.5 py-1.5 text-xs font-semibold outline-none"
-                  />
-                </div>
-              </div>
             </div>
-
           </div>
 
           {/* Pricing calculations & checkout actions */}
