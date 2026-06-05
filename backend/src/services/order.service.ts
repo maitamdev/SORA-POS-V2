@@ -3,6 +3,7 @@ import { CatalogService } from './catalog.service';
 import { parsePagination, toNumber } from '../utils/query';
 import { AppError } from '../utils/AppError';
 import { SettingsService } from './settings.service';
+import { ShiftService } from './shift.service';
 
 type OrderItemInput = {
   product_id: string;
@@ -13,6 +14,7 @@ type OrderItemInput = {
 type CreateOrderInput = {
   customer_id?: string | null;
   discount_amount?: number;
+  used_points?: number;
   note?: string | null;
   payment?: {
     method?: string;
@@ -153,6 +155,16 @@ export class OrderService {
     const discountAmount = Math.min(toNumber(input.discount_amount), totalAmount);
     const finalAmount = Math.max(totalAmount - discountAmount, 0);
     const orderNumber = await this.generateOrderNumber();
+    const shiftId = await ShiftService.requireActiveShiftForOrder(userId);
+
+    // Tính toán ghi nhận điểm thưởng vào ghi chú đơn hàng
+    let finalNote = input.note || '';
+    const pointsUsed = Number(input.used_points || 0);
+    const pointsEarned = Math.floor(finalAmount / 10000);
+    if (pointsUsed > 0 || pointsEarned > 0) {
+      const pointsLog = `[Tích điểm] Đã sử dụng ${pointsUsed} điểm. Tích lũy thêm +${pointsEarned} điểm.`;
+      finalNote = finalNote ? `${finalNote}\n${pointsLog}` : pointsLog;
+    }
 
     // 5. Ghi nhận hóa đơn vào DB
     const { data: order, error: orderError } = await supabase
@@ -161,11 +173,12 @@ export class OrderService {
         order_number: orderNumber,
         customer_id: input.customer_id || null,
         user_id: userId,
+        shift_id: shiftId,
         total_amount: totalAmount,
         discount_amount: discountAmount,
         final_amount: finalAmount,
         payment_status: 'paid',
-        note: input.note || null,
+        note: finalNote || null,
       })
       .select('*')
       .single();
@@ -252,11 +265,13 @@ export class OrderService {
         .eq('id', input.customer_id)
         .maybeSingle();
       if (customer) {
+        const currentPoints = Number(customer.points || 0);
+        const nextPoints = Math.max(0, currentPoints - pointsUsed + pointsEarned);
         await supabase
           .from('customers')
           .update({
             total_spent: Number(customer.total_spent || 0) + finalAmount,
-            points: Number(customer.points || 0) + Math.floor(finalAmount / 10000),
+            points: nextPoints,
           })
           .eq('id', input.customer_id);
       }
@@ -309,6 +324,16 @@ export class OrderService {
 
     await supabase.from('payments').update({ status: 'refunded' }).eq('order_id', id);
     return this.getById(id);
+  }
+
+  static async deleteAll() {
+    // Xóa các giao dịch kho liên quan đến bán hàng và trả hàng
+    await supabase.from('stock_transactions').delete().in('type', ['sale', 'return']);
+    
+    // Xóa toàn bộ hóa đơn (Cascade delete tự động xóa order_details và payments)
+    const { error } = await supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) throw new AppError(400, error.message);
+    return null;
   }
 
   static async delete(id: string) {
