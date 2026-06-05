@@ -12,6 +12,7 @@ import reportRoutes from './report.routes';
 import aiRoutes from './ai.routes';
 import staffRoutes from './staff.routes';
 import settingsRoutes from './settings.routes';
+import shiftRoutes from './shift.routes';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/ai',
       '/api/staff',
       '/api/settings',
+      '/api/shifts',
     ],
   });
 });
@@ -58,5 +60,6 @@ router.use('/reports', reportRoutes);
 router.use('/ai', aiRoutes);
 router.use('/staff', staffRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/shifts', shiftRoutes);
 
 export default router;
