@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const orderCreateSchema = z.object({
   customer_id: z.string().uuid().optional().nullable(),
   discount_amount: z.coerce.number().min(0).optional(),
+  used_points: z.coerce.number().int().min(0).optional(),
   note: z.string().trim().optional().nullable(),
   payment: z.object({
     method: z.enum(['cash', 'card', 'transfer', 'momo', 'zalopay']).default('cash'),
