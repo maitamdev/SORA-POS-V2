@@ -29,6 +29,9 @@ export const defaultOperationSettings: OperationSettings = operationSettingsSche
   confirmBeforeCheckout: false,
   sessionLockMinutes: 30,
   compactMode: false,
+  bankBin: '',
+  bankAccountNumber: '',
+  bankAccountName: '',
 });
 
 const normalizeSettings = (value: unknown): OperationSettings => {
