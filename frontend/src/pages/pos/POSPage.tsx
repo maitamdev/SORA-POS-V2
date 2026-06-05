@@ -1494,7 +1494,7 @@ const POSPage = () => {
           </div>
 
           {/* Cart Items List Area */}
-          <div className="flex-1 overflow-y-auto p-4 divide-y divide-slate-100 min-h-0 bg-slate-50/20">
+          <div className="flex-1 overflow-y-auto p-4 divide-y divide-slate-100 min-h-[180px] bg-slate-50/20">
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center text-slate-400 py-10">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-350 mb-2">
@@ -1585,78 +1585,85 @@ const POSPage = () => {
 
               {customerPhone.trim() && (
                 matchedCustomer ? (
-                  /* Khách hàng thành viên đã đăng ký */
-                  <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 space-y-2.5">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Thành viên Sora</p>
-                        <h4 className="text-xs font-black text-slate-800 mt-0.5">{matchedCustomer.name}</h4>
+                  /* Khách hàng thành viên đã đăng ký - Ultra Compact */
+                  <div className="bg-blue-50/45 border border-blue-100 rounded-lg p-2.5 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] font-bold text-blue-600 bg-blue-100/60 px-1.5 py-0.5 rounded-md flex-shrink-0">TV</span>
+                        <span className="font-extrabold text-slate-800 truncate" title={matchedCustomer.name}>
+                          {matchedCustomer.name}
+                        </span>
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
+                          {matchedCustomer.points}đp
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Điểm tích lũy</p>
-                        <p className="text-xs font-black text-blue-600 mt-0.5">{matchedCustomer.points}đp</p>
-                      </div>
+                      <button 
+                        onClick={() => handlePhoneChange('')} 
+                        className="text-[10px] font-bold text-red-500 hover:text-red-750 uppercase"
+                      >
+                        Hủy
+                      </button>
                     </div>
 
-                    <div className="border-t border-blue-100/50 pt-2 flex flex-col gap-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={isRedeemingPoints}
-                          onChange={(e) => {
-                            setIsRedeemingPoints(e.target.checked);
-                            setUsedPoints(0);
-                          }}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                        />
-                        <span className="text-[11px] font-bold text-slate-600">Đổi điểm thanh toán (1 điểm = 1.000đ)</span>
-                      </label>
-
-                      {isRedeemingPoints && (
-                        <div className="flex items-center gap-2 pl-5.5">
-                          <span className="text-[11px] text-slate-400 font-semibold">Đổi</span>
+                    <div className="border-t border-blue-200/50 pt-1.5 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
                           <input
-                            type="number"
-                            min={0}
-                            max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
-                            value={usedPoints || ''}
+                            type="checkbox"
+                            checked={isRedeemingPoints}
                             onChange={(e) => {
-                              const points = Math.max(0, parseInt(e.target.value, 10) || 0);
-                              const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
-                              setUsedPoints(Math.min(points, maxPoints));
+                              setIsRedeemingPoints(e.target.checked);
+                              setUsedPoints(0);
                             }}
-                            placeholder="0"
-                            className="w-20 bg-white border border-slate-200 px-2 py-1 rounded text-xs font-bold text-slate-800 text-center outline-none focus:border-blue-500"
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
                           />
-                          <span className="text-[11px] text-slate-600 font-bold">
-                            điểm = -{money((usedPoints || 0) * 1000)}
-                          </span>
-                        </div>
+                          <span className="text-[11px] font-semibold text-slate-600">Đổi điểm (1đp = 1k)</span>
+                        </label>
+                        
+                        {isRedeemingPoints && (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={0}
+                              max={Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000))}
+                              value={usedPoints || ''}
+                              onChange={(e) => {
+                                const points = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                const maxPoints = Math.min(matchedCustomer.points, Math.floor((total - discountAmount) / 1000));
+                                setUsedPoints(Math.min(points, maxPoints));
+                              }}
+                              placeholder="0"
+                              className="w-14 bg-white border border-slate-200 px-1 py-0.5 rounded text-[11px] font-bold text-slate-800 text-center outline-none focus:border-blue-500"
+                            />
+                            <span className="text-[10px] text-slate-500 font-bold">đp</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {isRedeemingPoints && usedPoints > 0 && (
+                        <p className="text-[11px] font-bold text-blue-600 text-right">
+                          Giảm trừ: -{money(usedPoints * 1000)}
+                        </p>
                       )}
 
-                      <div className="text-[10px] font-bold text-emerald-600 flex items-center justify-between mt-1 bg-emerald-50/50 px-2.5 py-1 rounded-lg">
-                        <span>Đơn hàng này tích lũy thêm:</span>
-                        <span>+{Math.floor(finalAmount / 10000)} điểm ↗</span>
-                      </div>
+                      <p className="text-[10px] font-bold text-emerald-600">
+                        Tích lũy thêm: +{Math.floor(finalAmount / 10000)} điểm
+                      </p>
                     </div>
                   </div>
                 ) : (
-                  /* Đăng ký khách hàng mới nhanh */
-                  <div className="bg-amber-50/40 border border-amber-100 rounded-xl p-3 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded uppercase tracking-wider">Khách hàng mới</span>
-                      <span className="text-[9px] font-semibold text-slate-400">SĐT chưa đăng ký tích điểm</span>
+                  /* Đăng ký khách hàng mới nhanh - Ultra Compact */
+                  <div className="bg-amber-50/45 border border-amber-100 rounded-lg p-2.5 space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-amber-700">
+                      <span>Khách mới (Chưa tích điểm)</span>
                     </div>
-                    <div className="space-y-1">
-                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Họ và tên khách mới *</label>
-                      <input
-                        type="text"
-                        value={newCustName}
-                        onChange={(e) => setNewCustName(e.target.value)}
-                        placeholder="Nhập tên khách để tự động tạo TK"
-                        className="w-full bg-white border border-amber-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={newCustName}
+                      onChange={(e) => setNewCustName(e.target.value)}
+                      placeholder="Nhập Họ & Tên để tự động tạo TK"
+                      className="w-full bg-white border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 transition"
+                    />
                   </div>
                 )
               )}
