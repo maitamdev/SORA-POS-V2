@@ -15,6 +15,7 @@ export interface Category {
   description?: string | null;
   image_url?: string | null;
   is_active: boolean;
+  products?: { count: number }[];
 }
 
 export interface Supplier {
@@ -63,6 +64,7 @@ export interface Order {
   order_number: string;
   customer_id?: string | null;
   user_id: string;
+  shift_id?: string | null;
   total_amount: number;
   discount_amount: number;
   final_amount: number;
@@ -132,6 +134,55 @@ export interface AIRecommendation {
   products?: Product;
 }
 
+export interface RestockAnalysisItem {
+  id: string;
+  sku: string;
+  name: string;
+  stock_quantity: number;
+  min_stock_level: number;
+  unit: string;
+  average_daily_sales: number;
+  target_stock: number;
+  recommended_quantity: number;
+  priority: 'low' | 'medium' | 'high';
+  alert_status: 'out_of_stock' | 'low_stock' | 'needs_restock' | 'healthy';
+  stock_days: number | null;
+  reason: string;
+  ai_insight: string;
+}
+
+export interface RestockAnalysis {
+  target_days: number;
+  sales_window_days: number;
+  summary: {
+    total_products: number;
+    out_of_stock: number;
+    low_stock: number;
+    needs_restock: number;
+    healthy: number;
+    total_recommended_quantity: number;
+    urgent_items: number;
+  };
+  items: RestockAnalysisItem[];
+  ai_provider: string;
+}
+
+export interface BarcodeProductSuggestion {
+  source: string;
+  source_url?: string;
+  barcode: string;
+  sku: string;
+  name: string;
+  brand?: string | null;
+  category_name?: string | null;
+  unit: string;
+  image_url?: string | null;
+  description: string;
+  confidence: 'medium' | 'high';
+  exists?: boolean;
+  raw?: any;
+}
+
 export interface StaffUser {
   id: string;
   email: string;
@@ -143,4 +194,48 @@ export interface StaffUser {
   last_login?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ShiftPaymentSummary {
+  cash: number;
+  transfer: number;
+  card: number;
+  other: number;
+}
+
+export interface ShiftSummary {
+  revenue: number;
+  gross_revenue: number;
+  discount: number;
+  order_count: number;
+  cancelled_count: number;
+  average_order_value: number;
+  payments: ShiftPaymentSummary;
+  hourly: Array<{ hour: string; revenue: number; orders: number }>;
+  top_products: Array<{ product_id: string; product_name: string; quantity: number; revenue: number }>;
+}
+
+export interface ShiftSession {
+  id: string;
+  employee_id: string;
+  opened_by: string;
+  shift_date: string;
+  shift_name?: string | null;
+  shift_code: string;
+  status: 'opened' | 'checked_in' | 'closed' | 'cancelled';
+  opening_cash: number;
+  closing_cash?: number | null;
+  expected_cash?: number | null;
+  cash_difference?: number | null;
+  note?: string | null;
+  manager_note?: string | null;
+  started_at?: string | null;
+  checked_in_at?: string | null;
+  closed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  employee?: Pick<StaffUser, 'id' | 'full_name' | 'email'> | null;
+  opener?: Pick<StaffUser, 'id' | 'full_name' | 'email'> | null;
+  summary?: ShiftSummary;
+  orders?: Order[];
 }
