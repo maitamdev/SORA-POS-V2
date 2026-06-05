@@ -1,6 +1,7 @@
 import { supabase } from './backend/src/config/supabase';
 async function run() { 
-  const {data} = await supabase.from('products').select('id, categories(name)').limit(2); 
-  console.log(JSON.stringify(data)); 
+  const {data, error} = await supabase.from('categories').select('*, products(count)').limit(5); 
+  console.log("Error:", error);
+  console.log("Data:", JSON.stringify(data, null, 2)); 
 } 
 run();
