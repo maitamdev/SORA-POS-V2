@@ -5,6 +5,12 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 
 export class AIController {
+  static restockAnalysis = asyncHandler(async (req: Request, res: Response) => {
+    const targetDays = Number(req.query.target_days || 14);
+    const productId = typeof req.query.product_id === 'string' ? req.query.product_id : undefined;
+    successResponse(res, await AIService.analyzeRestock(targetDays, productId), 'Phân tích tồn kho thành công');
+  });
+
   static generate = asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(
@@ -24,6 +30,14 @@ export class AIController {
       res,
       await AIService.updateStatus(req.params.id, req.body.status),
       'Cập nhật trạng thái gợi ý thành công'
+    );
+  });
+
+  static identifyProductByBarcode = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(
+      res,
+      await AIService.identifyProductByBarcode(req.params.barcode),
+      'Nhận diện sản phẩm từ mã vạch thành công'
     );
   });
 
