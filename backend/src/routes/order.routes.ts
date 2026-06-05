@@ -12,6 +12,7 @@ router.get('/', OrderController.list);
 router.post('/', roleMiddleware('admin', 'manager', 'cashier'), validateMiddleware(orderCreateSchema), OrderController.create);
 router.get('/:id', OrderController.get);
 router.patch('/:id/cancel', roleMiddleware('admin', 'manager'), validateMiddleware(cancelOrderSchema), OrderController.cancel);
+router.delete('/all', roleMiddleware('admin'), OrderController.deleteAll);
 router.delete('/:id', roleMiddleware('admin', 'manager'), OrderController.remove);
 
 export default router;
