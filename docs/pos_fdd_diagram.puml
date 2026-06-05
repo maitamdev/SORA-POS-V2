@@ -1,0 +1,60 @@
+@startwbs
+' Sử dụng skinparam cổ điển để tránh lỗi tương thích trên các phiên bản PlantUML
+skinparam monochrome true
+skinparam DefaultFontName "Segoe UI"
+skinparam DefaultFontSize 13
+skinparam LineThickness 1.5
+
+* HỆ THỐNG SORA POS
+
+++ Phân hệ Xác thực & Phân quyền
++++ Đăng nhập (JWT)
++++ Đăng xuất
++++ Xác thực phiên (Get Me)
++++ Thông tin cá nhân (Profile)
++++ Phân quyền truy cập (RBAC)
+
+++ Phân hệ Bán hàng (POS)
++++ Tra cứu sản phẩm
++++ Quản lý giỏ hàng
++++ Khách hàng thành viên
++++ Tính toán hóa đơn
++++ Xử lý thanh toán
++++ In hóa đơn & Xuất PDF
+
+++ Quản lý sản phẩm & danh mục
++++ CRUD Danh mục
++++ CRUD Sản phẩm
++++ Upload ảnh sản phẩm
++++ Thiết lập tồn tối thiểu
++++ Tìm kiếm & lọc nâng cao
+
+++ Quản lý kho & Cảnh báo tồn kho
++++ Xem tồn kho thực tế
++++ Lập phiếu nhập kho
++++ Điều chỉnh tồn kho
++++ Lịch sử giao dịch kho
++++ Tự động kiểm tra ngưỡng cảnh báo
++++ Tạo cảnh báo tồn thấp/hết hàng
++++ Hiển thị cảnh báo chủ động (Badge)
++++ Xử lý trạng thái cảnh báo (Resolved)
+
+-- Quản lý đối tác
+--- CRUD Khách hàng
+--- CRUD Nhà cung cấp
+--- CRUD Nhân viên (Chỉ Admin)
+
+-- Thống kê & Báo cáo
+--- Dashboard tổng quan
+--- Báo cáo doanh thu (Line Chart)
+--- Top 10 sản phẩm bán chạy
+--- Xuất báo cáo tồn kho
+
+-- Trợ lý AI gợi ý nhập hàng
+--- Tính tốc độ bán trung bình
+--- Ước tính lượng hàng cần nhập
+--- Phân tích xu hướng (Groq AI)
+--- Chế độ dự phòng cục bộ
+--- Duyệt/Từ chối đề xuất AI
+
+@endwbs
