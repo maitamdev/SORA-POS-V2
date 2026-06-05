@@ -6,6 +6,7 @@ import { buildQuery } from './catalog.api';
 export interface CreateOrderPayload {
   customer_id?: string | null;
   discount_amount?: number;
+  used_points?: number;
   note?: string | null;
   payment?: {
     method?: string;
