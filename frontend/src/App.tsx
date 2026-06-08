@@ -21,6 +21,7 @@ import SettingsPage from './pages/settings/SettingsPage';
 import StaffPage from './pages/staff/StaffPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { useAuthStore } from './stores/auth.store';
+import { syncAllDataToLocal } from './services/offlineSync';
 
 const HomePage = () => {
   const { user } = useAuthStore();
@@ -38,6 +39,13 @@ function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Đồng bộ dữ liệu xuống IndexedDB khi đăng nhập thành công (chuẩn bị cho offline)
+  useEffect(() => {
+    if (isAuthenticated) {
+      syncAllDataToLocal();
+    }
+  }, [isAuthenticated]);
 
   return (
     <ErrorBoundary>
