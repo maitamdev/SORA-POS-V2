@@ -26,6 +26,16 @@ import { Category, Customer, Product, ShiftSession } from '../../types/domain.ty
 import { getRoleLabel, getUserInitials } from '../../utils/userDisplay';
 import html2canvas from 'html2canvas-pro';
 import { buildVietQR } from '../../utils/vietqr';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import {
+  getProductsOffline,
+  getProductByBarcodeOffline,
+  getCategoriesOffline,
+  getCustomersOffline,
+  savePendingOrder,
+  deductLocalStock,
+} from '../../services/offlineDB';
+import { syncAllDataToLocal } from '../../services/offlineSync';
 import { POPULAR_BANKS } from '../../utils/banks';
 import QRCode from 'qrcode';
 
@@ -49,6 +59,7 @@ const getProductImage = (product: Product) => {
 
 const POSPage = () => {
   const { user } = useAuthStore();
+  const { isOnline, refreshPendingCount } = useNetworkStatus();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -118,6 +129,31 @@ const POSPage = () => {
   };
 
   const loadData = async () => {
+    // --- Chế độ OFFLINE: đọc từ IndexedDB ---
+    if (!navigator.onLine) {
+      try {
+        const categoryIdFilter = selectedCategoryId !== 'all' ? selectedCategoryId : undefined;
+        const { items, total } = await getProductsOffline(
+          search,
+          categoryIdFilter,
+          page,
+          operationSettings.productPageSize
+        );
+        setProducts(items);
+        setPagination({ page, limit: operationSettings.productPageSize, total });
+
+        const offlineCategories = await getCategoriesOffline();
+        if (offlineCategories.length > 0) setCategories(offlineCategories);
+
+        const offlineCustomers = await getCustomersOffline();
+        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+      } catch (err) {
+        console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
+      }
+      return;
+    }
+
+    // --- Chế độ ONLINE: gọi API bình thường ---
     const params: Record<string, unknown> = {
       search,
       is_active: true,
@@ -138,6 +174,9 @@ const POSPage = () => {
     setPagination(productRes.data.data.pagination);
     setCategories(categoryRes.data.data.items);
     setCustomers(customerRes.data.data.items);
+
+    // Background: đồng bộ xuống IndexedDB cho lần offline tiếp theo
+    syncAllDataToLocal().catch(() => {});
   };
 
   useEffect(() => {
@@ -363,6 +402,17 @@ const POSPage = () => {
         return;
       }
 
+      // Khi offline: tìm trong IndexedDB
+      if (!navigator.onLine) {
+        const offlineMatch = await getProductByBarcodeOffline(query);
+        if (offlineMatch) {
+          addOrSelectProduct(offlineMatch);
+        } else {
+          toast.error(`Không tìm thấy sản phẩm có mã/SKU: ${query} (offline)`);
+        }
+        return;
+      }
+
       const response = await catalogAPI.products.list({ search: query, is_active: true, limit: 5 });
       const dbMatch = response.data.data.items.find((product) => product.barcode === query || product.sku === query);
 
@@ -372,6 +422,14 @@ const POSPage = () => {
         toast.error(`Không tìm thấy sản phẩm có mã/SKU: ${query}`);
       }
     } catch {
+      // Nếu lỗi mạng, thử offline fallback
+      try {
+        const offlineMatch = await getProductByBarcodeOffline(query);
+        if (offlineMatch) {
+          addOrSelectProduct(offlineMatch);
+          return;
+        }
+      } catch {}
       toast.error('Lỗi khi quét mã vạch');
     } finally {
       barcodeSubmittingRef.current = false;
@@ -975,6 +1033,75 @@ const POSPage = () => {
     }
 
     setLoading(true);
+
+    // ═══ Xây dựng payload đơn hàng ═══
+    const orderPayload = {
+      customer_id: matchedCustomer?.id || null,
+      discount_amount: discountAmount + pointsDiscount,
+      used_points: isRedeemingPoints ? usedPoints : 0,
+      note: null as string | null,
+      payment: {
+        method: paymentMethod,
+        received_amount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
+      },
+      items: cart.map((item) => ({
+        product_id: item.product.id,
+        quantity: item.quantity,
+      })),
+    };
+
+    // ═══ CHẾ ĐỘ OFFLINE: lưu đơn hàng vào IndexedDB ═══
+    if (!navigator.onLine) {
+      try {
+        const pending = await savePendingOrder(orderPayload, finalAmount, paymentMethod);
+
+        // Trừ tồn kho local
+        for (const item of cart) {
+          await deductLocalStock(item.product.id, item.quantity);
+        }
+
+        const customerObj = matchedCustomer || (customerPhone ? { name: newCustName || 'Khách lẻ', phone: customerPhone } : null);
+
+        setCheckoutSuccessInfo({
+          orderNumber: pending.offlineOrderNumber,
+          finalAmount,
+          total,
+          discountAmount: discountAmount + pointsDiscount,
+          change: paymentMethod === 'cash' ? Math.max((receivedAmount || finalAmount) - finalAmount, 0) : 0,
+          paymentMethod,
+          receivedAmount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
+          cart: [...cart],
+          customerName: customerObj?.name || 'Khách lẻ',
+          customerPhone: customerPhone || '',
+          cashierName: user?.full_name || 'Nhân viên',
+          date: new Date().toLocaleString('vi-VN'),
+        });
+
+        setCart([]);
+        setReceivedAmount(0);
+        setShowCashPayment(false);
+        setShowTransferPayment(false);
+        setDiscountValue(0);
+        setVoucherCode('');
+        setCustomerPhone('');
+        setMatchedCustomer(null);
+        setNewCustName('');
+        setUsedPoints(0);
+        setIsRedeemingPoints(false);
+        setShowCheckoutConfirm(false);
+        await loadData();
+        await refreshPendingCount();
+        toast.success(`Đã lưu đơn hàng ngoại tuyến ${pending.offlineOrderNumber} — sẽ đồng bộ khi có mạng`, { duration: 5000 });
+      } catch (err) {
+        console.error('[POS Offline] Lỗi lưu đơn hàng offline:', err);
+        toast.error('Không thể lưu đơn hàng ngoại tuyến');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ═══ CHẾ ĐỘ ONLINE: gọi API bình thường ═══
     try {
       let finalCustomerId = matchedCustomer?.id || null;
 
@@ -1004,20 +1131,9 @@ const POSPage = () => {
         }
       }
 
-      const response = await orderAPI.create({
-        customer_id: finalCustomerId,
-        discount_amount: discountAmount + pointsDiscount,
-        used_points: isRedeemingPoints ? usedPoints : 0,
-        note: null,
-        payment: {
-          method: paymentMethod,
-          received_amount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
-        },
-        items: cart.map((item) => ({
-          product_id: item.product.id,
-          quantity: item.quantity,
-        })),
-      });
+      orderPayload.customer_id = finalCustomerId;
+
+      const response = await orderAPI.create(orderPayload);
 
       const orderNumber = response.data.data.order_number;
       
