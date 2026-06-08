@@ -10,6 +10,12 @@ Thư mục này chứa các file SQL để thiết lập cơ sở dữ liệu ch
 |------|-------|
 | `schema.sql` | Tạo tất cả bảng, indexes, triggers (12 bảng) |
 | `seed.sql` | Dữ liệu khởi tạo ban đầu (3 roles + 1 admin) |
+| `app_settings.sql` | Bảng cấu hình vận hành cửa hàng |
+| `shift_sessions.sql` | Migration bổ sung ca làm nếu đang dùng schema cũ |
+| `hardening.sql` | Ràng buộc bảo vệ dữ liệu và unique barcode |
+| `enterprise_pos_core.sql` | Transaction tạo/hủy hóa đơn, audit log, loyalty delta cho POS doanh nghiệp |
+
+> Lưu ý: `seed.sql` là script reset/demo và có `DELETE FROM` nhiều bảng. Không chạy file này trên database production đang có dữ liệu thật.
 
 ## Cách sử dụng
 
@@ -24,12 +30,18 @@ Thư mục này chứa các file SQL để thiết lập cơ sở dữ liệu ch
 2. Dán toàn bộ nội dung file `schema.sql`
 3. Nhấn **Run** để tạo tất cả bảng
 
-### Bước 3: Chạy Seed Data
+### Bước 3: Chạy migration vận hành
+1. Chạy `app_settings.sql` để tạo bảng cấu hình vận hành
+2. Chạy `hardening.sql` để thêm ràng buộc dữ liệu an toàn
+3. Chạy `enterprise_pos_core.sql` để bật transaction checkout/cancel và audit log
+
+### Bước 4: Chạy Seed Data
 1. Vẫn trong **SQL Editor**
 2. Dán toàn bộ nội dung file `seed.sql`
 3. Nhấn **Run** để thêm dữ liệu mẫu
+4. Chỉ chạy seed trên database mới/demo vì script này có xóa dữ liệu cũ
 
-### Bước 4: Lấy Connection Info
+### Bước 5: Lấy Connection Info
 Vào **Settings > API** để lấy:
 - `SUPABASE_URL` (Project URL)
 - `SUPABASE_ANON_KEY` (anon public key)

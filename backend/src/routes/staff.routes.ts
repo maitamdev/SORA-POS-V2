@@ -8,11 +8,10 @@ import { staffCreateSchema, staffUpdateSchema } from '../validations/staff.valid
 const router = Router();
 
 router.use(authMiddleware);
-router.use(roleMiddleware('admin', 'manager'));
 
-router.get('/', StaffController.list);
-router.post('/', validateMiddleware(staffCreateSchema), StaffController.create);
-router.put('/:id', validateMiddleware(staffUpdateSchema), StaffController.update);
-router.delete('/:id', StaffController.deactivate);
+router.get('/', roleMiddleware('admin', 'manager'), StaffController.list);
+router.post('/', roleMiddleware('admin'), validateMiddleware(staffCreateSchema), StaffController.create);
+router.put('/:id', roleMiddleware('admin'), validateMiddleware(staffUpdateSchema), StaffController.update);
+router.delete('/:id', roleMiddleware('admin'), StaffController.deactivate);
 
 export default router;

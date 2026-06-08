@@ -4,6 +4,7 @@ import { ListResponse, Order } from '../types/domain.type';
 import { buildQuery } from './catalog.api';
 
 export interface CreateOrderPayload {
+  client_order_number?: string;
   customer_id?: string | null;
   discount_amount?: number;
   used_points?: number;
@@ -26,6 +27,4 @@ export const orderAPI = {
   get: (id: string) => api.get<ApiResponse<Order>>(`/orders/${id}`),
   create: (data: CreateOrderPayload) => api.post<ApiResponse<Order>>('/orders', data),
   cancel: (id: string, note?: string) => api.patch<ApiResponse<Order>>(`/orders/${id}/cancel`, { note, restock: true }),
-  remove: (id: string) => api.delete<ApiResponse<null>>(`/orders/${id}`),
-  removeAll: () => api.delete<ApiResponse<null>>('/orders/all'),
 };

@@ -42,6 +42,5 @@ export const catalogAPI = {
       api.post<ApiResponse<{ imported: number; skipped: number; skippedSkus: string[] }>>('/products/bulk', { products }),
     update: (id: string, data: Partial<Product>) => api.put<ApiResponse<Product>>(`/products/${id}`, data),
     remove: (id: string) => api.delete<ApiResponse<null>>(`/products/${id}`),
-    removeAll: () => api.delete<ApiResponse<null>>('/products/all'),
   },
 };

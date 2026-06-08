@@ -327,17 +327,9 @@ export class CatalogService {
   }
 
   static async deleteAllProducts() {
-    // Hard delete all order_details first (foreign key constraint)
-    await supabase.from('order_details').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    // Delete stock_alerts
-    await supabase.from('stock_alerts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    // Delete stock_transactions
-    await supabase.from('stock_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    // Delete ai_recommendations
-    await supabase.from('ai_recommendations').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    // Finally delete all products
-    const { error } = await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (error) throw new AppError(400, error.message);
-    return null;
+    throw new AppError(
+      403,
+      'He thong POS doanh nghiep khong cho xoa toan bo san pham. Hay dung ngung kinh doanh, import dieu chinh, hoac backup/restore co kiem soat.'
+    );
   }
 }

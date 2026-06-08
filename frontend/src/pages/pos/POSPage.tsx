@@ -46,6 +46,18 @@ interface CartItem {
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
+const escapeHtml = (value: unknown) =>
+  String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return entities[char];
+  });
+
 // Custom Barcode icon svg
 const BarcodeIcon = () => (
   <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -636,6 +648,10 @@ const POSPage = () => {
 
     const customerName = checkoutSuccessInfo?.customerName ?? (customers.find(c => c.id === customerId)?.name || 'Khách lẻ');
     const customerPhoneStr = checkoutSuccessInfo?.customerPhone ?? (customerPhone || customers.find(c => c.id === customerId)?.phone || '');
+    const safeCustomerName = escapeHtml(customerName);
+    const safeCustomerPhone = escapeHtml(customerPhoneStr);
+    const safeCashierName = escapeHtml(user?.full_name || 'Nhân viên');
+    const safeOrderNumber = escapeHtml(orderNumber);
 
     const printPointsBefore = checkoutSuccessInfo?.pointsBefore ?? 0;
     const printPointsUsed = checkoutSuccessInfo?.pointsUsed ?? 0;
@@ -652,8 +668,8 @@ const POSPage = () => {
     const cartRowsHtml = itemsToRender.map((item, idx) => `
       <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
         <td style="padding: 10px 14px; font-size: 13px; color: #334155;">
-          <div style="font-weight: 600;">${item.product.name}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">${item.product.sku || ''}</div>
+          <div style="font-weight: 600;">${escapeHtml(item.product.name)}</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">${escapeHtml(item.product.sku || '')}</div>
         </td>
         <td style="text-align: center; padding: 10px 8px; font-size: 13px; color: #475569; font-weight: 600;">${item.quantity}</td>
         <td style="text-align: right; padding: 10px 8px; font-size: 13px; color: #475569;">${money(item.product.sell_price)}</td>
@@ -662,13 +678,19 @@ const POSPage = () => {
     `).join('');
 
     const storeName = operationSettings.storeName || 'SORA MART';
+    const safeStoreName = escapeHtml(storeName);
+    const safeBranchName = escapeHtml(operationSettings.branchName || '');
+    const safeAddress = escapeHtml(operationSettings.address || '');
+    const safeHotline = escapeHtml(operationSettings.hotline || '');
+    const safeTaxCode = escapeHtml(operationSettings.taxCode || '');
+    const safeReceiptFooter = escapeHtml(operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!');
     const nowStr = new Date().toLocaleString('vi-VN');
     const dateStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     printWindow.document.write(`
       <html>
         <head>
-          <title>Hóa đơn ${orderNumber} - ${storeName}</title>
+          <title>Hóa đơn ${safeOrderNumber} - ${safeStoreName}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
             * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -862,15 +884,15 @@ const POSPage = () => {
             <!-- Header -->
             <div class="invoice-header">
               <div class="store-info">
-                <h1>${storeName}</h1>
-                ${operationSettings.branchName ? `<p>${operationSettings.branchName}</p>` : ''}
-                ${operationSettings.address ? `<p>${operationSettings.address}</p>` : ''}
-                ${operationSettings.hotline ? `<p>SĐT: ${operationSettings.hotline}</p>` : ''}
-                ${operationSettings.taxCode ? `<p>MST: ${operationSettings.taxCode}</p>` : ''}
+                <h1>${safeStoreName}</h1>
+                ${operationSettings.branchName ? `<p>${safeBranchName}</p>` : ''}
+                ${operationSettings.address ? `<p>${safeAddress}</p>` : ''}
+                ${operationSettings.hotline ? `<p>SĐT: ${safeHotline}</p>` : ''}
+                ${operationSettings.taxCode ? `<p>MST: ${safeTaxCode}</p>` : ''}
               </div>
               <div class="invoice-number-block">
                 <h2>HÓA ĐƠN</h2>
-                <div class="order-code">${orderNumber}</div>
+                <div class="order-code">${safeOrderNumber}</div>
                 <div class="order-date">${dateStr}</div>
               </div>
             </div>
@@ -880,13 +902,13 @@ const POSPage = () => {
               <div class="billing-block">
                 <div class="label">Khách hàng</div>
                 <div class="value">
-                  ${customerName}
-                  ${customerPhoneStr ? `<br/>${customerPhoneStr}` : ''}
+                  ${safeCustomerName}
+                  ${customerPhoneStr ? `<br/>${safeCustomerPhone}` : ''}
                 </div>
               </div>
               <div class="billing-block">
                 <div class="label">Thu ngân</div>
-                <div class="value">${user?.full_name || 'Nhân viên'}</div>
+                <div class="value">${safeCashierName}</div>
               </div>
               <div class="billing-block" style="text-align: right;">
                 <div class="label">Ngày giờ</div>
@@ -975,7 +997,7 @@ const POSPage = () => {
 
             <!-- Footer -->
             <div class="invoice-footer">
-              <div class="thank-you">${operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!'}</div>
+              <div class="thank-you">${safeReceiptFooter}</div>
               <div class="sub">Hẹn gặp lại quý khách!</div>
               <div class="powered">Powered by Sora POS</div>
             </div>

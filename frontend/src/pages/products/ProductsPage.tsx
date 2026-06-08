@@ -106,9 +106,6 @@ const ProductsPage = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filterActiveStatus, setFilterActiveStatus] = useState<boolean | 'all'>(true);
 
-  // Delete All State
-  const [deletingAll, setDeletingAll] = useState(false);
-  const [confirmDeleteText, setConfirmDeleteText] = useState('');
   const [operationSettings, setOperationSettings] = useState<OperationSettings>(defaultOperationSettings);
 
   // Table Settings
@@ -144,7 +141,7 @@ const ProductsPage = () => {
 
   const densityPadding = tableDensity === 'compact' ? 'py-1.5' : tableDensity === 'comfortable' ? 'py-4' : 'py-3';
   const densityPaddingTh = tableDensity === 'compact' ? 'py-2' : tableDensity === 'comfortable' ? 'py-4' : 'py-3.5';
-  const canManageProducts = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'cashier';
+  const canManageProducts = user?.role === 'admin' || user?.role === 'manager';
   const visibleColCount = Object.values(visibleColumns).filter(Boolean).length + (canManageProducts ? 2 : 0); // +2 for checkbox & actions
 
   const loadData = async () => {
@@ -546,29 +543,6 @@ const ProductsPage = () => {
       } catch (err) {
         toast.error('Lỗi khi xóa sản phẩm');
       }
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!canManageProducts) {
-      toast.error('Tài khoản nhân viên không có quyền xóa sản phẩm');
-      return;
-    }
-    if (confirmDeleteText !== 'XOA TAT CA') {
-      toast.error('Vui lòng nhập đúng "XOA TAT CA" để xác nhận!');
-      return;
-    }
-    setDeletingAll(true);
-    try {
-      await catalogAPI.products.removeAll();
-      toast.success('Đã xóa toàn bộ sản phẩm!');
-      setConfirmDeleteText('');
-      setShowTableSettings(false);
-      await loadData();
-    } catch (err) {
-      toast.error('Lỗi khi xóa toàn bộ sản phẩm');
-    } finally {
-      setDeletingAll(false);
     }
   };
 

@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { orderAPI } from '../../services/order.api';
 import { Order } from '../../types/domain.type';
-import { useAuthStore } from '../../stores/auth.store';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
 const OrdersPage = () => {
-  const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,36 +58,6 @@ const OrdersPage = () => {
     }
   };
 
-  const remove = async (order: Order) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA HOÀN TOÀN hóa đơn ${order.order_number}? Hành động này sẽ xóa dữ liệu hóa đơn, các khoản thanh toán và lịch sử kho hàng liên quan.`)) return;
-    try {
-      await orderAPI.remove(order.id);
-      toast.success('Đã xóa hóa đơn');
-      await loadOrders();
-      setSelected(null);
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Xóa hóa đơn thất bại');
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!window.confirm('CẢNH BÁO NGUY HIỂM!\nHành động này sẽ XÓA TOÀN BỘ hóa đơn, thanh toán và các lịch sử kho hàng liên quan trên hệ thống.\nHành động này không thể hoàn tác!\n\nBạn có chắc chắn muốn tiếp tục?')) return;
-
-    setLoading(true);
-    try {
-      await orderAPI.removeAll();
-      toast.success('Đã xóa toàn bộ hóa đơn thành công');
-      await loadOrders();
-      setSelected(null);
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Xóa toàn bộ hóa đơn thất bại');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-slate-200 pb-5">
@@ -99,14 +67,6 @@ const OrdersPage = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button onClick={loadOrders} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white w-full sm:w-auto whitespace-nowrap">Tải lại</button>
-          {user?.role === 'admin' && (
-            <button
-              onClick={handleDeleteAll}
-              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white w-full sm:w-auto whitespace-nowrap hover:bg-red-700 transition"
-            >
-              Xóa tất cả
-            </button>
-          )}
         </div>
       </header>
 
@@ -188,9 +148,6 @@ const OrdersPage = () => {
                       <button onClick={() => openDetail(order.id)} className="mr-3 text-xs font-bold text-blue-600">Chi tiết</button>
                       {order.status !== 'cancelled' && (
                         <button onClick={() => cancel(order)} className="mr-3 text-xs font-bold text-amber-600">Hủy</button>
-                      )}
-                      {(user?.role === 'admin' || user?.role === 'manager') && (
-                        <button onClick={() => remove(order)} className="text-xs font-bold text-red-600">Xóa</button>
                       )}
                     </td>
                   </tr>

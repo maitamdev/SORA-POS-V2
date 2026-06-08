@@ -13,6 +13,7 @@ import aiRoutes from './ai.routes';
 import staffRoutes from './staff.routes';
 import settingsRoutes from './settings.routes';
 import shiftRoutes from './shift.routes';
+import auditRoutes from './audit.routes';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/staff',
       '/api/settings',
       '/api/shifts',
+      '/api/audit-logs',
     ],
   });
 });
@@ -61,5 +63,6 @@ router.use('/ai', aiRoutes);
 router.use('/staff', staffRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/shifts', shiftRoutes);
+router.use('/audit-logs', auditRoutes);
 
 export default router;

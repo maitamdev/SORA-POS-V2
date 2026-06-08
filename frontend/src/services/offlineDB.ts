@@ -59,15 +59,26 @@ import { catalogAPI } from './catalog.api';
  */
 export async function syncProductsToLocal(): Promise<number> {
   try {
-    const response = await catalogAPI.products.list({
-      is_active: true,
-      limit: 10000,
-    });
-    const items = response.data.data.items;
-    if (items.length > 0) {
-      await offlineDB.products.clear();
-      await offlineDB.products.bulkPut(items);
-    }
+    const items: Product[] = [];
+    const limit = 100;
+    let page = 1;
+    let total = 0;
+
+    do {
+      const response = await catalogAPI.products.list({
+        is_active: true,
+        limit,
+        page,
+      });
+      const data = response.data.data;
+      items.push(...data.items);
+      total = data.pagination.total;
+      if (data.items.length === 0) break;
+      page += 1;
+    } while (items.length < total);
+
+    await offlineDB.products.clear();
+    if (items.length > 0) await offlineDB.products.bulkPut(items);
     return items.length;
   } catch (err) {
     console.warn('[OfflineDB] Không thể đồng bộ sản phẩm:', err);
@@ -80,15 +91,26 @@ export async function syncProductsToLocal(): Promise<number> {
  */
 export async function syncCategoriesToLocal(): Promise<number> {
   try {
-    const response = await catalogAPI.categories.list({
-      is_active: true,
-      limit: 1000,
-    });
-    const items = response.data.data.items;
-    if (items.length > 0) {
-      await offlineDB.categories.clear();
-      await offlineDB.categories.bulkPut(items);
-    }
+    const items: Category[] = [];
+    const limit = 100;
+    let page = 1;
+    let total = 0;
+
+    do {
+      const response = await catalogAPI.categories.list({
+        is_active: true,
+        limit,
+        page,
+      });
+      const data = response.data.data;
+      items.push(...data.items);
+      total = data.pagination.total;
+      if (data.items.length === 0) break;
+      page += 1;
+    } while (items.length < total);
+
+    await offlineDB.categories.clear();
+    if (items.length > 0) await offlineDB.categories.bulkPut(items);
     return items.length;
   } catch (err) {
     console.warn('[OfflineDB] Không thể đồng bộ danh mục:', err);
@@ -101,15 +123,26 @@ export async function syncCategoriesToLocal(): Promise<number> {
  */
 export async function syncCustomersToLocal(): Promise<number> {
   try {
-    const response = await catalogAPI.customers.list({
-      is_active: true,
-      limit: 10000,
-    });
-    const items = response.data.data.items;
-    if (items.length > 0) {
-      await offlineDB.customers.clear();
-      await offlineDB.customers.bulkPut(items);
-    }
+    const items: Customer[] = [];
+    const limit = 100;
+    let page = 1;
+    let total = 0;
+
+    do {
+      const response = await catalogAPI.customers.list({
+        is_active: true,
+        limit,
+        page,
+      });
+      const data = response.data.data;
+      items.push(...data.items);
+      total = data.pagination.total;
+      if (data.items.length === 0) break;
+      page += 1;
+    } while (items.length < total);
+
+    await offlineDB.customers.clear();
+    if (items.length > 0) await offlineDB.customers.bulkPut(items);
     return items.length;
   } catch (err) {
     console.warn('[OfflineDB] Không thể đồng bộ khách hàng:', err);
@@ -215,9 +248,13 @@ export async function savePendingOrder(
   finalAmount: number,
   paymentMethod: string
 ): Promise<PendingOrder> {
+  const offlineOrderNumber = generateOfflineOrderNumber();
   const order: PendingOrder = {
-    offlineOrderNumber: generateOfflineOrderNumber(),
-    payload,
+    offlineOrderNumber,
+    payload: {
+      ...payload,
+      client_order_number: offlineOrderNumber,
+    },
     finalAmount,
     paymentMethod,
     createdAt: new Date().toISOString(),

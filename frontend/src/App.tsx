@@ -1,27 +1,35 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './routes/ProtectedRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import LoginPage from './pages/auth/LoginPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import POSPage from './pages/pos/POSPage';
-import ProductsPage from './pages/products/ProductsPage';
-import CategoriesPage from './pages/categories/CategoriesPage';
-import OrdersPage from './pages/orders/OrdersPage';
-import StockPage from './pages/stock/StockPage';
-import CustomersPage from './pages/customers/CustomersPage';
-import SuppliersPage from './pages/suppliers/SuppliersPage';
-import ReportsPage from './pages/reports/ReportsPage';
-import ShiftsPage from './pages/shifts/ShiftsPage';
-import MyShiftPage from './pages/shifts/MyShiftPage';
-import AIRecommendationsPage from './pages/ai/AIRecommendationsPage';
-import SettingsPage from './pages/settings/SettingsPage';
-import StaffPage from './pages/staff/StaffPage';
-import NotFoundPage from './pages/NotFoundPage';
 import { useAuthStore } from './stores/auth.store';
 import { syncAllDataToLocal } from './services/offlineSync';
+
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const POSPage = lazy(() => import('./pages/pos/POSPage'));
+const ProductsPage = lazy(() => import('./pages/products/ProductsPage'));
+const CategoriesPage = lazy(() => import('./pages/categories/CategoriesPage'));
+const OrdersPage = lazy(() => import('./pages/orders/OrdersPage'));
+const StockPage = lazy(() => import('./pages/stock/StockPage'));
+const CustomersPage = lazy(() => import('./pages/customers/CustomersPage'));
+const SuppliersPage = lazy(() => import('./pages/suppliers/SuppliersPage'));
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage'));
+const ShiftsPage = lazy(() => import('./pages/shifts/ShiftsPage'));
+const MyShiftPage = lazy(() => import('./pages/shifts/MyShiftPage'));
+const AIRecommendationsPage = lazy(() => import('./pages/ai/AIRecommendationsPage'));
+const AuditLogsPage = lazy(() => import('./pages/audit/AuditLogsPage'));
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
+const StaffPage = lazy(() => import('./pages/staff/StaffPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 animate-spin" />
+  </div>
+);
 
 const HomePage = () => {
   const { user } = useAuthStore();
@@ -64,6 +72,7 @@ function App() {
           }}
         />
 
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
           <Route
@@ -128,6 +137,14 @@ function App() {
               }
             />
             <Route
+              path="/audit-logs"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <AuditLogsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/staff"
               element={
                 <ProtectedRoute requiredRoles={['admin', 'manager']}>
@@ -146,6 +163,7 @@ function App() {
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </ErrorBoundary>
   );

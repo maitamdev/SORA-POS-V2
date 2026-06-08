@@ -1,13 +1,19 @@
 import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
+import { rateLimitMiddleware } from '../middlewares/rateLimit.middleware';
 import { validateMiddleware } from '../middlewares/validate.middleware';
 import { loginSchema } from '../validations/auth.validation';
 
 const router = Router();
 
 // POST /api/auth/login - Đăng nhập (public)
-router.post('/login', validateMiddleware(loginSchema), AuthController.login);
+router.post(
+  '/login',
+  rateLimitMiddleware({ keyPrefix: 'auth-login', windowMs: 60_000, max: 20 }),
+  validateMiddleware(loginSchema),
+  AuthController.login
+);
 
 // POST /api/auth/logout - Đăng xuất (protected)
 router.post('/logout', authMiddleware, AuthController.logout);

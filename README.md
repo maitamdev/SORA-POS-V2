@@ -64,7 +64,7 @@ graph TD
 Hệ thống đã được thiết lập để có thể chạy toàn bộ dự án (cả Frontend lẫn Backend) chỉ bằng **một câu lệnh duy nhất**. Hãy làm theo các bước dưới đây:
 
 ### 1. Yêu cầu hệ thống
-- **Node.js**: Phiên bản >= 18
+- **Node.js**: Phiên bản 22.x
 - **Tài khoản Supabase**: Đăng ký miễn phí tại [supabase.com](https://supabase.com)
 - **Groq API Key**: Lấy API Key miễn phí tại [console.groq.com](https://console.groq.com)
 
@@ -72,8 +72,9 @@ Hệ thống đã được thiết lập để có thể chạy toàn bộ dự 
 1. Đăng nhập vào Supabase và tạo một Project mới.
 2. Mở mục **SQL Editor** trong thanh công cụ bên trái.
 3. Mở file `database/schema.sql` trong dự án này, copy toàn bộ nội dung và dán vào SQL Editor, sau đó nhấn **Run**.
-4. (Tùy chọn) Để có dữ liệu mẫu ban đầu, tiếp tục copy và chạy nội dung file `database/seed.sql`.
-5. Vào **Project Settings > API** để lấy `Project URL` và `service_role secret`.
+4. Chạy tiếp `database/app_settings.sql`, `database/hardening.sql`, và `database/enterprise_pos_core.sql` để bật cấu hình vận hành, ràng buộc dữ liệu, transaction checkout/cancel và audit log.
+5. (Tùy chọn) Để có dữ liệu mẫu ban đầu, tiếp tục copy và chạy nội dung file `database/seed.sql`. Lưu ý file này có xóa dữ liệu cũ, chỉ dùng cho database mới/demo.
+6. Vào **Project Settings > API** để lấy `Project URL` và `service_role secret`.
 
 ### 3. Tải dự án và Cài đặt thư viện
 Mở Terminal/Command Prompt và chạy các lệnh sau:
@@ -98,7 +99,7 @@ Tạo file `.env` trong thư mục `backend/` dựa trên file `.env.example`:
 PORT=3001
 NODE_ENV=development
 JWT_SECRET=thay-bang-chuoi-bi-mat-cua-ban
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=10h
 SUPABASE_URL=https://<ID-CUA-BAN>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY-CUA-BAN>
 GROQ_API_KEY=<GROQ-API-KEY-CUA-BAN>
@@ -111,6 +112,8 @@ Tạo file `.env` trong thư mục `frontend/` dựa trên file `.env.example`:
 ```env
 VITE_API_URL=http://localhost:3001/api
 VITE_APP_NAME=Sora POS
+VITE_SUPABASE_URL=https://<ID-CUA-BAN>.supabase.co
+VITE_SUPABASE_ANON_KEY=<ANON-KEY-CUA-BAN>
 ```
 
 ### 5. Khởi chạy Hệ thống
@@ -133,9 +136,9 @@ Nếu bạn đã chạy file `database/seed.sql`, bạn có thể đăng nhập 
 
 | Vai trò | Email / Mã đăng nhập | Mật khẩu | Quyền hạn |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin@sorapos.com` | `123456` | Toàn quyền quản trị hệ thống, cài đặt, phân quyền |
-| **Manager** | `manager@sorapos.com` | `123456` | Quản lý kho, khách hàng, báo cáo, sản phẩm |
-| **Cashier** | `cashier@sorapos.com` | `123456` | Bán hàng tại quầy, tra cứu thông tin sản phẩm |
+| **Admin** | `admin@sorapos.com` | `password123` | Toàn quyền quản trị hệ thống, cài đặt, phân quyền |
+
+> File `database/seed.sql` hiện chỉ tạo 3 vai trò và 1 tài khoản admin mặc định. Các tài khoản Manager/Cashier nên được tạo trong màn hình Nhân viên sau khi đăng nhập admin.
 
 ---
 

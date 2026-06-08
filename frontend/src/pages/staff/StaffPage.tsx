@@ -12,6 +12,7 @@ import {
 } from 'react-icons/hi';
 import { staffAPI, StaffPayload } from '../../services/staff.api';
 import { StaffUser } from '../../types/domain.type';
+import { useAuthStore } from '../../stores/auth.store';
 
 const emptyForm = {
   password: '',
@@ -22,6 +23,7 @@ const emptyForm = {
 };
 
 const StaffPage = () => {
+  const { user } = useAuthStore();
   const [staff, setStaff] = useState<StaffUser[]>([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<'all' | 'active' | 'inactive'>('all');
@@ -30,6 +32,7 @@ const StaffPage = () => {
   const [editing, setEditing] = useState<StaffUser | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [lastCreated, setLastCreated] = useState<{ code: string; password: string; name: string } | null>(null);
+  const canManageStaff = user?.role === 'admin';
 
   const loadStaff = async () => {
     setLoading(true);
@@ -56,6 +59,10 @@ const StaffPage = () => {
   };
 
   const startEdit = (item: StaffUser) => {
+    if (!canManageStaff) {
+      toast.error('Chi admin moi co quyen cap nhat nhan vien');
+      return;
+    }
     setEditing(item);
     setLastCreated(null);
     setForm({
@@ -69,6 +76,10 @@ const StaffPage = () => {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManageStaff) {
+      toast.error('Chi admin moi co quyen luu tai khoan nhan vien');
+      return;
+    }
 
     if (!form.full_name.trim()) {
       toast.error('Vui lòng nhập họ tên nhân viên');
@@ -112,6 +123,10 @@ const StaffPage = () => {
   };
 
   const deactivate = async (item: StaffUser) => {
+    if (!canManageStaff) {
+      toast.error('Chi admin moi co quyen khoa tai khoan nhan vien');
+      return;
+    }
     if (!window.confirm(`Vô hiệu hóa tài khoản ${item.full_name}? Nhân viên này sẽ không đăng nhập được nữa.`)) return;
     try {
       await staffAPI.deactivate(item.id);
@@ -186,7 +201,8 @@ const StaffPage = () => {
         </section>
       )}
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[380px_1fr]">
+      <section className={`grid grid-cols-1 gap-6 ${canManageStaff ? 'xl:grid-cols-[380px_1fr]' : ''}`}>
+        {canManageStaff && (
         <form onSubmit={submit} className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -280,6 +296,7 @@ const StaffPage = () => {
             {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Tạo mã đăng nhập'}
           </button>
         </form>
+        )}
 
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
@@ -291,17 +308,17 @@ const StaffPage = () => {
                   <th className="px-4 py-3 font-black">Liên hệ</th>
                   <th className="px-4 py-3 font-black">Trạng thái</th>
                   <th className="px-4 py-3 font-black">Đăng nhập gần nhất</th>
-                  <th className="px-4 py-3 text-right font-black">Thao tác</th>
+                  {canManageStaff && <th className="px-4 py-3 text-right font-black">Thao tác</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center font-semibold text-slate-400">Đang tải...</td>
+                    <td colSpan={canManageStaff ? 6 : 5} className="px-4 py-8 text-center font-semibold text-slate-400">Đang tải...</td>
                   </tr>
                 ) : staff.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có nhân viên</td>
+                    <td colSpan={canManageStaff ? 6 : 5} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có nhân viên</td>
                   </tr>
                 ) : (
                   staff.map((item) => (
@@ -329,6 +346,7 @@ const StaffPage = () => {
                       <td className="px-4 py-3 font-semibold text-slate-500">
                         {item.last_login ? new Date(item.last_login).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
                       </td>
+                      {canManageStaff && (
                       <td className="px-4 py-3 text-right">
                         <button onClick={() => startEdit(item)} className="mr-3 inline-flex items-center gap-1 text-xs font-bold text-blue-600">
                           <HiOutlinePencil className="h-4 w-4" />
@@ -341,6 +359,7 @@ const StaffPage = () => {
                           </button>
                         )}
                       </td>
+                      )}
                     </tr>
                   ))
                 )}
