@@ -1,0 +1,21 @@
+{
+  "name": "Sora POS — Hệ thống bán hàng",
+  "short_name": "Sora POS",
+  "description": "Hệ thống quản lý bán hàng tại quầy thông minh, hỗ trợ bán hàng ngoại tuyến",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070a13",
+  "theme_color": "#070a13",
+  "categories": ["business", "productivity"],
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
