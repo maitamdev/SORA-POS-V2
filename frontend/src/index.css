@@ -258,3 +258,21 @@ textarea:not(.rounded-full):not([class*="rounded-full"]),
 button:not(.rounded-full):not([class*="rounded-full"]) {
   border-radius: 0px !important;
 }
+
+/* ============================================ */
+/* Network Status Bar Animation                  */
+/* ============================================ */
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
+}
