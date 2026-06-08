@@ -1,5 +1,9 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import NetworkStatusBar from '../common/NetworkStatusBar';
+import { startAutoSync } from '../../services/offlineSync';
+import { startRealtimeSubscriptions, stopRealtimeSubscriptions } from '../../services/realtimeService';
 
 /**
  * MainLayout - Layout chính sau khi đăng nhập
@@ -10,8 +14,21 @@ const MainLayout = () => {
   const location = useLocation();
   const isPosPage = location.pathname === '/pos';
 
+  // Khởi chạy auto-sync + realtime subscriptions khi mount
+  useEffect(() => {
+    startAutoSync();
+    startRealtimeSubscriptions();
+
+    return () => {
+      stopRealtimeSubscriptions();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Network Status Banner (offline/online) */}
+      <NetworkStatusBar />
+
       {/* Sidebar */}
       <Sidebar />
 

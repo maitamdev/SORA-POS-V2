@@ -19,6 +19,7 @@ import {
   HiOutlineMenu,
   HiOutlineX,
 } from 'react-icons/hi';
+import NotificationCenter from '../common/NotificationCenter';
 
 /**
  * Cấu trúc menu sidebar
@@ -158,10 +159,12 @@ const Sidebar = () => {
             <p className="text-slate-500 text-[10px] font-semibold mt-0.5 uppercase tracking-wider">Quản lý bán hàng</p>
           </div>
         </div>
+        {/* Notification Bell */}
+        <NotificationCenter />
         {/* Close button for mobile */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="lg:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors"
+          className="lg:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors ml-1"
         >
           <HiOutlineX className="w-5 h-5" />
         </button>
