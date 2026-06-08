@@ -104,10 +104,11 @@ const LoginPage = () => {
       >
         {/* Brand visual */}
         <div
-          className="absolute inset-0 bg-center bg-no-repeat opacity-20"
+          className="absolute inset-0 bg-no-repeat opacity-85"
           style={{
-            backgroundImage: `url('/assets/logo.png')`,
-            backgroundSize: 'min(360px, 46%)',
+            backgroundImage: `url('/assets/image.png')`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'right center',
           }}
         />
         {/* Gradient */}
