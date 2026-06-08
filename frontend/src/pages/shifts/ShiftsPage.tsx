@@ -335,7 +335,7 @@ const ShiftsPage = () => {
                       setClosingCashInput('');
                       setManagerNoteInput('');
                     }}
-                    className="rounded-lg bg-red-650 px-4 py-2 text-sm font-black text-white hover:bg-red-700 transition"
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-black text-white hover:bg-red-700 transition"
                   >
                     Chốt ca này
                   </button>
@@ -425,7 +425,7 @@ const ShiftsPage = () => {
           <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-xs font-black uppercase text-red-650">Yêu cầu chốt ca nhân viên</p>
+                <p className="text-xs font-black uppercase text-red-600">Yêu cầu chốt ca nhân viên</p>
                 <h3 className="text-base font-black text-slate-900">
                   {closingShift.employee?.full_name}
                 </h3>
@@ -511,7 +511,7 @@ const ShiftsPage = () => {
                 <button
                   type="submit"
                   disabled={closingLoading}
-                  className="py-2.5 bg-red-650 hover:bg-red-750 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                  className="py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50"
                 >
                   {closingLoading ? 'Đang chốt ca...' : 'Xác nhận chốt ca'}
                 </button>

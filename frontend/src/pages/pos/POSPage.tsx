@@ -2326,7 +2326,7 @@ const POSPage = () => {
                   setShowClearCartConfirm(false);
                   toast.success('Đã xóa giỏ hàng');
                 }}
-                className="py-2.5 bg-red-650 hover:bg-red-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition"
+                className="py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition"
               >
                 <HiOutlineTrash className="w-4 h-4" />
                 <span>Xóa sạch</span>
@@ -2518,7 +2518,7 @@ const POSPage = () => {
                     {info.pointsUsed !== undefined && info.pointsUsed > 0 && (
                       <div className="flex justify-between text-[12px]">
                         <span className="text-red-500 font-semibold">Điểm đã sử dụng:</span>
-                        <span className="font-bold text-red-650">-{info.pointsUsed} đp</span>
+                        <span className="font-bold text-red-600">-{info.pointsUsed} đp</span>
                       </div>
                     )}
                     <div className="flex justify-between text-[12px]">

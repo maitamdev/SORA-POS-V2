@@ -384,7 +384,9 @@ export class ShiftService {
 
     const hourly = new Map<string, { hour: string; revenue: number; orders: number }>();
     for (const order of completed) {
-      const hour = new Date(order.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }).slice(0, 2) + ':00';
+      const date = new Date(order.created_at);
+      const hourVal = date.getHours();
+      const hour = `${String(hourVal).padStart(2, '0')}:00`;
       const current = hourly.get(hour) || { hour, revenue: 0, orders: 0 };
       current.revenue += Number(order.final_amount || 0);
       current.orders += 1;
