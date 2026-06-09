@@ -20,6 +20,7 @@ import { aiAPI } from '../../services/ai.api';
 import { defaultOperationSettings, OperationSettings, settingsAPI } from '../../services/settings.api';
 import { useAuthStore } from '../../stores/auth.store';
 import { Category, Product, Supplier } from '../../types/domain.type';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
@@ -53,6 +54,7 @@ const getProductImage = (product: Product) => {
 
 const ProductsPage = () => {
   const { user } = useAuthStore();
+  const { scannedBarcode } = useBarcodeScanner();
   const [searchParams] = useSearchParams();
   const categoryParam = searchParams.get('categoryId') || 'all';
 
@@ -219,6 +221,17 @@ const ProductsPage = () => {
   useEffect(() => {
     loadProducts();
   }, [page, limit, selectedCategoryId, debouncedSearch, filterActiveStatus]);
+
+  // Handle scanned barcode
+  useEffect(() => {
+    if (scannedBarcode) {
+      if (showModal) {
+        setBarcode(scannedBarcode);
+      } else {
+        setSearch(scannedBarcode);
+      }
+    }
+  }, [scannedBarcode, showModal]);
 
   // Sync selectedCategoryId with URL parameters if categoryParam changes
   useEffect(() => {
