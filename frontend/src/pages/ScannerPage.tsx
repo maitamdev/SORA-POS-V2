@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 
 const ScannerPage: React.FC = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const channelRef = useRef<any>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameras, setCameras] = useState<any[]>([]);
@@ -37,13 +38,16 @@ const ScannerPage: React.FC = () => {
         console.log('Scanner Page Ready to Broadcast');
       }
     });
+    channelRef.current = channel;
 
     return () => {
       // Dọn dẹp scanner khi unmount
       if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
         scannerRef.current.stop().catch(console.error);
       }
-      supabaseClient.removeChannel(channel);
+      if (channelRef.current) {
+        supabaseClient.removeChannel(channelRef.current);
+      }
     };
   }, []);
 
@@ -79,13 +83,16 @@ const ScannerPage: React.FC = () => {
 
           try {
             // Thay vì gọi API (không ổn định trên Vercel do timeout), ta dùng Supabase Broadcast
-            const channel = supabaseClient.channel('scanner-events');
-            await channel.send({
-              type: 'broadcast',
-              event: 'barcode_scanned',
-              payload: { barcode: decodedText, timestamp: Date.now() },
-            });
-            toast.success('Đã gửi mã lên máy tính!');
+            if (channelRef.current) {
+              await channelRef.current.send({
+                type: 'broadcast',
+                event: 'barcode_scanned',
+                payload: { barcode: decodedText, timestamp: Date.now() },
+              });
+              toast.success('Đã gửi mã lên máy tính!');
+            } else {
+              toast.error('Chưa kết nối máy tính');
+            }
           } catch (error) {
             toast.error('Lỗi khi gửi mã qua Supabase');
             console.error(error);
