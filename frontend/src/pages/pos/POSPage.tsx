@@ -27,6 +27,7 @@ import { getRoleLabel, getUserInitials } from '../../utils/userDisplay';
 import html2canvas from 'html2canvas-pro';
 import { buildVietQR } from '../../utils/vietqr';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import {
   getProductsOffline,
   getProductByBarcodeOffline,
@@ -72,6 +73,8 @@ const getProductImage = (product: Product) => {
 const POSPage = () => {
   const { user } = useAuthStore();
   const { isOnline, refreshPendingCount } = useNetworkStatus();
+  const { scannedBarcode, isConnected } = useBarcodeScanner();
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -487,6 +490,12 @@ const POSPage = () => {
       }
     };
   }, [barcodeSearch]);
+
+  useEffect(() => {
+    if (scannedBarcode) {
+      submitBarcode(scannedBarcode);
+    }
+  }, [scannedBarcode]);
 
   // Stepper cart modifications
   const addToCart = (product: Product) => {
@@ -1363,10 +1372,17 @@ const POSPage = () => {
             />
             <button type="submit" className="hidden">Submit</button>
           </form>
-          <div className="hidden xl:flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Máy quét sẵn sàng
-          </div>
+          {isConnected ? (
+            <div className="hidden xl:flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Đã kết nối ĐT
+            </div>
+          ) : (
+            <div className="hidden xl:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-black text-slate-500" title="Chưa kết nối điện thoại qua SSE">
+              <span className="h-2 w-2 rounded-full bg-slate-400" />
+              Sẵn sàng quét
+            </div>
+          )}
         </div>
 
         {/* Right Info Widgets */}

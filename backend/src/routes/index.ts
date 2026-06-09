@@ -14,6 +14,7 @@ import staffRoutes from './staff.routes';
 import settingsRoutes from './settings.routes';
 import shiftRoutes from './shift.routes';
 import auditRoutes from './audit.routes';
+import scannerRoutes from './scanner.route';
 
 const router = Router();
 
@@ -64,5 +65,6 @@ router.use('/staff', staffRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/audit-logs', auditRoutes);
+router.use('/scanner', scannerRoutes);
 
 export default router;

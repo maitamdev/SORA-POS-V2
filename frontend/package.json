@@ -27,6 +27,7 @@
     "axios": "^1.16.1",
     "dexie": "^4.4.3",
     "html2canvas-pro": "^2.0.4",
+    "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",
     "react-hook-form": "^7.76.1",
     "react-hot-toast": "^2.6.0",
