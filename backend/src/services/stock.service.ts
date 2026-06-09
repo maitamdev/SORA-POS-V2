@@ -73,7 +73,10 @@ export class StockService {
       .from('products')
       .update({ stock_quantity: newStock })
       .eq('id', productId);
-    if (updateError) throw new AppError(400, updateError.message);
+    if (updateError) {
+      console.error('[StockService.importStock] updateError:', updateError);
+      throw new AppError(400, updateError.message);
+    }
 
     const { data: transaction, error: transactionError } = await supabase
       .from('stock_transactions')
@@ -88,7 +91,10 @@ export class StockService {
       })
       .select('*')
       .single();
-    if (transactionError) throw new AppError(400, transactionError.message);
+    if (transactionError) {
+      console.error('[StockService.importStock] transactionError:', transactionError);
+      throw new AppError(400, transactionError.message);
+    }
 
     await CatalogService.syncStockAlert(productId);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);

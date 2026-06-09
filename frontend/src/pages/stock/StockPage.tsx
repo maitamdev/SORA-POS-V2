@@ -51,7 +51,8 @@ const StockPage = () => {
     }
     if (loading) return;
 
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
     const productId = String(form.get('product_id') || '');
     const quantity = Number(form.get('quantity') || 0);
     const note = String(form.get('note') || '');
@@ -61,7 +62,7 @@ const StockPage = () => {
       if (mode === 'import') await stockAPI.importStock({ product_id: productId, quantity, note });
       else await stockAPI.adjustStock({ product_id: productId, new_stock: quantity, note });
       toast.success(mode === 'import' ? 'Đã nhập kho' : 'Đã điều chỉnh tồn kho');
-      event.currentTarget.reset();
+      formEl.reset();
       await loadData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
