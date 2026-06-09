@@ -2,6 +2,10 @@ import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { parsePagination, toNumber } from '../utils/query';
 import { UserRole } from '../types/user.type';
+import {
+  calculateShiftCash,
+  summarizePayments,
+} from '../utils/posCalculations';
 
 type ShiftStatus = 'opened' | 'checked_in' | 'closed' | 'cancelled';
 
@@ -32,20 +36,6 @@ const todayString = () => {
 const generateShiftCode = () => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-};
-
-const summarizePayments = (payments: Array<{ method: string; amount: number }>) => {
-  const totals = { cash: 0, transfer: 0, card: 0, other: 0 };
-
-  for (const payment of payments) {
-    const amount = Number(payment.amount || 0);
-    if (payment.method === 'cash') totals.cash += amount;
-    else if (['transfer', 'momo', 'zalopay'].includes(payment.method)) totals.transfer += amount;
-    else if (payment.method === 'card') totals.card += amount;
-    else totals.other += amount;
-  }
-
-  return totals;
 };
 
 const mapShift = (shift: any) => ({
@@ -267,16 +257,15 @@ export class ShiftService {
     const summary = await this.summary(shift.id);
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
-    const expectedCash = openingCash + summary.payments.cash;
-    const cashDifference = closingCash - expectedCash;
+    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash);
 
     const { data, error } = await supabase
       .from('shift_sessions')
       .update({
         status: 'closed',
         closing_cash: closingCash,
-        expected_cash: expectedCash,
-        cash_difference: cashDifference,
+        expected_cash: cashSummary.expected_cash,
+        cash_difference: cashSummary.cash_difference,
         note: input.note || null,
         closed_at: new Date().toISOString(),
       })
@@ -301,16 +290,15 @@ export class ShiftService {
     const summary = await this.summary(shiftId);
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
-    const expectedCash = openingCash + summary.payments.cash;
-    const cashDifference = closingCash - expectedCash;
+    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash);
 
     const { data, error } = await supabase
       .from('shift_sessions')
       .update({
         status: 'closed',
         closing_cash: closingCash,
-        expected_cash: expectedCash,
-        cash_difference: cashDifference,
+        expected_cash: cashSummary.expected_cash,
+        cash_difference: cashSummary.cash_difference,
         note: shift.note || `Được chốt bởi quản lý`,
         manager_note: input.note || null,
         closed_at: new Date().toISOString(),

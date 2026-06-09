@@ -19,9 +19,12 @@ export const asyncHandler = (
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     fn(req, res, next).catch((error: unknown) => {
-      // AppError: lỗi do logic nghiệp vụ (có status code rõ ràng)
-      if (error instanceof AppError) {
-        errorResponse(res, error.message, error.status);
+      const err = error as Error & { status?: number; statusCode?: number };
+      const status = err.status || err.statusCode;
+
+      // Lỗi do logic nghiệp vụ (có status code rõ ràng)
+      if (err instanceof AppError || status) {
+        errorResponse(res, err.message, status || 500);
         return;
       }
 

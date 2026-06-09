@@ -6,21 +6,25 @@ import { AppError } from '../utils/AppError';
  * Phải đặt SAU tất cả routes trong app.ts
  */
 export const errorHandler = (
-  err: Error,
+  err: Error & { status?: number; statusCode?: number },
   _req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
-  console.error('❌ Unhandled Error:', err.message);
-
-  if (err instanceof AppError) {
-    res.status(err.status).json({
+  const status = err.status || err.statusCode || 500;
+  
+  if (status !== 500) {
+    res.status(status).json({
       success: false,
       message: err.message,
       errors: null,
     });
     return;
   }
+
+  // Lỗi 500
+  console.error('❌ Unhandled Error:', err.message);
+  console.error(err.stack);
 
   // Log full stack trace cho lỗi không xác định
   console.error(err.stack);

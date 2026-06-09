@@ -2,6 +2,9 @@ import { supabase } from '../config/supabase';
 import { CatalogService } from './catalog.service';
 import { parsePagination } from '../utils/query';
 import { AppError } from '../utils/AppError';
+import { appCache } from '../utils/cache';
+
+const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
 export class StockService {
   static async inventory(queryParams: Record<string, unknown>) {
@@ -88,6 +91,7 @@ export class StockService {
     if (transactionError) throw new AppError(400, transactionError.message);
 
     await CatalogService.syncStockAlert(productId);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return transaction;
   }
 
@@ -123,6 +127,7 @@ export class StockService {
     if (transactionError) throw new AppError(400, transactionError.message);
 
     await CatalogService.syncStockAlert(productId);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return transaction;
   }
 

@@ -1,6 +1,9 @@
 import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
 import { AppError } from '../utils/AppError';
+import { appCache } from '../utils/cache';
+
+const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
 type OrderItemInput = {
   product_id: string;
@@ -80,6 +83,7 @@ export class OrderService {
       throw new AppError(400, mapRpcError(error?.message));
     }
 
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return this.getById(String(orderId));
   }
 
@@ -95,6 +99,7 @@ export class OrderService {
       throw new AppError(400, mapRpcError(error?.message));
     }
 
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return this.getById(String(orderId));
   }
 

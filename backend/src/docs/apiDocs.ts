@@ -83,6 +83,8 @@ export const openApiSpec: OpenApiSpec = {
     { name: 'AI', description: 'AI helpers and recommendations' },
     { name: 'Staff', description: 'Staff management' },
     { name: 'Settings', description: 'Operational settings' },
+    { name: 'Shifts', description: 'Cashier shift sessions' },
+    { name: 'Audit', description: 'Enterprise audit trail' },
   ],
   components: {
     securitySchemes: {
@@ -196,6 +198,42 @@ export const openApiSpec: OpenApiSpec = {
           reference_code: { type: 'string', nullable: true },
         },
       },
+      AuditLog: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          actor_id: { type: 'string', format: 'uuid', nullable: true },
+          action: { type: 'string', example: 'order.create' },
+          entity_type: { type: 'string', example: 'orders' },
+          entity_id: { type: 'string', format: 'uuid', nullable: true },
+          metadata: { type: 'object' },
+          created_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      ShiftOpen: {
+        type: 'object',
+        required: ['employee_id'],
+        properties: {
+          employee_id: { type: 'string', format: 'uuid' },
+          shift_date: { type: 'string', format: 'date' },
+          shift_name: { type: 'string', nullable: true },
+        },
+      },
+      ShiftCheckIn: {
+        type: 'object',
+        required: ['opening_cash'],
+        properties: {
+          opening_cash: { type: 'number', minimum: 0 },
+        },
+      },
+      ShiftClose: {
+        type: 'object',
+        required: ['closing_cash'],
+        properties: {
+          closing_cash: { type: 'number', minimum: 0 },
+          note: { type: 'string', nullable: true },
+        },
+      },
       StockImport: {
         type: 'object',
         required: ['product_id', 'quantity'],
@@ -295,7 +333,7 @@ export const openApiSpec: OpenApiSpec = {
       post: { tags: ['Products'], summary: 'Bulk create products', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', properties: { products: { type: 'array', items: { $ref: '#/components/schemas/Product' } } } }), responses: { '201': ok('Created') } },
     },
     '/products/all': {
-      delete: { tags: ['Products'], summary: 'Delete all products', description: 'Roles: admin only', security: auth, responses: { '200': ok() } },
+      delete: { tags: ['Products'], summary: 'Blocked hard delete all products', description: 'Enterprise mode returns 403. Products should be deactivated or adjusted with audit trail.', security: auth, responses: { '403': ok('Forbidden') } },
     },
     '/categories': {
       get: { tags: ['Categories'], summary: 'List categories', security: auth, parameters: pagingParams, responses: { '200': ok() } },
@@ -327,7 +365,7 @@ export const openApiSpec: OpenApiSpec = {
     },
     '/orders/{id}': {
       get: { tags: ['Orders'], summary: 'Get order', security: auth, parameters: [idParam()], responses: { '200': ok() } },
-      delete: { tags: ['Orders'], summary: 'Hard delete order', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+      delete: { tags: ['Orders'], summary: 'Blocked hard delete order', description: 'Enterprise mode returns 403. Use cancel/refund to preserve audit trail.', security: auth, parameters: [idParam()], responses: { '403': ok('Forbidden') } },
     },
     '/orders/{id}/cancel': {
       patch: { tags: ['Orders'], summary: 'Cancel order and optionally restock', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', properties: { note: { type: 'string' }, restock: { type: 'boolean' } } }), responses: { '200': ok() } },
@@ -388,6 +426,31 @@ export const openApiSpec: OpenApiSpec = {
     },
     '/settings/operation/defaults': {
       get: { tags: ['Settings'], summary: 'Operation setting defaults', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
+    },
+    '/shifts': {
+      get: { tags: ['Shifts'], summary: 'List shift sessions', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      post: { tags: ['Shifts'], summary: 'Open shift for cashier', description: 'Roles: admin, manager', security: auth, requestBody: refBody('ShiftOpen'), responses: { '201': ok('Created') } },
+    },
+    '/shifts/active': {
+      get: { tags: ['Shifts'], summary: 'Get active cashier shift', description: 'Roles: cashier', security: auth, responses: { '200': ok() } },
+    },
+    '/shifts/my': {
+      get: { tags: ['Shifts'], summary: 'List my cashier shifts', description: 'Roles: cashier', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+    },
+    '/shifts/active/check-in': {
+      post: { tags: ['Shifts'], summary: 'Cashier check-in with opening cash', description: 'Roles: cashier', security: auth, requestBody: refBody('ShiftCheckIn'), responses: { '200': ok() } },
+    },
+    '/shifts/active/close': {
+      post: { tags: ['Shifts'], summary: 'Cashier close active shift', description: 'Roles: cashier', security: auth, requestBody: refBody('ShiftClose'), responses: { '200': ok() } },
+    },
+    '/shifts/{id}': {
+      get: { tags: ['Shifts'], summary: 'Get shift detail', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+    },
+    '/shifts/{id}/close': {
+      post: { tags: ['Shifts'], summary: 'Manager closes a cashier shift', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: refBody('ShiftClose'), responses: { '200': ok() } },
+    },
+    '/audit-logs': {
+      get: { tags: ['Audit'], summary: 'List audit logs', description: 'Roles: admin, manager. Requires database/enterprise_pos_core.sql.', security: auth, parameters: pagingParams, responses: { '200': ok() } },
     },
   },
 };

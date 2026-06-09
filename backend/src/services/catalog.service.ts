@@ -1,9 +1,13 @@
 import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { emptyToNull, parsePagination } from '../utils/query';
+import { appCache, stableCacheKey } from '../utils/cache';
 
 type Query = Record<string, unknown>;
 type Entity = Record<string, unknown>;
+const CATALOG_CACHE_TTL_MS = 30_000;
+const CATEGORY_CACHE_PREFIX = 'catalog:categories';
+const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
 const applySearch = (
   query: any,
@@ -63,6 +67,10 @@ export class CatalogService {
   }
 
   static async listCategories(queryParams: Query) {
+    const cacheKey = stableCacheKey(CATEGORY_CACHE_PREFIX, queryParams);
+    const cached = appCache.get<{ items: unknown[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
+    if (cached) return cached;
+
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('categories')
@@ -75,7 +83,9 @@ export class CatalogService {
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
-    return { items: data || [], pagination: { page, limit, total: count || 0 } };
+    const result = { items: data || [], pagination: { page, limit, total: count || 0 } };
+    appCache.set(cacheKey, result, CATALOG_CACHE_TTL_MS);
+    return result;
   }
 
   static async createCategory(data: Entity) {
@@ -85,6 +95,7 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(CATEGORY_CACHE_PREFIX);
     return created;
   }
 
@@ -96,12 +107,16 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(CATEGORY_CACHE_PREFIX);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return updated;
   }
 
   static async deleteCategory(id: string) {
     const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(CATEGORY_CACHE_PREFIX);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return null;
   }
 
@@ -192,6 +207,10 @@ export class CatalogService {
   }
 
   static async listProducts(queryParams: Query) {
+    const cacheKey = stableCacheKey(PRODUCT_CACHE_PREFIX, queryParams);
+    const cached = appCache.get<{ items: unknown[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
+    if (cached) return cached;
+
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('products')
@@ -206,7 +225,9 @@ export class CatalogService {
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
-    return { items: data || [], pagination: { page, limit, total: count || 0 } };
+    const result = { items: data || [], pagination: { page, limit, total: count || 0 } };
+    appCache.set(cacheKey, result, CATALOG_CACHE_TTL_MS);
+    return result;
   }
 
   static async getProduct(id: string) {
@@ -227,6 +248,7 @@ export class CatalogService {
       .single();
     if (error) throw new AppError(400, error.message);
     await this.syncStockAlert(created.id);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return created;
   }
 
@@ -299,6 +321,7 @@ export class CatalogService {
         await this.syncStockAlert(p.id);
       }
     }
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
 
     return {
       imported: inserted ? inserted.length : 0,
@@ -317,12 +340,14 @@ export class CatalogService {
       .single();
     if (error) throw new AppError(400, error.message);
     await this.syncStockAlert(id);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return updated;
   }
 
   static async deleteProduct(id: string) {
     const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id);
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return null;
   }
 

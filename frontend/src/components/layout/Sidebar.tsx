@@ -15,6 +15,7 @@ import {
   HiOutlineIdentification,
   HiOutlineExclamationCircle,
   HiOutlineLightBulb,
+  HiOutlineLightningBolt,
   HiOutlineCog,
   HiOutlineMenu,
   HiOutlineX,
@@ -31,6 +32,12 @@ const menuItems = [
     label: 'Dashboard',
     icon: HiOutlineViewGrid,
     path: '/',
+    roles: ['admin', 'manager'],
+  },
+  {
+    label: 'Command Center',
+    icon: HiOutlineLightningBolt,
+    path: '/command-center',
     roles: ['admin', 'manager'],
   },
   {
