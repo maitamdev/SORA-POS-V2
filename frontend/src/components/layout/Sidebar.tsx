@@ -35,12 +35,6 @@ const menuItems = [
     roles: ['admin', 'manager'],
   },
   {
-    label: 'Command Center',
-    icon: HiOutlineLightningBolt,
-    path: '/command-center',
-    roles: ['admin', 'manager'],
-  },
-  {
     label: 'Bán hàng (POS)',
     icon: HiOutlineShoppingCart,
     path: '/pos',

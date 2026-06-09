@@ -9,7 +9,6 @@ import { syncAllDataToLocal } from './services/offlineSync';
 
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
-const CommandCenterPage = lazy(() => import('./pages/command/CommandCenterPage'));
 const POSPage = lazy(() => import('./pages/pos/POSPage'));
 const ProductsPage = lazy(() => import('./pages/products/ProductsPage'));
 const CategoriesPage = lazy(() => import('./pages/categories/CategoriesPage'));
@@ -84,14 +83,6 @@ function App() {
             }
           >
             <Route path="/" element={<HomePage />} />
-            <Route
-              path="/command-center"
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                  <CommandCenterPage />
-                </ProtectedRoute>
-              }
-            />
             <Route path="/pos" element={<POSPage />} />
             <Route
               path="/my-shift"
