@@ -435,6 +435,42 @@ const LoginPage = () => {
             </button>
           </form>
 
+          {/* Demo Button */}
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => onSubmit({ email: 'demo@sora-pos.com', password: 'demo123' })}
+              className="w-full flex items-center justify-center gap-2.5 font-bold transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98]"
+              style={{
+                backgroundColor: 'transparent',
+                color: C.blueSky,
+                padding: '12px 20px',
+                borderRadius: '0px',
+                border: `1.5px dashed ${C.cardBorder}`,
+                fontSize: '13px',
+                letterSpacing: '0.02em',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                if (!isLoading) {
+                  e.currentTarget.style.backgroundColor = 'rgba(107,188,232,0.06)';
+                  e.currentTarget.style.borderColor = 'rgba(107,188,232,0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = C.cardBorder;
+              }}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Trải nghiệm Demo</span>
+            </button>
+          </div>
+
           {/* Status bar */}
           <div
             className="flex items-center justify-between mt-7 pt-5"
