@@ -154,6 +154,7 @@ const getCategoryFallbackImage = (name: string): string => {
 const CategoriesPage = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [editing, setEditing] = useState<Category | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -240,8 +241,13 @@ const CategoriesPage = () => {
   };
 
   useEffect(() => {
-    fetchCategories();
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [debouncedSearch]);
 
   const startEdit = (category: Category) => {
     setEditing(category);

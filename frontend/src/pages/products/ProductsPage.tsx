@@ -68,6 +68,7 @@ const ProductsPage = () => {
 
   // Filtering states
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(categoryParam);
   const [stockStatus, setStockStatus] = useState('all'); // all, in_stock, low_stock, out_of_stock
   const [sortBy, setSortBy] = useState('newest');
@@ -211,8 +212,13 @@ const ProductsPage = () => {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     loadProducts();
-  }, [page, limit, selectedCategoryId, search, filterActiveStatus]);
+  }, [page, limit, selectedCategoryId, debouncedSearch, filterActiveStatus]);
 
   // Sync selectedCategoryId with URL parameters if categoryParam changes
   useEffect(() => {

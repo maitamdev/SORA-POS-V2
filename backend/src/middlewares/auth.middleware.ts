@@ -43,7 +43,12 @@ export const authMiddleware = async (
       .eq('is_active', true)
       .single();
 
-    if (error || !user) {
+    if (error && error.code !== 'PGRST116') {
+      errorResponse(res, 'Hệ thống đang quá tải, vui lòng thử lại sau', 500);
+      return;
+    }
+
+    if ((error && error.code === 'PGRST116') || !user) {
       errorResponse(res, 'Tai khoan khong con hoat dong hoac khong ton tai', 401);
       return;
     }
