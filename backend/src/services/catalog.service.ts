@@ -246,7 +246,7 @@ export class CatalogService {
       .insert(emptyToNull(data))
       .select('*')
       .single();
-    if (error) throw new AppError(400, error.message);
+    if (error) this.handleDBError(error);
     await this.syncStockAlert(created.id);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return created;
@@ -338,7 +338,7 @@ export class CatalogService {
       .eq('id', id)
       .select('*')
       .single();
-    if (error) throw new AppError(400, error.message);
+    if (error) this.handleDBError(error);
     await this.syncStockAlert(id);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return updated;
@@ -356,5 +356,19 @@ export class CatalogService {
       403,
       'He thong POS doanh nghiep khong cho xoa toan bo san pham. Hay dung ngung kinh doanh, import dieu chinh, hoac backup/restore co kiem soat.'
     );
+  }
+
+  private static handleDBError(error: any): never {
+    const msg = error.message || '';
+    if (msg.includes('products_sku_key')) {
+      throw new AppError(400, 'Mã SKU này đã tồn tại trong hệ thống. Vui lòng nhập mã khác.');
+    }
+    if (msg.includes('products_barcode_key')) {
+      throw new AppError(400, 'Mã vạch (Barcode) này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
+    }
+    if (msg.includes('categories_name_key')) {
+      throw new AppError(400, 'Tên danh mục này đã tồn tại. Vui lòng nhập tên khác.');
+    }
+    throw new AppError(400, msg);
   }
 }
