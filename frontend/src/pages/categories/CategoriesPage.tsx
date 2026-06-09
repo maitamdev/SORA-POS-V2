@@ -10,6 +10,7 @@ import {
   HiOutlineSearch,
   HiOutlineTrash,
 } from 'react-icons/hi';
+import { aiAPI } from '../../services/ai.api';
 
 const getCategoryFallbackImage = (name: string): string => {
   const cleanName = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -170,7 +171,6 @@ const CategoriesPage = () => {
     }
     setGeneratingImage(true);
     try {
-      const { aiAPI } = await import('../../services/ai.api');
       const res = await aiAPI.suggestCategoryImage(name.trim());
       if (res.data.data.imageUrl) {
         setImageUrl(res.data.data.imageUrl);
@@ -192,7 +192,6 @@ const CategoriesPage = () => {
     const timer = setTimeout(async () => {
       setGeneratingImage(true);
       try {
-        const { aiAPI } = await import('../../services/ai.api');
         const res = await aiAPI.suggestCategoryImage(name.trim());
         if (res.data.data.imageUrl) {
           setImageUrl(res.data.data.imageUrl);
