@@ -79,6 +79,61 @@ const getCategoryFallbackImage = (name: string): string => {
     return 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=400';
   }
   if (
+    cleanName.includes('thuoc') ||
+    cleanName.includes('thuc pham chuc nang') ||
+    cleanName.includes('y te') ||
+    cleanName.includes('duoc') ||
+    cleanName.includes('medicine') ||
+    cleanName.includes('pharmacy') ||
+    cleanName.includes('pill')
+  ) {
+    // Pharmacy/Medicine image
+    return 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=400';
+  }
+  if (
+    cleanName.includes('sach') ||
+    cleanName.includes('van phong pham') ||
+    cleanName.includes('book') ||
+    cleanName.includes('stationery') ||
+    cleanName.includes('but') ||
+    cleanName.includes('vo')
+  ) {
+    // Books/Stationery image
+    return 'https://images.unsplash.com/photo-1568205612837-017257d2310a?auto=format&fit=crop&q=80&w=400';
+  }
+  if (
+    cleanName.includes('do choi') ||
+    cleanName.includes('toy') ||
+    cleanName.includes('kids') ||
+    cleanName.includes('baby')
+  ) {
+    // Toys image
+    return 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&q=80&w=400';
+  }
+  if (
+    cleanName.includes('dien tu') ||
+    cleanName.includes('cong nghe') ||
+    cleanName.includes('tech') ||
+    cleanName.includes('electronics') ||
+    cleanName.includes('dien thoai') ||
+    cleanName.includes('may tinh') ||
+    cleanName.includes('phu kien')
+  ) {
+    // Electronics/Tech image
+    return 'https://images.unsplash.com/photo-1498049794561-7780e7231661?auto=format&fit=crop&q=80&w=400';
+  }
+  if (
+    cleanName.includes('thoi trang') ||
+    cleanName.includes('quan ao') ||
+    cleanName.includes('fashion') ||
+    cleanName.includes('clothing') ||
+    cleanName.includes('giay') ||
+    cleanName.includes('dep')
+  ) {
+    // Fashion/Clothing image
+    return 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&q=80&w=400';
+  }
+  if (
     cleanName.includes('an') ||
     cleanName.includes('thuc pham') ||
     cleanName.includes('mi') ||
