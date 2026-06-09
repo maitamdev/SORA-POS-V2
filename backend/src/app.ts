@@ -45,7 +45,8 @@ app.use(
       }
       if (
         env.corsOrigins.includes(origin) ||
-        (env.nodeEnv === 'development' && isAllowedDevOrigin(origin))
+        (env.nodeEnv === 'development' && isAllowedDevOrigin(origin)) ||
+        origin.endsWith('.vercel.app')
       ) {
         callback(null, true);
         return;

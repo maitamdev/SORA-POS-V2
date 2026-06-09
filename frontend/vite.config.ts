@@ -12,7 +12,6 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['assets/**/*'],
       manifest: false, // Sử dụng manifest.webmanifest thủ công trong public/
       workbox: {
         // Precache tất cả asset tĩnh khi build production
