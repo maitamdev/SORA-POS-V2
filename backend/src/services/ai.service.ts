@@ -918,7 +918,7 @@ Chỉ trả về ID duy nhất.`;
     
     try {
       const keyword = await this.groqInsight(prompt);
-      const searchKeyword = keyword ? keyword.toLowerCase().trim().replace(/[^a-z0-9]/g, '') : '';
+      const searchKeyword = keyword ? keyword.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '') : '';
       if (!searchKeyword) return null;
       
       const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(searchKeyword)}&gsrnamespace=6&gsrlimit=3&pithumbsize=600`, {
