@@ -459,6 +459,34 @@ export class AIService {
     return null;
   }
 
+  private static async fetchOpenBeautyFacts(barcode: string): Promise<NormalizedProductInfo | null> {
+    try {
+      const response = await fetch(
+        `https://world.openbeautyfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`,
+        {
+          signal: AbortSignal.timeout(6000),
+          headers: { 'User-Agent': 'SoraPOS/1.0' },
+        }
+      );
+      if (!response.ok) return null;
+      const result = await response.json() as any;
+      if (result.status === 1 && result.product) {
+        const product = result.product;
+        return {
+          source: 'openbeautyfacts',
+          source_url: `https://world.openbeautyfacts.org/product/${barcode}`,
+          name: product.product_name || product.generic_name || undefined,
+          brand: product.brands || undefined,
+          category: product.categories || undefined,
+          image_url: product.image_front_url || product.image_url || undefined,
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
+  }
+
   private static async fetchUPCitemdb(barcode: string): Promise<NormalizedProductInfo | null> {
     try {
       const response = await fetch(
@@ -733,6 +761,7 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
 
     const activeFetches: Promise<NormalizedProductInfo | null>[] = [];
     activeFetches.push(this.fetchOpenFoodFacts(cleanBarcode));
+    activeFetches.push(this.fetchOpenBeautyFacts(cleanBarcode));
     activeFetches.push(this.fetchUPCitemdb(cleanBarcode));
     activeFetches.push(this.fetchICheck(cleanBarcode));
 
