@@ -140,12 +140,11 @@ const ScannerPage: React.FC = () => {
           </h1>
         </div>
 
-        {/* Khung chứa Camera */}
         <div className="relative w-full aspect-square bg-black rounded-xl overflow-hidden border-2 border-gray-700 flex items-center justify-center shadow-inner">
-          <div id="reader" className="w-full h-full" style={{ display: isScanning ? 'block' : 'none' }}></div>
+          <div id="reader" className="w-full h-full absolute inset-0 z-0"></div>
           
           {!isScanning && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 gap-3">
+            <div className="absolute inset-0 z-10 bg-black flex flex-col items-center justify-center text-gray-400 gap-3">
               <MdOutlineQrCodeScanner className="text-6xl opacity-50" />
               <p>Camera đang tắt</p>
             </div>
