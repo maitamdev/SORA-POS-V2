@@ -629,32 +629,30 @@ export class AIService {
 
     const formattedCategories = categoriesList.map(c => `- ID: ${c.id}, Name: ${c.name}`).join('\n');
     
-    const prompt = `Bạn là một trợ lý ảo quản lý hàng hóa POS thông minh. Hãy hợp nhất, chuẩn hóa và tối ưu hóa thông tin sản phẩm thu được từ các nguồn cơ sở dữ liệu mã vạch sau đây thành một đối tượng JSON tiếng Việt hoàn chỉnh.
+    const prompt = `Bạn là một chuyên gia dữ liệu hàng hóa siêu thị. Hãy hợp nhất và chuẩn hóa thông tin sản phẩm từ các nguồn dữ liệu mã vạch sau đây thành một đối tượng JSON tiếng Việt.
 Mã vạch: ${barcode}
 
-Thông tin thô thu thập được từ các nguồn:
+Dữ liệu thô:
 ${JSON.stringify(results, null, 2)}
 
-Danh sách danh mục hiện có trong hệ thống POS của chúng tôi:
+Danh mục POS hiện có:
 ${formattedCategories}
 
-Yêu cầu cụ thể:
-1. "name": Tên sản phẩm tiếng Việt chuẩn hóa và tự nhiên nhất dựa trên thông tin gốc. Viết hoa chữ cái đầu. Loại bỏ các mã số, nhãn hiệu lặp lại vô nghĩa. Nếu tên gốc bằng tiếng nước ngoài, hãy dịch hoặc chuyển ngữ tự nhiên sang tiếng Việt (TUYỆT ĐỐI KHÔNG TỰ BỊA TÊN, PHẢI DỰA VÀO DỮ LIỆU ĐẦU VÀO).
-2. "brand": Tên thương hiệu/nhãn hiệu (nếu có, tối đa 3 từ).
-3. "category_name": Chọn một danh mục phù hợp nhất từ danh sách danh mục POS hiện có ở trên. Nếu không trùng chính xác tên, hãy chọn danh mục liên quan gần nhất trong danh sách. Nếu danh sách trống hoặc không liên quan gì, hãy giữ nguyên phân loại từ nguồn ngoài.
-4. "unit": Chọn một đơn vị tính phù hợp nhất bằng tiếng Việt (ví dụ: Chai, Lon, Gói, Hộp, Cái, Hũ, Túi, Khay, Vỉ, Cây, Cuộn, Chiếc,...).
-5. "description": Viết một mô tả sản phẩm ngắn gọn, tự nhiên, khoảng 25-45 từ bằng tiếng Việt, làm nổi bật công dụng/đặc điểm sản phẩm.
-6. "image_url": Lấy URL ảnh sản phẩm hợp lý nhất từ các nguồn.
+Yêu cầu xuất JSON:
+1. "name": Tên tiếng Việt ngắn gọn, dễ hiểu dựa trên dữ liệu gốc. KHÔNG TỰ BỊA TÊN. Dịch sang tiếng Việt nếu cần.
+2. "brand": Tên thương hiệu (nếu có trong dữ liệu gốc).
+3. "category_name": CHỈ chọn 1 tên danh mục CÓ TRONG danh sách "Danh mục POS hiện có". Nếu không có danh mục nào hoàn toàn phù hợp, hãy trả về giá trị null. KHÔNG TỰ CHẾ DANH MỤC.
+4. "unit": Chọn đơn vị tính tiếng Việt chuẩn xác nhất dựa theo tên sản phẩm (Gói, Hộp, Lon, Chai, Lốc, Thùng, Cái, Túi, Cây, Cuộn). Nếu không chắc chắn, hãy dùng "Cái" hoặc "Gói". Chú ý: Bánh kẹo thường là Gói/Hộp.
+5. "description": Một câu mô tả rất ngắn gọn, thực tế về sản phẩm dựa trên tên gọi (không dùng các từ sáo rỗng như "dễ tiêu hóa, tốt cho sức khỏe" nếu dữ liệu gốc không có).
 
-Chú ý: Trả về duy nhất đối tượng JSON, không thêm bất kỳ văn bản giải thích hay markdown code block nào khác.
-Định dạng JSON trả về:
+Chỉ trả về JSON thuần túy, không có giải thích, không có markdown.
 {
-  "name": "tên sản phẩm",
-  "brand": "thương hiệu",
-  "category_name": "tên danh mục chọn được từ danh sách hoặc ngoài",
-  "unit": "đơn vị tính",
-  "description": "mô tả sản phẩm",
-  "image_url": "url ảnh"
+  "name": "...",
+  "brand": "...",
+  "category_name": "...",
+  "unit": "...",
+  "description": "...",
+  "image_url": "..."
 }`;
 
     try {
