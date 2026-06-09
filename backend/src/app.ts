@@ -78,8 +78,11 @@ app.get('/favicon.ico', (req, res) => {
 // Routes
 // ============================================
 app.get('/api-docs', sendApiDocsPage);
+app.get('/docs', sendApiDocsPage); // Vercel fallback
 app.get('/api/openapi.json', sendOpenApiSpec);
+app.get('/openapi.json', sendOpenApiSpec); // Vercel fallback
 app.use('/api', routes);
+app.use('/', routes); // Vercel strips /api from req.url
 
 // ============================================
 // Error Handler (phải đặt cuối cùng)
