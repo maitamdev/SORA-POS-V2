@@ -639,7 +639,7 @@ Danh sách danh mục hiện có trong hệ thống POS của chúng tôi:
 ${formattedCategories}
 
 Yêu cầu cụ thể:
-1. "name": Tên sản phẩm tiếng Việt chuẩn hóa và tự nhiên nhất. Viết hoa chữ cái đầu. Loại bỏ các mã số, nhãn hiệu lặp lại vô nghĩa. Nếu tên gốc bằng tiếng nước ngoài, hãy dịch hoặc chuyển ngữ tự nhiên sang tiếng Việt (ví dụ "Coca Cola Zero Can 320ml" dịch thành "Nước ngọt Coca-Cola Zero lon 320ml").
+1. "name": Tên sản phẩm tiếng Việt chuẩn hóa và tự nhiên nhất dựa trên thông tin gốc. Viết hoa chữ cái đầu. Loại bỏ các mã số, nhãn hiệu lặp lại vô nghĩa. Nếu tên gốc bằng tiếng nước ngoài, hãy dịch hoặc chuyển ngữ tự nhiên sang tiếng Việt (TUYỆT ĐỐI KHÔNG TỰ BỊA TÊN, PHẢI DỰA VÀO DỮ LIỆU ĐẦU VÀO).
 2. "brand": Tên thương hiệu/nhãn hiệu (nếu có, tối đa 3 từ).
 3. "category_name": Chọn một danh mục phù hợp nhất từ danh sách danh mục POS hiện có ở trên. Nếu không trùng chính xác tên, hãy chọn danh mục liên quan gần nhất trong danh sách. Nếu danh sách trống hoặc không liên quan gì, hãy giữ nguyên phân loại từ nguồn ngoài.
 4. "unit": Chọn một đơn vị tính phù hợp nhất bằng tiếng Việt (ví dụ: Chai, Lon, Gói, Hộp, Cái, Hũ, Túi, Khay, Vỉ, Cây, Cuộn, Chiếc,...).
