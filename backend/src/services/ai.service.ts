@@ -914,11 +914,14 @@ Chỉ trả về ID duy nhất.`;
 
   static async suggestCategoryImage(categoryName: string) {
     if (!env.groqApiKey) return null;
-    const prompt = `Tôi có một danh mục bán hàng tên là "${categoryName}". Hãy chọn ra DUY NHẤT MỘT từ khóa tiếng Anh mang tính hình tượng cao nhất, ngắn gọn nhất, sát nghĩa nhất để mô tả danh mục này. Từ khóa này sẽ dùng để tìm kiếm ảnh minh họa trên từ điển ảnh. Chú ý: Chỉ trả về 1 từ khóa, viết thường, không giải thích, không dấu ngoặc kép. Ví dụ: coffee, electronics, rice, shoes.`;
+    const prompt = `Translate this product category name to English for image search. Category: "${categoryName}". Return ONLY a JSON object with a single key "keyword". Example: {"keyword": "fried rice"}`;
     
     try {
-      const keyword = await this.groqInsight(prompt);
-      const searchKeyword = keyword ? keyword.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '') : '';
+      const result = await this.groqInsight(prompt);
+      const jsonStr = result?.match(/\{[\s\S]*\}/)?.[0];
+      if (!jsonStr) return null;
+      const parsed = JSON.parse(jsonStr);
+      const searchKeyword = parsed.keyword?.toLowerCase().trim();
       if (!searchKeyword) return null;
       
       const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(searchKeyword)}&gsrnamespace=6&gsrlimit=3&pithumbsize=600`, {
