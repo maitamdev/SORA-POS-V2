@@ -185,6 +185,25 @@ const CategoriesPage = () => {
     }
   };
 
+  const handleNameBlur = async () => {
+    // Only auto-generate if name exists, image URL is empty, and we aren't editing an existing category (or if we are editing, we just cleared the image URL)
+    if (!name.trim() || imageUrl.trim()) return;
+    
+    setGeneratingImage(true);
+    try {
+      const { aiAPI } = await import('../../services/ai.api');
+      const res = await aiAPI.suggestCategoryImage(name.trim());
+      if (res.data.data.imageUrl) {
+        setImageUrl(res.data.data.imageUrl);
+        toast.success('AI đã tự động tìm ảnh minh họa!');
+      }
+    } catch (error) {
+      console.error('Lỗi khi auto-gọi AI gợi ý ảnh:', error);
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   // Products modal states
   const [selectedCategoryForProducts, setSelectedCategoryForProducts] = useState<Category | null>(null);
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
@@ -349,6 +368,7 @@ const CategoriesPage = () => {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onBlur={handleNameBlur}
                 placeholder="Ví dụ: Đồ uống, Fastfood..."
                 required
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold outline-none focus:border-blue-500 transition"
