@@ -144,7 +144,7 @@ const ProductsPage = () => {
   const canManageProducts = user?.role === 'admin' || user?.role === 'manager';
   const visibleColCount = Object.values(visibleColumns).filter(Boolean).length + (canManageProducts ? 2 : 0); // +2 for checkbox & actions
 
-  const loadData = async () => {
+  const loadProducts = async () => {
     const params: Record<string, unknown> = {
       search,
       page,
@@ -162,17 +162,13 @@ const ProductsPage = () => {
     if (filterActiveStatus !== 'all') statsParams.is_active = filterActiveStatus ? 'true' : 'false';
 
     try {
-      const [productRes, allProductRes, categoryRes, supplierRes] = await Promise.all([
+      const [productRes, allProductRes] = await Promise.all([
         catalogAPI.products.list(params),
         catalogAPI.products.list(statsParams),
-        catalogAPI.categories.list({ limit: 100, is_active: true }),
-        catalogAPI.suppliers.list({ limit: 100, is_active: true }),
       ]);
 
       setProducts(productRes.data.data.items);
       setTotalItems(productRes.data.data.pagination.total);
-      setCategories(categoryRes.data.data.items);
-      setSuppliers(supplierRes.data.data.items);
 
       // Tính toán thống kê trên toàn bộ sản phẩm thỏa mãn bộ lọc
       const allProducts = allProductRes.data.data.items;
@@ -197,8 +193,25 @@ const ProductsPage = () => {
     }
   };
 
+  const loadStaticData = async () => {
+    try {
+      const [categoryRes, supplierRes] = await Promise.all([
+        catalogAPI.categories.list({ limit: 100, is_active: true }),
+        catalogAPI.suppliers.list({ limit: 100, is_active: true }),
+      ]);
+      setCategories(categoryRes.data.data.items);
+      setSuppliers(supplierRes.data.data.items);
+    } catch (err) {
+      console.warn('Lỗi khi tải danh mục và NCC', err);
+    }
+  };
+
   useEffect(() => {
-    loadData();
+    loadStaticData();
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
   }, [page, limit, selectedCategoryId, search, filterActiveStatus]);
 
   // Sync selectedCategoryId with URL parameters if categoryParam changes
@@ -331,7 +344,7 @@ const ProductsPage = () => {
         toast.success(`Đã thêm sản phẩm ${name} thành công`);
       }
       setShowModal(false);
-      await loadData();
+      await loadProducts();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi lưu sản phẩm');
     }
@@ -539,7 +552,7 @@ const ProductsPage = () => {
       try {
         await catalogAPI.products.remove(product.id);
         toast.success(`Đã xóa sản phẩm ${product.name}`);
-        await loadData();
+        await loadProducts();
       } catch (err) {
         toast.error('Lỗi khi xóa sản phẩm');
       }
@@ -810,7 +823,7 @@ const ProductsPage = () => {
             } else {
               toast.success(`Đã import thành công toàn bộ ${imported} sản phẩm!`);
             }
-            await loadData();
+            await loadProducts();
           } else {
             toast.error(`Không có sản phẩm nào được nhập. Bỏ qua ${skipped} trùng SKU: ${skippedSkus.join(', ')}`);
           }

@@ -140,8 +140,7 @@ const POSPage = () => {
     window.setTimeout(() => document.getElementById('barcode-search-input')?.focus(), 0);
   };
 
-  const loadData = async () => {
-    // --- Chế độ OFFLINE: đọc từ IndexedDB ---
+  const loadProducts = async () => {
     if (!navigator.onLine) {
       try {
         const categoryIdFilter = selectedCategoryId !== 'all' ? selectedCategoryId : undefined;
@@ -153,19 +152,12 @@ const POSPage = () => {
         );
         setProducts(items);
         setPagination({ page, limit: operationSettings.productPageSize, total });
-
-        const offlineCategories = await getCategoriesOffline();
-        if (offlineCategories.length > 0) setCategories(offlineCategories);
-
-        const offlineCustomers = await getCustomersOffline();
-        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
       } catch (err) {
         console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
       }
       return;
     }
 
-    // --- Chế độ ONLINE: gọi API bình thường ---
     const params: Record<string, unknown> = {
       search,
       is_active: true,
@@ -176,23 +168,39 @@ const POSPage = () => {
       params.category_id = selectedCategoryId;
     }
 
-    const [productRes, categoryRes, customerRes] = await Promise.all([
-      catalogAPI.products.list(params),
-      catalogAPI.categories.list({ is_active: true, limit: 100 }),
-      catalogAPI.customers.list({ is_active: true, limit: 100 }),
-    ]);
-
+    const productRes = await catalogAPI.products.list(params);
     setProducts(productRes.data.data.items);
     setPagination(productRes.data.data.pagination);
-    setCategories(categoryRes.data.data.items);
-    setCustomers(customerRes.data.data.items);
-
-    // Background: đồng bộ xuống IndexedDB cho lần offline tiếp theo
     syncAllDataToLocal().catch(() => {});
   };
 
+  const loadCategoriesAndCustomers = async () => {
+    if (!navigator.onLine) {
+      try {
+        const offlineCategories = await getCategoriesOffline();
+        if (offlineCategories.length > 0) setCategories(offlineCategories);
+        const offlineCustomers = await getCustomersOffline();
+        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+      } catch (err) {
+        console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
+      }
+      return;
+    }
+
+    const [categoryRes, customerRes] = await Promise.all([
+      catalogAPI.categories.list({ is_active: true, limit: 100 }),
+      catalogAPI.customers.list({ is_active: true, limit: 100 }),
+    ]);
+    setCategories(categoryRes.data.data.items);
+    setCustomers(customerRes.data.data.items);
+  };
+
   useEffect(() => {
-    loadData().catch(() => toast.error('Không tải được dữ liệu POS'));
+    loadCategoriesAndCustomers().catch(() => toast.error('Không tải được danh mục và khách hàng'));
+  }, []);
+
+  useEffect(() => {
+    loadProducts().catch(() => toast.error('Không tải được dữ liệu POS'));
   }, [page, selectedCategoryId, search, operationSettings.productPageSize]);
 
   useEffect(() => {
@@ -1111,7 +1119,7 @@ const POSPage = () => {
         setUsedPoints(0);
         setIsRedeemingPoints(false);
         setShowCheckoutConfirm(false);
-        await loadData();
+        await loadProducts();
         await refreshPendingCount();
         toast.success(`Đã lưu đơn hàng ngoại tuyến ${pending.offlineOrderNumber} — sẽ đồng bộ khi có mạng`, { duration: 5000 });
       } catch (err) {
@@ -1198,7 +1206,7 @@ const POSPage = () => {
       setNewCustName('');
       setUsedPoints(0);
       setIsRedeemingPoints(false);
-      await loadData();
+      await loadProducts();
       await loadActiveShift();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
