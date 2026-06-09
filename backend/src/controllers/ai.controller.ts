@@ -56,4 +56,11 @@ export class AIController {
     const categoryId = await AIService.suggestCategory(productName, categories);
     successResponse(res, { categoryId }, 'Gợi ý danh mục sản phẩm thành công');
   });
+
+  static suggestCategoryImage = asyncHandler(async (req: Request, res: Response) => {
+    const { categoryName } = req.body;
+    if (!categoryName) throw new AppError(400, 'Vui lòng cung cấp tên danh mục');
+    const imageUrl = await AIService.suggestCategoryImage(categoryName);
+    successResponse(res, { imageUrl }, 'Gợi ý ảnh danh mục thành công');
+  });
 }

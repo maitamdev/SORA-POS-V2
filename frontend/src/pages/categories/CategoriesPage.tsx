@@ -161,6 +161,29 @@ const CategoriesPage = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [generatingImage, setGeneratingImage] = useState(false);
+
+  const handleGenerateImage = async () => {
+    if (!name.trim()) {
+      toast.error('Vui lòng nhập tên danh mục trước khi dùng AI');
+      return;
+    }
+    setGeneratingImage(true);
+    try {
+      const { aiAPI } = await import('../../services/ai.api');
+      const res = await aiAPI.suggestCategoryImage(name.trim());
+      if (res.data.data.imageUrl) {
+        setImageUrl(res.data.data.imageUrl);
+        toast.success('Đã tìm thấy ảnh minh họa phù hợp!');
+      } else {
+        toast.error('AI không tìm thấy ảnh phù hợp. Vui lòng tự nhập.');
+      }
+    } catch (error) {
+      toast.error('Lỗi khi gọi AI gợi ý ảnh');
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
 
   // Products modal states
   const [selectedCategoryForProducts, setSelectedCategoryForProducts] = useState<Category | null>(null);
@@ -346,7 +369,17 @@ const CategoriesPage = () => {
 
             {/* Image URL Input */}
             <label className="block space-y-1.5">
-              <span className="block text-xs font-bold uppercase text-slate-500">URL hình ảnh</span>
+              <div className="flex items-center justify-between">
+                <span className="block text-xs font-bold uppercase text-slate-500">URL hình ảnh</span>
+                <button
+                  type="button"
+                  onClick={handleGenerateImage}
+                  disabled={generatingImage}
+                  className="text-xs font-black text-blue-600 hover:text-blue-800 disabled:opacity-50 transition flex items-center gap-1"
+                >
+                  {generatingImage ? 'Đang tìm...' : '✨ AI Gợi ý ảnh'}
+                </button>
+              </div>
               <input
                 type="text"
                 value={imageUrl}

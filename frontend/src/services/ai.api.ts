@@ -28,4 +28,6 @@ export const aiAPI = {
     api.post<ApiResponse<{ description: string }>>('/ai/generate-description', { productName }),
   suggestCategory: (productName: string, categories: Array<{ id: string; name: string }>) =>
     api.post<ApiResponse<{ categoryId: string | null }>>('/ai/suggest-category', { productName, categories }),
+  suggestCategoryImage: (categoryName: string) =>
+    api.post<ApiResponse<{ imageUrl: string | null }>>('/ai/suggest-category-image', { categoryName }),
 };

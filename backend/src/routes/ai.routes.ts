@@ -37,5 +37,11 @@ router.post(
   roleMiddleware('admin', 'manager'),
   AIController.suggestCategory
 );
+router.post(
+  '/suggest-category-image',
+  rateLimitMiddleware({ keyPrefix: 'ai-category-image', windowMs: 60_000, max: 30 }),
+  roleMiddleware('admin', 'manager'),
+  AIController.suggestCategoryImage
+);
 
 export default router;

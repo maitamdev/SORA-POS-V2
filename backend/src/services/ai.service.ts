@@ -911,4 +911,32 @@ Chỉ trả về ID duy nhất.`;
 
     return categories[0]?.id || null;
   }
+
+  static async suggestCategoryImage(categoryName: string) {
+    if (!env.groqApiKey) return null;
+    const prompt = `Tôi có một danh mục bán hàng tên là "${categoryName}". Hãy chọn ra DUY NHẤT MỘT từ khóa tiếng Anh mang tính hình tượng cao nhất, ngắn gọn nhất, sát nghĩa nhất để mô tả danh mục này. Từ khóa này sẽ dùng để tìm kiếm ảnh minh họa trên từ điển ảnh. Chú ý: Chỉ trả về 1 từ khóa, viết thường, không giải thích, không dấu ngoặc kép. Ví dụ: coffee, electronics, rice, shoes.`;
+    
+    try {
+      const keyword = await this.groqInsight(prompt);
+      const searchKeyword = keyword ? keyword.toLowerCase().trim().replace(/[^a-z0-9]/g, '') : '';
+      if (!searchKeyword) return null;
+      
+      const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(searchKeyword)}&gsrnamespace=6&gsrlimit=3&pithumbsize=600`, {
+        signal: AbortSignal.timeout(6000)
+      });
+      
+      if (!res.ok) return null;
+      const data = await res.json() as any;
+      if (data?.query?.pages) {
+        const pages = Object.values(data.query.pages) as any[];
+        const image = pages.find(p => p.thumbnail?.source);
+        if (image?.thumbnail?.source) {
+          return image.thumbnail.source;
+        }
+      }
+    } catch(e) {
+      console.error('Lỗi khi gợi ý ảnh danh mục:', e);
+    }
+    return null;
+  }
 }
