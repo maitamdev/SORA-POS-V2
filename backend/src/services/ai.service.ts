@@ -643,7 +643,7 @@ Yêu cầu xuất JSON:
 2. "brand": Tên thương hiệu (nếu có trong dữ liệu gốc).
 3. "category_name": CHỈ chọn 1 tên danh mục CÓ TRONG danh sách "Danh mục POS hiện có". Nếu không có danh mục nào hoàn toàn phù hợp, hãy trả về giá trị null. KHÔNG TỰ CHẾ DANH MỤC.
 4. "unit": Chọn đơn vị tính tiếng Việt chuẩn xác nhất dựa theo tên sản phẩm (Gói, Hộp, Lon, Chai, Lốc, Thùng, Cái, Túi, Cây, Cuộn). Nếu không chắc chắn, hãy dùng "Cái" hoặc "Gói". Chú ý: Bánh kẹo thường là Gói/Hộp.
-5. "description": Một câu mô tả rất ngắn gọn, thực tế về sản phẩm dựa trên tên gọi (không dùng các từ sáo rỗng như "dễ tiêu hóa, tốt cho sức khỏe" nếu dữ liệu gốc không có).
+5. "description": Viết một đoạn mô tả ngắn gọn, hấp dẫn và tự nhiên (khoảng 20-40 từ) dựa trên tên gọi và phân loại. Hãy làm cho sản phẩm nghe có vẻ ngon miệng hoặc hữu ích, nhưng đừng dùng những từ ngữ y tế thái quá như "chữa bệnh", "chống lão hóa".
 
 Chỉ trả về JSON thuần túy, không có giải thích, không có markdown.
 {
