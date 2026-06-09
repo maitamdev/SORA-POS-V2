@@ -25,7 +25,7 @@ type CreateOrderInput = {
   items: OrderItemInput[];
 };
 
-const orderSelect = '*, customers(*), users(id, full_name, email), order_details(*), payments(*)';
+const orderSelect = '*, customers(*), users!orders_user_id_fkey(id, full_name, email), order_details(*), payments(*)';
 
 const mapRpcError = (message?: string) => {
   const text = message || 'Database transaction failed';
@@ -47,7 +47,7 @@ export class OrderService {
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('orders')
-      .select('*, customers(id, name, phone), users(id, full_name)', { count: 'exact' })
+      .select('*, customers(id, name, phone), users!orders_user_id_fkey(id, full_name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -69,7 +69,10 @@ export class OrderService {
       .eq('id', id)
       .single();
 
-    if (error || !order) throw new AppError(404, 'Khong tim thay hoa don');
+    if (error || !order) {
+      if (error) console.error('[OrderService.getById] Supabase Error:', error);
+      throw new AppError(404, 'Khong tim thay hoa don');
+    }
     return order;
   }
 
