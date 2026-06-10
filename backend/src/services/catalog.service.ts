@@ -345,7 +345,26 @@ export class CatalogService {
   }
 
   static async deleteProduct(id: string) {
-    const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id);
+    // Lấy SKU hiện tại để tạo SKU mới không trùng
+    const { data: product } = await supabase
+      .from('products')
+      .select('sku')
+      .eq('id', id)
+      .single();
+
+    const deactivatedSku = product
+      ? `${product.sku}_DEL_${Date.now()}`
+      : `DELETED_${Date.now()}`;
+
+    // Soft-delete: ẩn sản phẩm + giải phóng barcode/sku để có thể tạo lại
+    const { error } = await supabase
+      .from('products')
+      .update({
+        is_active: false,
+        barcode: null,
+        sku: deactivatedSku,
+      })
+      .eq('id', id);
     if (error) throw new AppError(400, error.message);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return null;

@@ -603,6 +603,7 @@ export class AIService {
           .from('products')
           .select('id')
           .eq('sku', finalSku)
+          .eq('is_active', true)
           .limit(1)
           .maybeSingle();
 
@@ -623,20 +624,27 @@ export class AIService {
   }
 
   private static localMergeResults(results: NormalizedProductInfo[], barcode: string) {
-    const name = results.map(r => r.name).find(Boolean) || `Sản phẩm ${barcode}`;
+    const rawName = results.map(r => r.name).find(Boolean) || '';
     const brand = results.map(r => r.brand).find(Boolean) || null;
     const categoryName = results.map(r => r.category).find(Boolean) || null;
     const description = results.map(r => r.description).find(Boolean) || '';
     const imageUrl = results.map(r => r.image_url).find(Boolean) || null;
+
+    // Xây tên tốt nhất: nếu tên gốc chưa chứa brand thì thêm brand vào
+    let name = rawName;
+    if (brand && rawName && !rawName.toLowerCase().includes(brand.toLowerCase())) {
+      name = `${brand} ${rawName}`;
+    }
+    if (!name) name = `Sản phẩm ${barcode}`;
     
     const unitSource = `${name} ${description}`.toLowerCase();
     let unit = 'Cái';
-    if (unitSource.includes('ml') || unitSource.includes('l')) unit = 'Chai';
-    else if (unitSource.includes('lon') || unitSource.includes('can')) unit = 'Lon';
-    else if (unitSource.includes('gói') || unitSource.includes('pack')) unit = 'Gói';
-    else if (unitSource.includes('hộp') || unitSource.includes('box')) unit = 'Hộp';
-    else if (unitSource.includes('hũ') || unitSource.includes('jar')) unit = 'Hũ';
-    else if (unitSource.includes('túi') || unitSource.includes('bag')) unit = 'Túi';
+    if (/\blon\b/.test(unitSource) || /\bcan\b/.test(unitSource)) unit = 'Lon';
+    else if (unitSource.includes('ml') || /\bchai\b/.test(unitSource) || /\bbottle\b/.test(unitSource)) unit = 'Chai';
+    else if (/\bgói\b/.test(unitSource) || /\bpack\b/.test(unitSource)) unit = 'Gói';
+    else if (/\bhộp\b/.test(unitSource) || /\bbox\b/.test(unitSource)) unit = 'Hộp';
+    else if (/\bhũ\b/.test(unitSource) || /\bjar\b/.test(unitSource)) unit = 'Hũ';
+    else if (/\btúi\b/.test(unitSource) || /\bbag\b/.test(unitSource)) unit = 'Túi';
 
     return {
       name,
@@ -644,7 +652,7 @@ export class AIService {
       category_name: categoryName,
       unit,
       description: description || `Thông tin sản phẩm tự động từ cơ sở dữ liệu mã vạch cho mã ${barcode}.`,
-      image_url: imageUrl,
+      image_url: imageUrl || undefined,
     };
   }
 
@@ -657,7 +665,12 @@ export class AIService {
 
     const formattedCategories = categoriesList.map(c => `- ID: ${c.id}, Name: ${c.name}`).join('\n');
     
-    const prompt = `Bạn là một chuyên gia dữ liệu hàng hóa siêu thị. Hãy hợp nhất và chuẩn hóa thông tin sản phẩm từ các nguồn dữ liệu mã vạch sau đây thành một đối tượng JSON tiếng Việt.
+    // Lấy tên gốc từ nguồn dữ liệu đầu tiên để ép AI không bịa
+    const sourceNames = results.map(r => r.name).filter(Boolean);
+    const sourceBrands = results.map(r => r.brand).filter(Boolean);
+    const bestSourceName = sourceNames[0] || '';
+    
+    const prompt = `Bạn là trợ lý dữ liệu POS. Chuẩn hóa thông tin sản phẩm từ dữ liệu mã vạch.
 Mã vạch: ${barcode}
 
 Dữ liệu thô:
@@ -666,21 +679,20 @@ ${JSON.stringify(results, null, 2)}
 Danh mục POS hiện có:
 ${formattedCategories}
 
-Yêu cầu xuất JSON:
-1. "name": Tên tiếng Việt ngắn gọn, dễ hiểu dựa trên dữ liệu gốc. KHÔNG TỰ BỊA TÊN. Dịch sang tiếng Việt nếu cần.
-2. "brand": Tên thương hiệu (nếu có trong dữ liệu gốc).
-3. "category_name": CHỈ chọn 1 tên danh mục CÓ TRONG danh sách "Danh mục POS hiện có". Nếu không có danh mục nào hoàn toàn phù hợp, hãy trả về giá trị null. KHÔNG TỰ CHẾ DANH MỤC.
-4. "unit": Chọn đơn vị tính tiếng Việt chuẩn xác nhất dựa theo tên sản phẩm (Gói, Hộp, Lon, Chai, Lốc, Thùng, Cái, Túi, Cây, Cuộn). Nếu không chắc chắn, hãy dùng "Cái" hoặc "Gói". Chú ý: Bánh kẹo thường là Gói/Hộp.
-5. "description": Viết một đoạn mô tả ngắn gọn, hấp dẫn và tự nhiên (khoảng 20-40 từ) dựa trên tên gọi và phân loại. Hãy làm cho sản phẩm nghe có vẻ ngon miệng hoặc hữu ích, nhưng đừng dùng những từ ngữ y tế thái quá như "chữa bệnh", "chống lão hóa".
+QUY TẮC BẮT BUỘC:
+1. "name": PHẢI dùng ĐÚNG tên sản phẩm từ dữ liệu gốc ở trên. TUYỆT ĐỐI KHÔNG được đổi tên, KHÔNG dịch tên thương hiệu. Ví dụ: nếu dữ liệu gốc ghi "Pepsi" thì PHẢI giữ "Pepsi", KHÔNG được đổi thành "Coca Cola" hay bất kỳ tên khác. Chỉ được chuẩn hóa format (bỏ ký tự thừa, thêm dung tích nếu có). Tên gốc tham chiếu: "${bestSourceName}"
+2. "brand": Lấy ĐÚNG từ trường "brands" trong dữ liệu gốc. KHÔNG tự chế.
+3. "category_name": CHỈ chọn 1 tên danh mục CÓ TRONG danh sách trên. Nếu không phù hợp → null. KHÔNG tự chế danh mục.
+4. "unit": Chọn đơn vị (Lon, Chai, Gói, Hộp, Cái, Túi, Lốc, Thùng, Cây, Cuộn). Lon dạng can/lon kim loại. Chai dạng chai nhựa/thủy tinh.
+5. "description": Mô tả ngắn 20-40 từ tiếng Việt, tự nhiên.
 
-Chỉ trả về JSON thuần túy, không có giải thích, không có markdown.
+Chỉ trả về JSON thuần túy:
 {
   "name": "...",
   "brand": "...",
   "category_name": "...",
   "unit": "...",
-  "description": "...",
-  "image_url": "..."
+  "description": "..."
 }`;
 
     try {
@@ -695,11 +707,11 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
           messages: [
             {
               role: 'system',
-              content: 'Bạn là trợ lý dữ liệu POS. Chỉ trả về JSON thuần túy, không có giải thích, không có khối mã ```json.',
+              content: 'Bạn là trợ lý dữ liệu POS. Chỉ trả về JSON thuần túy. TUYỆT ĐỐI KHÔNG thay đổi tên sản phẩm hoặc thương hiệu từ dữ liệu gốc.',
             },
             { role: 'user', content: prompt },
           ],
-          temperature: 0.1,
+          temperature: 0,
           max_tokens: 400,
         }),
       });
@@ -711,13 +723,34 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
 
       const cleanJsonStr = content.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
       const parsed = JSON.parse(cleanJsonStr);
+
+      // === VALIDATION: Kiểm tra AI có bịa tên không ===
+      const aiName = (parsed.name || '').toLowerCase();
+      const allSourceText = [...sourceNames, ...sourceBrands].join(' ').toLowerCase();
+      
+      // Tách từ quan trọng (>= 3 ký tự) từ tên AI trả về
+      const aiWords = aiName.replace(/[^a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ0-9\s]/gi, '')
+        .split(/\s+/)
+        .filter((w: string) => w.length >= 3);
+      
+      // Ít nhất 1 từ quan trọng trong tên AI phải có trong dữ liệu gốc
+      const hasOverlap = aiWords.length === 0 || aiWords.some((word: string) => allSourceText.includes(word));
+      
+      if (!hasOverlap) {
+        console.warn(`[AI Validation] Tên AI "${parsed.name}" không khớp dữ liệu gốc "${sourceNames.join(', ')}". Dùng tên gốc.`);
+        parsed.name = bestSourceName;
+      }
+
+      // Lấy image_url từ nguồn gốc, không để AI bịa URL
+      const sourceImageUrl = results.map(r => r.image_url).find(Boolean) || undefined;
+
       return {
         name: parsed.name || undefined,
         brand: parsed.brand || undefined,
         category_name: parsed.category_name || undefined,
         unit: parsed.unit || undefined,
         description: parsed.description || undefined,
-        image_url: parsed.image_url || undefined,
+        image_url: sourceImageUrl,
       };
     } catch (e) {
       console.error('Lỗi khi gọi Groq AI để merge sản phẩm:', e);
@@ -735,6 +768,7 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
       const { data: existingProduct } = await supabase
         .from('products')
         .select('*, categories(id, name), suppliers(id, name)')
+        .eq('is_active', true)
         .or(`barcode.eq.${cleanBarcode},sku.eq.${cleanBarcode}`)
         .limit(1)
         .maybeSingle();
@@ -790,7 +824,7 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
       // ignore
     }
 
-    let merged = await this.groqMergeResults(validResults, cleanBarcode, categoriesList);
+    let merged: { name?: string; brand?: string | null; category_name?: string | null; unit?: string; description?: string; image_url?: string } | null = await this.groqMergeResults(validResults, cleanBarcode, categoriesList);
     let isAiProcessed = true;
 
     if (!merged) {
@@ -798,20 +832,23 @@ Chỉ trả về JSON thuần túy, không có giải thích, không có markdow
       isAiProcessed = false;
     }
 
+    // merged is guaranteed non-null after localMergeResults fallback
+    const finalMerged = merged!;
+
     const firstSourceUrl = validResults.map(r => r.source_url).find(Boolean) || '';
-    const generatedSku = await this.generateSku(merged.name || `Sản phẩm ${cleanBarcode}`, cleanBarcode);
+    const generatedSku = await this.generateSku(finalMerged.name || `Sản phẩm ${cleanBarcode}`, cleanBarcode);
 
     return {
       source: isAiProcessed ? 'ai-merged' : 'local-merged',
       source_url: firstSourceUrl || null,
       barcode: cleanBarcode,
       sku: generatedSku,
-      name: merged.name || `Sản phẩm ${cleanBarcode}`,
-      brand: merged.brand || null,
-      category_name: merged.category_name || null,
-      unit: merged.unit || 'Cái',
-      image_url: merged.image_url || null,
-      description: merged.description || '',
+      name: finalMerged.name || `Sản phẩm ${cleanBarcode}`,
+      brand: finalMerged.brand || null,
+      category_name: finalMerged.category_name || null,
+      unit: finalMerged.unit || 'Cái',
+      image_url: finalMerged.image_url || null,
+      description: finalMerged.description || '',
       confidence: isAiProcessed ? 'high' : 'medium',
       exists: false,
       raw: {

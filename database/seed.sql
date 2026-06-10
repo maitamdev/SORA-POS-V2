@@ -33,4 +33,4 @@ INSERT INTO users (id, email, password_hash, full_name, role_id) VALUES
     'a0000000-0000-0000-0000-000000000001'
   );
 
--- HẾT. KHÔNG THÊM BẤT KỲ DỮ LIỆU GIẢ NÀO KHÁC.
+
