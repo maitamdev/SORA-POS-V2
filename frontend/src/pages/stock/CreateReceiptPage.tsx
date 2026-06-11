@@ -7,6 +7,7 @@ import {
 import { goodsReceiptAPI } from '../../services/goodsReceipt.api';
 import { catalogAPI } from '../../services/catalog.api';
 import { Product, Supplier } from '../../types/domain.type';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 interface SelectedItem {
   product: Product;
@@ -36,6 +37,35 @@ export default function CreateReceiptPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Kết nối máy quét mã vạch từ xa qua Supabase Realtime
+  const { scannedBarcode, isConnected: isScannerConnected } = useBarcodeScanner();
+
+  const handleScanProduct = async (barcode: string) => {
+    const code = barcode.trim();
+    if (!code) return;
+
+    const toastId = toast.loading(`Đang tìm sản phẩm có mã: ${code}...`);
+    try {
+      const response = await catalogAPI.products.list({ search: code, is_active: true, limit: 5 });
+      const dbMatch = response.data.data.items.find((p) => p.barcode === code || p.sku === code);
+
+      if (dbMatch) {
+        handleAddItem(dbMatch);
+        toast.success(`Đã thêm ${dbMatch.name} vào phiếu nhập`, { id: toastId });
+      } else {
+        toast.error(`Không tìm thấy sản phẩm có mã: ${code}`, { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Lỗi khi truy vấn mã vạch', { id: toastId });
+    }
+  };
+
+  useEffect(() => {
+    if (scannedBarcode) {
+      handleScanProduct(scannedBarcode);
+    }
+  }, [scannedBarcode]);
 
   useEffect(() => {
     const loadSuppliers = async () => {
@@ -204,8 +234,20 @@ export default function CreateReceiptPage() {
           <div className="space-y-6">
             {/* Search Input Card */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 relative">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-black text-slate-700">Tìm sản phẩm nhập kho</span>
+                {isScannerConnected ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black text-emerald-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Máy quét đang bật
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-[10px] font-black text-slate-400">
+                    Máy quét ngoại tuyến
+                  </span>
+                )}
+              </div>
               <label className="block">
-                <span className="mb-2 block text-sm font-black text-slate-700">Tìm sản phẩm nhập kho</span>
                 <div className="relative">
                   <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
