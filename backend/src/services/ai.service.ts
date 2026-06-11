@@ -290,11 +290,12 @@ export class AIService {
       created_by: userId || null,
     };
 
+    // Tìm gợi ý cũ (pending hoặc rejected) để thay thế thay vì tạo mới
     const { data: existing, error: findError } = await supabase
       .from('ai_recommendations')
       .select('id')
       .eq('product_id', item.id)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'rejected'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -321,14 +322,23 @@ export class AIService {
 
     const created = [];
     for (const item of actionableItems) {
+      const now = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+      const stockDaysLeft = item.average_daily_sales > 0
+        ? Math.floor(item.stock_quantity / item.average_daily_sales)
+        : null;
+
       const prompt = [
+        `Thời điểm phân tích: ${now}`,
         `Sản phẩm: ${item.name} (${item.sku})`,
-        `Tồn hiện tại: ${item.stock_quantity}`,
+        `Tồn hiện tại: ${item.stock_quantity} ${item.unit}`,
         `Ngưỡng tối thiểu: ${item.min_stock_level}`,
         `Bán trung bình 30 ngày: ${item.average_daily_sales}/ngày`,
+        stockDaysLeft !== null ? `Dự kiến hết hàng sau: ${stockDaysLeft} ngày` : 'Chưa có dữ liệu bán hàng',
         `Số lượng đề xuất nhập: ${item.recommended_quantity}`,
         `Mục tiêu tồn kho: ${analysis.target_days} ngày`,
-        'Hãy đưa ra cảnh báo tồn kho và khuyến nghị nhập hàng.',
+        '',
+        'Hãy đưa ra nhận định ngắn gọn (2-3 câu) về tình trạng tồn kho và khuyến nghị cụ thể.',
+        'Viết tự nhiên, chuyên nghiệp, tập trung vào hành động cần làm. Không dùng dấu ** hay markdown.',
       ].join('\n');
 
       const aiInsight = (await this.groqInsight(prompt)) || item.ai_insight;

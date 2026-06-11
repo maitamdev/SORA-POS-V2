@@ -132,7 +132,7 @@ const StockPage = () => {
     try {
       const [aRes, rRes] = await Promise.all([
         aiAPI.restockAnalysis({ target_days: targetDays }),
-        aiAPI.list({ limit: 100 }),
+        aiAPI.list({ limit: 100, status: 'pending' }),
       ]);
       setAnalysis(aRes.data.data);
       setAiItems(rRes.data.data.items);
