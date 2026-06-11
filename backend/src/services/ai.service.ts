@@ -119,18 +119,27 @@ export class AIService {
         messages: [
           {
             role: 'system',
-            content: 'Bạn là trợ lý quản lý tồn kho POS. Trả lời tiếng Việt, ngắn gọn, có hành động cụ thể.',
+            content: 'Bạn là trợ lý quản lý tồn kho POS chuyên nghiệp. Trả lời tiếng Việt, ngắn gọn 2-3 câu văn liền mạch. TUYỆT ĐỐI KHÔNG dùng dấu **, dấu gạch đầu dòng (-), markdown hay định dạng đặc biệt. Chỉ viết câu văn thuần túy, tập trung vào hành động cụ thể cần làm.',
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.2,
-        max_tokens: 180,
+        temperature: 0.3,
+        max_tokens: 300,
       }),
     });
 
     if (!response.ok) return null;
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content?.trim() || null;
+    const raw = data.choices?.[0]?.message?.content?.trim() || null;
+    // Làm sạch output: loại bỏ ** và - đầu dòng nếu AI vẫn tự thêm
+    if (!raw) return null;
+    return raw
+      .replace(/\*\*/g, '')
+      .replace(/^[-•]\s*/gm, '')
+      .replace(/\n{2,}/g, ' ')
+      .replace(/\n/g, '. ')
+      .replace(/\.\s*\./g, '.')
+      .trim();
   }
 
   private static aiProviderName() {
