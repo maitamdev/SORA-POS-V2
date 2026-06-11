@@ -35,4 +35,24 @@ export class GoodsReceiptController {
     const result = await GoodsReceiptService.getById(req.params.id);
     successResponse(res, result, 'Lấy chi tiết phiếu nhập thành công');
   });
+
+  /**
+   * PATCH /api/stock/receipts/:id/payment
+   * Cập nhật số tiền đã thanh toán (trả thêm nợ)
+   */
+  static updatePayment = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new AppError(401, 'Yêu cầu đăng nhập để thực hiện');
+    }
+
+    const { id } = req.params;
+    const { pay_amount } = req.body;
+
+    if (pay_amount === undefined || pay_amount === null) {
+      throw new AppError(400, 'Thiếu số tiền thanh toán thêm (pay_amount)');
+    }
+
+    const result = await GoodsReceiptService.updatePayment(id, Number(pay_amount), req.user.userId);
+    successResponse(res, result, 'Cập nhật thanh toán thành công');
+  });
 }

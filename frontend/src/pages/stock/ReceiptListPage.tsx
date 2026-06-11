@@ -42,6 +42,10 @@ export default function ReceiptListPage() {
   const [selectedReceipt, setSelectedReceipt] = useState<GoodsReceipt | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Debt Payment states
+  const [payAmountInput, setPayAmountInput] = useState('');
+  const [payLoading, setPayLoading] = useState(false);
+
   // Filter states
   const [supplierId, setSupplierId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
@@ -84,6 +88,34 @@ export default function ReceiptListPage() {
       toast.error(err.response?.data?.message || 'Không thể tải chi tiết phiếu nhập');
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleUpdatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedReceipt) return;
+    const amount = Number(payAmountInput);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Vui lòng nhập số tiền thanh toán hợp lệ');
+      return;
+    }
+    const remaining = selectedReceipt.total_amount - selectedReceipt.paid_amount;
+    if (amount > remaining) {
+      toast.error(`Số tiền trả thêm vượt quá nợ còn lại (${formatCurrency(remaining)})`);
+      return;
+    }
+
+    setPayLoading(true);
+    try {
+      const res = await goodsReceiptAPI.updatePayment(selectedReceipt.id, amount);
+      toast.success('Cập nhật thanh toán thành công');
+      setSelectedReceipt(res.data.data);
+      setPayAmountInput('');
+      loadReceipts();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Lỗi cập nhật thanh toán');
+    } finally {
+      setPayLoading(false);
     }
   };
 
@@ -312,6 +344,42 @@ export default function ReceiptListPage() {
                 <div className="rounded-xl border border-slate-200 bg-amber-50/20 p-4 text-sm">
                   <p className="font-bold text-slate-500 mb-1">Ghi chú phiếu nhập:</p>
                   <p className="font-semibold text-slate-700">{selectedReceipt.note}</p>
+                </div>
+              )}
+
+              {/* Payment Section for Debt */}
+              {selectedReceipt.payment_status !== 'paid' && (
+                <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-extrabold text-blue-900 text-sm">Thanh toán thêm nợ Nhà cung cấp</p>
+                      <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                        Còn nợ NCC: <span className="font-black text-rose-600">{formatCurrency(selectedReceipt.total_amount - selectedReceipt.paid_amount)}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <form onSubmit={handleUpdatePayment} className="flex gap-2 items-end">
+                    <label className="block flex-1">
+                      <span className="mb-1 block text-[10px] font-black uppercase text-slate-400">Số tiền trả thêm (VND)</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={selectedReceipt.total_amount - selectedReceipt.paid_amount}
+                        value={payAmountInput}
+                        onChange={(e) => setPayAmountInput(e.target.value)}
+                        placeholder="Ví dụ: 200000"
+                        className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-450 bg-white"
+                        required
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={payLoading}
+                      className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-xs font-black text-white transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      {payLoading ? 'Đang lưu...' : 'Xác nhận trả nợ'}
+                    </button>
+                  </form>
                 </div>
               )}
 

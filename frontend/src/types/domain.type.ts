@@ -117,6 +117,7 @@ export interface StockTransaction {
   note?: string | null;
   created_at: string;
   products?: Product;
+  users?: { full_name: string } | null;
 }
 
 export interface AIRecommendation {

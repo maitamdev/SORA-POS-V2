@@ -220,4 +220,62 @@ export class GoodsReceiptService {
       items: details || [],
     };
   }
+
+  /**
+   * Cập nhật số tiền đã thanh toán cho phiếu nhập kho (trả nợ thêm)
+   */
+  static async updatePayment(id: string, payAmount: number, userId: string) {
+    if (payAmount <= 0) {
+      throw new AppError(400, 'Số tiền thanh toán thêm phải lớn hơn 0');
+    }
+
+    // 1. Lấy thông tin phiếu nhập hiện tại
+    const { data: receipt, error: getErr } = await supabase
+      .from('goods_receipts')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (getErr || !receipt) {
+      throw new AppError(404, 'Không tìm thấy phiếu nhập kho');
+    }
+
+    const currentPaid = Number(receipt.paid_amount || 0);
+    const totalAmount = Number(receipt.total_amount || 0);
+    const remaining = totalAmount - currentPaid;
+
+    if (remaining <= 0) {
+      throw new AppError(400, 'Phiếu nhập kho này đã được thanh toán đầy đủ');
+    }
+
+    if (payAmount > remaining) {
+      throw new AppError(400, `Số tiền thanh toán vượt quá số nợ còn lại (${new Intl.NumberFormat('vi-VN').format(remaining)}đ)`);
+    }
+
+    const newPaidAmount = currentPaid + payAmount;
+
+    // 2. Xác định trạng thái thanh toán mới
+    let paymentStatus = 'partial';
+    if (newPaidAmount >= totalAmount) {
+      paymentStatus = 'paid';
+    }
+
+    // 3. Cập nhật vào DB
+    const { data: updatedReceipt, error: updErr } = await supabase
+      .from('goods_receipts')
+      .update({
+        paid_amount: newPaidAmount,
+        payment_status: paymentStatus,
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updErr || !updatedReceipt) {
+      console.error('[GoodsReceiptService.updatePayment] updErr:', updErr);
+      throw new AppError(400, 'Không thể cập nhật thanh toán: ' + (updErr?.message || 'Lỗi không xác định'));
+    }
+
+    return this.getById(id);
+  }
 }

@@ -23,4 +23,7 @@ export const goodsReceiptAPI = {
     
   create: (data: CreateGoodsReceiptPayload) =>
     api.post<ApiResponse<GoodsReceipt>>('/stock/receipts', data),
+    
+  updatePayment: (id: string, payAmount: number) =>
+    api.patch<ApiResponse<GoodsReceipt>>(`/stock/receipts/${id}/payment`, { pay_amount: payAmount }),
 };

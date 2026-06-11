@@ -12,5 +12,6 @@ router.use(authMiddleware);
 router.get('/', roleMiddleware('admin', 'manager'), GoodsReceiptController.list);
 router.get('/:id', roleMiddleware('admin', 'manager'), GoodsReceiptController.getById);
 router.post('/', roleMiddleware('admin', 'manager'), GoodsReceiptController.create);
+router.patch('/:id/payment', roleMiddleware('admin', 'manager'), GoodsReceiptController.updatePayment);
 
 export default router;
