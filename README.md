@@ -159,7 +159,7 @@ Hệ thống cung cấp một module thông minh độc lập (`ai.service.ts`),
 Dự án này được cấp phép theo tiêu chuẩn **MIT License**. Bạn có toàn quyền sử dụng, sao chép, thay đổi, và phân phối dự án với mục đích cá nhân hoặc thương mại.
 
 ---
-*Phát triển với ❤️ bởi đội ngũ Sora POS*
+*Phát triển MaiTam Developer*
 
 
 ## AI Barcode Scanning & Cashier Shift Management
