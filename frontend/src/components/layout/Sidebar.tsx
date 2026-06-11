@@ -19,6 +19,7 @@ import {
   HiOutlineCog,
   HiOutlineMenu,
   HiOutlineX,
+  HiOutlineDownload,
 } from 'react-icons/hi';
 import NotificationCenter from '../common/NotificationCenter';
 
@@ -69,6 +70,12 @@ const menuItems = [
     icon: HiOutlineTruck,
     path: '/stock',
     roles: ['admin', 'manager', 'cashier'],
+  },
+  {
+    label: 'Nhập hàng',
+    icon: HiOutlineDownload,
+    path: '/stock/receipts',
+    roles: ['admin', 'manager'],
   },
   {
     label: 'Khách hàng',

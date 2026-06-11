@@ -15,6 +15,7 @@ import settingsRoutes from './settings.routes';
 import shiftRoutes from './shift.routes';
 import auditRoutes from './audit.routes';
 import scannerRoutes from './scanner.route';
+import goodsReceiptRoutes from './goodsReceipt.routes';
 
 const router = Router();
 
@@ -33,6 +34,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/customers',
       '/api/orders',
       '/api/stock',
+      '/api/stock/receipts',
       '/api/reports',
       '/api/ai',
       '/api/staff',
@@ -59,6 +61,7 @@ router.use('/suppliers', supplierRoutes);
 router.use('/customers', customerRoutes);
 router.use('/orders', orderRoutes);
 router.use('/stock', stockRoutes);
+router.use('/stock/receipts', goodsReceiptRoutes);
 router.use('/reports', reportRoutes);
 router.use('/ai', aiRoutes);
 router.use('/staff', staffRoutes);

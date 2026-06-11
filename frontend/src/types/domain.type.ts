@@ -239,3 +239,36 @@ export interface ShiftSession {
   summary?: ShiftSummary;
   orders?: Order[];
 }
+
+export interface GoodsReceiptDetail {
+  id: string;
+  goods_receipt_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  created_at: string;
+  products?: {
+    id: string;
+    name: string;
+    sku: string;
+    barcode?: string | null;
+    unit: string;
+  } | null;
+}
+
+export interface GoodsReceipt {
+  id: string;
+  receipt_number: string;
+  supplier_id?: string | null;
+  user_id: string;
+  total_amount: number;
+  paid_amount: number;
+  payment_status: 'paid' | 'unpaid' | 'partial';
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+  suppliers?: Pick<Supplier, 'id' | 'name'> | null;
+  users?: { id: string; full_name: string; email?: string } | null;
+  items?: GoodsReceiptDetail[];
+}
