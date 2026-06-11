@@ -1,8 +1,37 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
+import { FiCheck, FiRefreshCw, FiX, FiZap, FiPackage, FiAlertTriangle, FiTrendingUp, FiShield, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { stockAPI } from '../../services/stock.api';
-import { Product, StockAlert, StockTransaction } from '../../types/domain.type';
+import { aiAPI } from '../../services/ai.api';
+import { Product, StockAlert, StockTransaction, AIRecommendation, RestockAnalysis } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
+
+const priorityClass = {
+  high: 'bg-red-50 text-red-700 border-red-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-200',
+  low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+const priorityLabel = {
+  high: 'Khẩn cấp',
+  medium: 'Cần nhập',
+  low: 'Theo dõi',
+};
+
+const alertLabel = {
+  out_of_stock: 'Hết hàng',
+  low_stock: 'Tồn thấp',
+  needs_restock: 'Sắp thiếu',
+  healthy: 'An toàn',
+};
+
+const statusLabel: Record<string, string> = {
+  pending: 'Đang chờ',
+  approved: 'Đã duyệt',
+  rejected: 'Đã từ chối',
+};
+
+const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 
 const StockPage = () => {
   const { user } = useAuthStore();
@@ -11,6 +40,16 @@ const StockPage = () => {
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [mode, setMode] = useState<'import' | 'adjust'>('import');
   const [loading, setLoading] = useState(false);
+
+  // AI Panel state
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiItems, setAiItems] = useState<AIRecommendation[]>([]);
+  const [analysis, setAnalysis] = useState<RestockAnalysis | null>(null);
+  const [targetDays, setTargetDays] = useState(14);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
 
   const canManageStock = user?.role === 'admin' || user?.role === 'manager';
 
@@ -87,6 +126,59 @@ const StockPage = () => {
     }
   };
 
+  // ═══════════════ AI Functions ═══════════════
+  const loadAIData = async () => {
+    setAiLoading(true);
+    try {
+      const [analysisResponse, recommendationsResponse] = await Promise.all([
+        aiAPI.restockAnalysis({ target_days: targetDays }),
+        aiAPI.list({ limit: 100 }),
+      ]);
+      setAnalysis(analysisResponse.data.data);
+      setAiItems(recommendationsResponse.data.data.items);
+    } catch {
+      toast.error('Không tải được dữ liệu AI tồn kho');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleOpenAI = () => {
+    setShowAIPanel(true);
+    loadAIData();
+  };
+
+  const generateRecommendations = async () => {
+    setGenerating(true);
+    try {
+      const response = await aiAPI.generate({ target_days: targetDays });
+      toast.success(`Đã tạo/cập nhật ${response.data.data.generated} gợi ý nhập hàng`);
+      await loadAIData();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Không tạo được gợi ý nhập hàng');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const updateRecommendationStatus = async (id: string, status: 'approved' | 'rejected') => {
+    try {
+      await aiAPI.updateStatus(id, status);
+      toast.success(status === 'approved' ? 'Đã duyệt gợi ý' : 'Đã từ chối gợi ý');
+      await loadAIData();
+    } catch {
+      toast.error('Không cập nhật được trạng thái');
+    }
+  };
+
+  const visibleAnalysisItems = useMemo(() => {
+    const allItems = analysis?.items || [];
+    return showAllProducts ? allItems : allItems.filter((item) => item.alert_status !== 'healthy');
+  }, [analysis, showAllProducts]);
+
+  const summary = analysis?.summary;
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between border-b border-slate-200 pb-5">
@@ -98,11 +190,235 @@ const StockPage = () => {
               : 'Theo dõi tồn kho và cảnh báo hàng sắp hết.'}
           </p>
         </div>
-        <button onClick={loadData} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white w-full sm:w-auto">
-          {loading ? 'Đang tải...' : 'Tải lại'}
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          {canManageStock && (
+            <button
+              onClick={showAIPanel ? () => setShowAIPanel(false) : handleOpenAI}
+              className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all duration-200 ${
+                showAIPanel
+                  ? 'bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                  : 'bg-gradient-to-r from-violet-500 to-blue-500 text-white hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.02]'
+              }`}
+            >
+              <FiZap className={showAIPanel ? 'animate-pulse' : ''} />
+              AI Gợi ý
+            </button>
+          )}
+          <button onClick={loadData} className="flex-1 sm:flex-none rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+            {loading ? 'Đang tải...' : 'Tải lại'}
+          </button>
+        </div>
       </header>
 
+      {/* ═══════════════ AI PANEL (Slide down) ═══════════════ */}
+      {showAIPanel && (
+        <div className="animate-fadeIn rounded-2xl border border-blue-200/60 bg-gradient-to-br from-slate-50 via-blue-50/30 to-violet-50/30 shadow-xl shadow-blue-500/5 overflow-hidden">
+          {/* AI Header */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-blue-100 bg-gradient-to-r from-violet-600 to-blue-600 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <FiZap className="text-yellow-300" />
+                AI nhập hàng & cảnh báo tồn kho
+              </h2>
+              <p className="text-xs font-medium text-blue-100 mt-0.5">
+                Phân tích tồn kho, tốc độ bán 30 ngày và đề xuất số lượng cần nhập.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-blue-200" htmlFor="target-days">
+                Mục tiêu
+              </label>
+              <input
+                id="target-days"
+                value={targetDays}
+                onChange={(event) => setTargetDays(Number(event.target.value))}
+                type="number"
+                min={1}
+                max={90}
+                className="h-9 w-20 rounded-lg border border-blue-300/50 bg-white/90 px-2.5 text-sm font-bold text-slate-700 outline-none focus:border-blue-400"
+              />
+              <span className="text-xs font-bold text-blue-200">ngày</span>
+              <button
+                onClick={loadAIData}
+                disabled={aiLoading}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 text-xs font-bold text-white hover:bg-white/20 transition disabled:opacity-60"
+              >
+                <FiRefreshCw className={aiLoading ? 'animate-spin' : ''} size={14} />
+              </button>
+              <button
+                onClick={generateRecommendations}
+                disabled={generating}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-yellow-400 px-4 text-xs font-black text-slate-900 hover:bg-yellow-300 transition disabled:opacity-60"
+              >
+                <FiZap size={14} />
+                {generating ? 'Đang phân tích...' : 'Tạo gợi ý'}
+              </button>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          {summary && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
+                <FiAlertTriangle className="mx-auto text-red-500 mb-1" size={18} />
+                <p className="text-2xl font-black text-red-700">{summary.out_of_stock}</p>
+                <p className="text-[10px] font-bold uppercase text-red-500 mt-0.5">Hết hàng</p>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
+                <FiTrendingUp className="mx-auto text-amber-500 mb-1" size={18} />
+                <p className="text-2xl font-black text-amber-700">{summary.low_stock}</p>
+                <p className="text-[10px] font-bold uppercase text-amber-500 mt-0.5">Tồn thấp</p>
+              </div>
+              <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-center">
+                <FiPackage className="mx-auto text-orange-500 mb-1" size={18} />
+                <p className="text-2xl font-black text-orange-700">{summary.needs_restock}</p>
+                <p className="text-[10px] font-bold uppercase text-orange-500 mt-0.5">Sắp thiếu</p>
+              </div>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-center">
+                <FiPackage className="mx-auto text-blue-500 mb-1" size={18} />
+                <p className="text-2xl font-black text-blue-700">{formatNumber(summary.total_recommended_quantity)}</p>
+                <p className="text-[10px] font-bold uppercase text-blue-500 mt-0.5">Cần nhập</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-center">
+                <FiShield className="mx-auto text-emerald-500 mb-1" size={18} />
+                <p className="text-2xl font-black text-emerald-700">{summary.healthy}</p>
+                <p className="text-[10px] font-bold uppercase text-emerald-500 mt-0.5">An toàn</p>
+              </div>
+            </div>
+          )}
+
+          {/* AI Analysis Table */}
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-black text-slate-700">
+                📊 Bảng phân tích ({visibleAnalysisItems.length} sản phẩm)
+              </h3>
+              <button
+                onClick={() => setShowAllProducts((value) => !value)}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+              >
+                {showAllProducts ? 'Chỉ xem cảnh báo' : 'Xem tất cả'}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-400">Sản phẩm</th>
+                    <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-400">Cảnh báo</th>
+                    <th className="px-4 py-3 text-right text-xs font-black uppercase text-slate-400">Tồn</th>
+                    <th className="px-4 py-3 text-right text-xs font-black uppercase text-slate-400">Tối thiểu</th>
+                    <th className="px-4 py-3 text-right text-xs font-black uppercase text-slate-400">Bán TB/ngày</th>
+                    <th className="px-4 py-3 text-right text-xs font-black uppercase text-slate-400">Đề xuất nhập</th>
+                    <th className="px-4 py-3 text-left text-xs font-black uppercase text-slate-400">AI nhận định</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {aiLoading ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center font-bold text-slate-400" colSpan={7}>
+                        <FiRefreshCw className="inline animate-spin mr-2" />
+                        Đang phân tích dữ liệu kho...
+                      </td>
+                    </tr>
+                  ) : visibleAnalysisItems.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center font-bold text-slate-400" colSpan={7}>
+                        Không có sản phẩm cần cảnh báo.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleAnalysisItems.map((item) => (
+                      <tr key={item.id} className="align-top hover:bg-slate-50/50 transition">
+                        <td className="px-4 py-3">
+                          <p className="font-black text-slate-800">{item.name}</p>
+                          <p className="text-xs font-bold text-slate-400">{item.sku}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-black ${priorityClass[item.priority]}`}>
+                            {alertLabel[item.alert_status]} · {priorityLabel[item.priority]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-slate-800">{formatNumber(item.stock_quantity)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-600">{formatNumber(item.min_stock_level)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-600">{Number(item.average_daily_sales).toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-black text-blue-700">{formatNumber(item.recommended_quantity)}</td>
+                        <td className="max-w-xs px-4 py-3">
+                          <button
+                            onClick={() => setExpandedInsight(expandedInsight === item.id ? null : item.id)}
+                            className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
+                          >
+                            {expandedInsight === item.id ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
+                            {expandedInsight === item.id ? 'Thu gọn' : 'Xem AI'}
+                          </button>
+                          {expandedInsight === item.id && (
+                            <p className="mt-2 text-xs font-semibold leading-relaxed text-slate-600 animate-fadeIn">
+                              {item.ai_insight}
+                            </p>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Saved Recommendations */}
+          {aiItems.length > 0 && (
+            <div className="px-4 pb-4 pt-2">
+              <h3 className="text-sm font-black text-slate-700 mb-3">💡 Gợi ý nhập hàng đã lưu ({aiItems.length})</h3>
+              <div className="space-y-2">
+                {aiItems.map((item) => (
+                  <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="font-black text-slate-800 text-sm">{item.products?.name || item.product_id}</h4>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${priorityClass[item.priority]}`}>
+                          {priorityLabel[item.priority]}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+                          {statusLabel[item.status] || item.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs font-semibold text-slate-500 line-clamp-2">
+                        {item.ai_insight || item.reason}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-slate-400">
+                        <span>Tồn: {formatNumber(item.current_stock)}</span>
+                        <span>Bán TB: {Number(item.average_daily_sales).toFixed(2)}/ngày</span>
+                        <span className="text-blue-600">Đề xuất: +{formatNumber(item.recommended_quantity)}</span>
+                      </div>
+                    </div>
+                    {item.status === 'pending' && (
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          onClick={() => updateRecommendationStatus(item.id, 'rejected')}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-slate-100 px-3 text-xs font-black text-slate-600 hover:bg-slate-200 transition"
+                        >
+                          <FiX size={13} />
+                          Từ chối
+                        </button>
+                        <button
+                          onClick={() => updateRecommendationStatus(item.id, 'approved')}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700 transition"
+                        >
+                          <FiCheck size={13} />
+                          Duyệt
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════ STOCK CONTENT (Original) ═══════════════ */}
       <section className={`grid grid-cols-1 gap-6 ${canManageStock ? 'xl:grid-cols-[360px_1fr]' : ''}`}>
         {canManageStock && (
           <form onSubmit={submit} className="h-fit rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">

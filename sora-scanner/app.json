@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Sora Scanner",
+    "slug": "sora-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.sorapos.scanner"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.sorapos.scanner",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Sora Scanner cần quyền truy cập Camera để quét mã vạch / QR code.",
+          "recordAudioPermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0f825ac6-b5a6-487b-91ff-b0ec29084a22"
+      }
+    },
+    "owner": "maitamdev"
+  }
+}

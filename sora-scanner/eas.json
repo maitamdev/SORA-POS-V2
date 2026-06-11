@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "env": {
+          "EXPO_NO_HERMES_SOURCEMAPS": "1"
+        }
+      }
+    },
+    "preview-arm64": {
+      "android": {
+        "buildType": "apk",
+        "config": "arm64-only.gradle",
+        "env": {
+          "EXPO_NO_HERMES_SOURCEMAPS": "1"
+        }
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  }
+}

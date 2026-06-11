@@ -758,11 +758,109 @@ Chỉ trả về JSON thuần túy:
     }
   }
 
+  /**
+   * Parse nội dung QR code thông minh — trích xuất barcode/GTIN từ nhiều định dạng:
+   * - GS1 Digital Link: https://id.gs1.org/01/08934680036832
+   * - iCheck: https://icheck.vn/san-pham/8934680036832
+   * - Open Food Facts: https://world.openfoodfacts.org/product/8934680036832
+   * - Barcode thuần: 8934680036832
+   * - URL chứa số barcode trong path
+   */
+  private static extractBarcodeFromQR(rawInput: string): { barcode: string; qrUrl?: string } {
+    const input = String(rawInput || '').trim();
+
+    // 1. GS1 Digital Link — tìm /01/ + 8-14 chữ số (GTIN)
+    const gs1Match = input.match(/\/01\/(\d{8,14})/);
+    if (gs1Match) {
+      return { barcode: gs1Match[1], qrUrl: input };
+    }
+
+    // 2. iCheck URL — https://icheck.vn/san-pham/{barcode}
+    const icheckMatch = input.match(/icheck\.vn\/san-pham\/(\d{6,14})/i);
+    if (icheckMatch) {
+      return { barcode: icheckMatch[1], qrUrl: input };
+    }
+
+    // 3. Open Food Facts / Open Beauty Facts / Open Products Facts URL
+    const offMatch = input.match(/open(?:food|beauty|pet|products?)facts\.org\/(?:api\/v\d\/)?product\/(\d{6,14})/i);
+    if (offMatch) {
+      return { barcode: offMatch[1], qrUrl: input };
+    }
+
+    // 4. Barcodelookup URL
+    const bclMatch = input.match(/barcodelookup\.com\/(\d{6,14})/i);
+    if (bclMatch) {
+      return { barcode: bclMatch[1], qrUrl: input };
+    }
+
+    // 5. URL chung chứa chuỗi số dài 8-14 ký tự trong path (fallback cho QR nhà sản xuất)
+    if (/^https?:\/\//i.test(input)) {
+      // Tìm chuỗi số 8-14 trong path (sau domain)
+      const urlPath = input.replace(/^https?:\/\/[^/]+/i, '');
+      const numMatch = urlPath.match(/(\d{8,14})/);
+      if (numMatch) {
+        return { barcode: numMatch[1], qrUrl: input };
+      }
+      // Nếu URL không chứa barcode → trả về URL để fetch metadata
+      return { barcode: '', qrUrl: input };
+    }
+
+    // 6. Input thuần là số (barcode truyền thống)
+    const digitsOnly = input.replace(/\D/g, '');
+    return { barcode: digitsOnly };
+  }
+
+  /**
+   * Fetch thông tin sản phẩm từ URL QR code (scrape metadata OG tags)
+   */
+  private static async fetchProductFromQRUrl(url: string): Promise<NormalizedProductInfo | null> {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        signal: AbortSignal.timeout(8000),
+        redirect: 'follow',
+      });
+      if (!response.ok) return null;
+
+      const html = await response.text();
+
+      // Parse OG tags + title
+      const ogTitle = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)?.[1];
+      const ogDesc = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i)?.[1];
+      const ogImage = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i)?.[1];
+      const titleTag = html.match(/<title>([^<]+)<\/title>/i)?.[1];
+
+      const name = ogTitle || titleTag?.replace(/\s*[\|–-]\s*.+$/, '').trim();
+      if (!name || name.length < 3) return null;
+
+      // Tìm barcode trong HTML (nếu trang hiển thị barcode)
+      const barcodeInPage = html.match(/(?:barcode|mã vạch|EAN|UPC|GTIN)[:\s]*(\d{8,14})/i)?.[1];
+
+      return {
+        source: 'qr-url',
+        source_url: url,
+        name: name || undefined,
+        description: ogDesc || undefined,
+        image_url: ogImage && !ogImage.includes('logo') && !ogImage.includes('avatar') ? ogImage : undefined,
+      };
+    } catch (e) {
+      // ignore
+    }
+    return null;
+  }
+
   static async identifyProductByBarcode(barcode: string) {
-    const cleanBarcode = String(barcode || '').replace(/\D/g, '');
-    if (cleanBarcode.length < 6) {
+    // === SMART QR PARSER: Xử lý cả QR code URL lẫn barcode thuần ===
+    const { barcode: extractedBarcode, qrUrl } = this.extractBarcodeFromQR(barcode);
+    const cleanBarcode = extractedBarcode.replace(/\D/g, '');
+
+    if (cleanBarcode.length < 6 && !qrUrl) {
       throw new AppError(400, 'Mã vạch không hợp lệ');
     }
+
 
     try {
       const { data: existingProduct } = await supabase
@@ -794,10 +892,19 @@ Chỉ trả về JSON thuần túy:
     }
 
     const activeFetches: Promise<NormalizedProductInfo | null>[] = [];
-    activeFetches.push(this.fetchOpenFoodFacts(cleanBarcode));
-    activeFetches.push(this.fetchOpenBeautyFacts(cleanBarcode));
-    activeFetches.push(this.fetchUPCitemdb(cleanBarcode));
-    activeFetches.push(this.fetchICheck(cleanBarcode));
+
+    // Fetch từ barcode APIs (nếu có barcode hợp lệ)
+    if (cleanBarcode.length >= 6) {
+      activeFetches.push(this.fetchOpenFoodFacts(cleanBarcode));
+      activeFetches.push(this.fetchOpenBeautyFacts(cleanBarcode));
+      activeFetches.push(this.fetchUPCitemdb(cleanBarcode));
+      activeFetches.push(this.fetchICheck(cleanBarcode));
+    }
+
+    // Fetch từ QR URL (nếu input là URL từ QR code)
+    if (qrUrl) {
+      activeFetches.push(this.fetchProductFromQRUrl(qrUrl));
+    }
 
     let validResults: NormalizedProductInfo[] = [];
     try {
@@ -806,11 +913,12 @@ Chỉ trả về JSON thuần túy:
         .filter((r): r is PromiseFulfilledResult<NormalizedProductInfo> => r.status === 'fulfilled' && r.value !== null)
         .map(r => r.value);
     } catch (e) {
-      console.error('Lỗi khi fetch barcode APIs:', e);
+      console.error('Lỗi khi fetch barcode/QR APIs:', e);
     }
 
     if (validResults.length === 0) {
-      throw new AppError(404, `Không tìm thấy thông tin sản phẩm trên bất kỳ hệ thống dữ liệu nào với mã: ${cleanBarcode}`);
+      const identifier = cleanBarcode || qrUrl || barcode;
+      throw new AppError(404, `Không tìm thấy thông tin sản phẩm trên bất kỳ hệ thống dữ liệu nào với mã: ${identifier}`);
     }
 
     let categoriesList: Array<{ id: string; name: string }> = [];
@@ -836,14 +944,16 @@ Chỉ trả về JSON thuần túy:
     const finalMerged = merged!;
 
     const firstSourceUrl = validResults.map(r => r.source_url).find(Boolean) || '';
-    const generatedSku = await this.generateSku(finalMerged.name || `Sản phẩm ${cleanBarcode}`, cleanBarcode);
+    const barcodeOrFallback = cleanBarcode || 'QR';
+    const generatedSku = await this.generateSku(finalMerged.name || `Sản phẩm ${barcodeOrFallback}`, cleanBarcode || Date.now().toString().slice(-8));
 
     return {
       source: isAiProcessed ? 'ai-merged' : 'local-merged',
-      source_url: firstSourceUrl || null,
-      barcode: cleanBarcode,
+      source_url: firstSourceUrl || qrUrl || null,
+      barcode: cleanBarcode || null,
+      qr_url: qrUrl || null,
       sku: generatedSku,
-      name: finalMerged.name || `Sản phẩm ${cleanBarcode}`,
+      name: finalMerged.name || `Sản phẩm ${barcodeOrFallback}`,
       brand: finalMerged.brand || null,
       category_name: finalMerged.category_name || null,
       unit: finalMerged.unit || 'Cái',
