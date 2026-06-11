@@ -107,12 +107,6 @@ const menuItems = [
     roles: ['admin', 'manager'],
   },
   {
-    label: 'AI Gợi ý',
-    icon: HiOutlineLightBulb,
-    path: '/ai',
-    roles: ['admin', 'manager'],
-  },
-  {
     label: 'Cài đặt',
     icon: HiOutlineCog,
     path: '/settings',
