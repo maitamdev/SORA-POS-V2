@@ -14,3 +14,9 @@ export const closeShiftSchema = z.object({
   closing_cash: z.coerce.number().min(0, 'Tiền chốt ca không hợp lệ'),
   note: z.string().trim().max(500).optional().nullable(),
 });
+
+export const cashDrawerTxSchema = z.object({
+  type: z.enum(['cash_in', 'cash_out']),
+  amount: z.coerce.number().positive('Số tiền phải lớn hơn 0'),
+  reason: z.string().trim().max(500).optional().nullable(),
+});

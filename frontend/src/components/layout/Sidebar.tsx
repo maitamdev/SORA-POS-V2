@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import {
   HiOutlineViewGrid,
@@ -192,13 +192,13 @@ const Sidebar = () => {
 
             return (
               <li key={item.path}>
-                <NavLink
+                <Link
                   to={item.path}
                   className={`sidebar-link ${isActive ? 'active' : ''}`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
-                </NavLink>
+                </Link>
               </li>
             );
           })}
@@ -206,7 +206,7 @@ const Sidebar = () => {
       </nav>
 
       {/* User Info + Logout */}
-      <div className="border-t border-slate-800/40 p-4 bg-[#090d19]/80">
+      <div className="border-t border-slate-800/40 p-4 bg-sidebar-hover/80">
         <button
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-red-400 hover:bg-red-950/20 rounded-xl transition-all duration-200"
@@ -223,7 +223,7 @@ const Sidebar = () => {
       {/* Mobile hamburger button - shown only on small screens */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-[#070a13] text-white rounded-xl flex items-center justify-center shadow-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
+        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-sidebar-bg text-white rounded-xl flex items-center justify-center shadow-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
         aria-label="Mở menu"
       >
         <HiOutlineMenu className="w-5 h-5" />
@@ -240,7 +240,7 @@ const Sidebar = () => {
       {/* Sidebar - desktop: fixed visible, mobile: slide-in */}
       <aside
         className={`
-          w-64 h-screen bg-[#070a13] flex flex-col fixed left-0 top-0 border-r border-slate-800/40
+          w-64 h-screen bg-sidebar-bg flex flex-col fixed left-0 top-0 border-r border-slate-800/40
           transition-transform duration-300 ease-in-out
           lg:translate-x-0 lg:z-50
           ${mobileOpen ? 'translate-x-0 z-[80]' : '-translate-x-full z-[80]'}

@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const orderCreateSchema = z.object({
   client_order_number: z.string().trim().min(6).max(50).regex(/^[A-Z0-9-]+$/).optional(),
   customer_id: z.string().uuid().optional().nullable(),
+  shift_code: z.string().trim().min(4).max(16).optional(),
   discount_amount: z.coerce.number().min(0).optional(),
   used_points: z.coerce.number().int().min(0).optional(),
   note: z.string().trim().optional().nullable(),

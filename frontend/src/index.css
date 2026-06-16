@@ -1,4 +1,4 @@
-/* Font Montserrat loaded via index.html */
+/* Fonts loaded via index.html: Inter (sans) & Plus Jakarta Sans (title) */
 
 
 @tailwind base;
@@ -43,12 +43,19 @@ img {
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Montserrat', Arial, Helvetica, sans-serif;
+body, button, input, select, textarea, p, span, div, h1, h2, h3, h4, h5, h6, a {
+  font-family: 'Lexend', 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+body {
   background-color: #f8fafc;
   color: #0f172a;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Lexend', 'Inter', sans-serif;
 }
 
 /* Custom Scrollbar */
@@ -93,7 +100,7 @@ body {
 .login-page {
   background-color: #0b1326;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Lexend', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 /* Left panel photo overlay */
@@ -276,3 +283,5 @@ button:not(.rounded-full):not([class*="rounded-full"]) {
 .animate-slideDown {
   animation: slideDown 0.3s ease-out forwards;
 }
+
+/* Force Tailwind rebuild: Sunset Amber & Obsidian Theme */

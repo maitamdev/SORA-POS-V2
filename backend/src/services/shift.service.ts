@@ -201,11 +201,19 @@ export class ShiftService {
     if (error) throw new AppError(500, error.message);
 
     const enriched = await this.attachUsers((data || []).map(mapShift));
-    const items = await Promise.all(enriched.map(async (shift) => ({
-      ...shift,
-      summary: await this.summary(shift.id),
-      orders: await this.orders(shift.id),
-    })));
+    const items = await Promise.all(enriched.map(async (shift) => {
+      const { data: drawerTxs } = await supabase
+        .from('cash_drawer_transactions')
+        .select('*, users!cash_drawer_transactions_created_by_fkey(id, full_name)')
+        .eq('shift_id', shift.id)
+        .order('created_at', { ascending: false });
+      return {
+        ...shift,
+        summary: await this.summary(shift.id),
+        orders: await this.orders(shift.id),
+        cash_drawer_transactions: drawerTxs || [],
+      };
+    }));
 
     return { items, pagination: { page, limit, total: count || 0 } };
   }
@@ -219,7 +227,19 @@ export class ShiftService {
 
     if (error || !data) throw new AppError(404, 'Không tìm thấy ca làm');
     const [shift] = await this.attachUsers([mapShift(data)]);
-    return { ...shift, summary: await this.summary(id), orders: await this.orders(id) };
+    
+    const { data: drawerTxs } = await supabase
+      .from('cash_drawer_transactions')
+      .select('*, users!cash_drawer_transactions_created_by_fkey(id, full_name)')
+      .eq('shift_id', id)
+      .order('created_at', { ascending: false });
+
+    return { 
+      ...shift, 
+      summary: await this.summary(id), 
+      orders: await this.orders(id),
+      cash_drawer_transactions: drawerTxs || []
+    };
   }
 
   static async activeForUser(userId: string) {
@@ -257,7 +277,7 @@ export class ShiftService {
     const summary = await this.summary(shift.id);
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
-    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash);
+    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash, summary.cash_drawer_tx_total);
 
     const { data, error } = await supabase
       .from('shift_sessions')
@@ -290,7 +310,7 @@ export class ShiftService {
     const summary = await this.summary(shiftId);
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
-    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash);
+    const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash, summary.cash_drawer_tx_total);
 
     const { data, error } = await supabase
       .from('shift_sessions')
@@ -325,13 +345,26 @@ export class ShiftService {
   }
 
   static async summary(shiftId: string) {
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select('id, order_number, final_amount, total_amount, discount_amount, status, created_at')
-      .eq('shift_id', shiftId)
-      .order('created_at', { ascending: true });
+    const [{ data: orders, error }, { data: drawerTx, error: drawerError }] = await Promise.all([
+      supabase
+        .from('orders')
+        .select('id, order_number, final_amount, total_amount, discount_amount, status, created_at')
+        .eq('shift_id', shiftId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('cash_drawer_transactions')
+        .select('type, amount')
+        .eq('shift_id', shiftId)
+    ]);
 
     if (error) throw new AppError(500, error.message);
+    if (drawerError) throw new AppError(500, drawerError.message);
+
+    const cashDrawerTxTotal = (drawerTx || []).reduce((sum, tx) => {
+      const amt = Number(tx.amount || 0);
+      return tx.type === 'cash_in' ? sum + amt : sum - amt;
+    }, 0);
+
     const orderItems = orders || [];
     const completed = orderItems.filter((order) => order.status === 'completed');
     const cancelled = orderItems.filter((order) => order.status === 'cancelled');
@@ -393,7 +426,49 @@ export class ShiftService {
       payments: summarizePayments(payments),
       hourly: Array.from(hourly.values()),
       top_products: topProducts,
+      cash_drawer_tx_total: cashDrawerTxTotal,
     };
+  }
+
+  static async logCashDrawerTx(
+    shiftId: string,
+    input: { type: 'cash_in' | 'cash_out'; amount: number; reason?: string | null },
+    userId: string
+  ) {
+    const { data: shift, error: getErr } = await supabase
+      .from('shift_sessions')
+      .select('*')
+      .eq('id', shiftId)
+      .single();
+
+    if (getErr || !shift) throw new AppError(404, 'Không tìm thấy ca làm');
+    if (shift.status !== 'checked_in') {
+      throw new AppError(400, 'Ca làm việc phải ở trạng thái đang bán hàng (checked_in) để thực hiện giao dịch két tiền');
+    }
+
+    const { data, error } = await supabase
+      .from('cash_drawer_transactions')
+      .insert({
+        shift_id: shiftId,
+        type: input.type,
+        amount: toNumber(input.amount),
+        reason: input.reason || null,
+        created_by: userId,
+      })
+      .select('*, users!cash_drawer_transactions_created_by_fkey(id, full_name)')
+      .single();
+
+    if (error || !data) throw new AppError(400, error?.message || 'Không ghi nhận được giao dịch két tiền');
+    return data;
+  }
+
+  static async logCashDrawerTxActive(
+    input: { type: 'cash_in' | 'cash_out'; amount: number; reason?: string | null },
+    userId: string
+  ) {
+    const shift = await this.getActiveShift(userId);
+    if (!shift) throw new AppError(404, 'Không có ca làm việc nào đang hoạt động của bạn');
+    return this.logCashDrawerTx(shift.id, input, userId);
   }
 
   static async orders(shiftId: string) {

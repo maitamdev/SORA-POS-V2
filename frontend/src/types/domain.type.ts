@@ -204,6 +204,20 @@ export interface ShiftPaymentSummary {
   other: number;
 }
 
+export interface CashDrawerTransaction {
+  id: string;
+  shift_id: string;
+  type: 'cash_in' | 'cash_out';
+  amount: number;
+  reason?: string | null;
+  created_by: string;
+  created_at: string;
+  users?: {
+    id: string;
+    full_name: string;
+  } | null;
+}
+
 export interface ShiftSummary {
   revenue: number;
   gross_revenue: number;
@@ -214,6 +228,7 @@ export interface ShiftSummary {
   payments: ShiftPaymentSummary;
   hourly: Array<{ hour: string; revenue: number; orders: number }>;
   top_products: Array<{ product_id: string; product_name: string; quantity: number; revenue: number }>;
+  cash_drawer_tx_total?: number;
 }
 
 export interface ShiftSession {
@@ -239,6 +254,7 @@ export interface ShiftSession {
   opener?: Pick<StaffUser, 'id' | 'full_name' | 'email'> | null;
   summary?: ShiftSummary;
   orders?: Order[];
+  cash_drawer_transactions?: CashDrawerTransaction[];
 }
 
 export interface GoodsReceiptDetail {

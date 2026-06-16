@@ -18,23 +18,49 @@ export default {
     },
     extend: {
       colors: {
+        blue: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
         primary: {
-          50: '#e8f2fd',
-          100: '#c5defb',
-          200: '#9ec7f7',
-          300: '#6bbce8',
-          400: '#3b8fd4',
-          500: '#1b4d8e',
-          600: '#163f76',
-          700: '#11305e',
-          800: '#0d1c38',
-          900: '#091530',
-          950: '#050d22',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
+        amber: {
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+          950: '#451a03',
         },
         sidebar: {
-          bg: '#091530',
-          hover: '#0d1c38',
-          active: '#1b4d8e',
+          bg: '#08080a',      // Obsidian Black
+          hover: '#131316',   // Deep Charcoal
+          active: '#2563eb',  // Cobalt Blue
         },
         // Material Design 3 Dark Theme - Sora POS Enterprise
         sora: {
@@ -68,7 +94,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Montserrat', 'Arial', 'Helvetica', 'sans-serif'],
+        sans: ['Lexend', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        title: ['Lexend', 'Inter', 'sans-serif'],
       },
       fontSize: {
         'headline-xl': ['36px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '700' }],

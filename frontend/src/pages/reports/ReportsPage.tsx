@@ -1,18 +1,76 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { 
-  HiOutlineCurrencyDollar, 
-  HiOutlineShoppingCart, 
-  HiOutlineCalculator, 
-  HiOutlineCalendar,
-  HiOutlineTrendingUp,
-  HiOutlineClock
+  HiOutlineTrendingUp as HiTrendUp, 
+  HiOutlineCurrencyDollar as HiDollar,
+  HiOutlineShoppingCart as HiCart,
+  HiOutlineCalculator as HiCalc,
+  HiOutlineCalendar as HiCal,
+  HiOutlineClock as HiClock,
+  HiOutlineDownload
 } from 'react-icons/hi';
 import { reportAPI, RevenuePoint, TopProduct } from '../../services/report.api';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend 
+} from 'recharts';
+import * as XLSX from 'xlsx';
 
 // Format money to VND (round to integer, no decimals)
 const money = (value: number) => {
   return `${Math.round(value || 0).toLocaleString('vi-VN')}đ`;
+};
+
+const formatDateLabel = (dateStr: string) => {
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  return `${parts[2]}/${parts[1]}`;
+};
+
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload as RevenuePoint;
+    const rev = data.revenue || 0;
+    const cogs = data.cogs || 0;
+    const profit = data.profit || 0;
+    const margin = rev > 0 ? ((profit / rev) * 100).toFixed(1) : '0';
+    return (
+      <div className="rounded-2xl bg-slate-900/95 p-4 text-white shadow-2xl border border-slate-700/80 backdrop-blur-md">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+          {data.date.split('-').reverse().join('/')}
+        </p>
+        <div className="space-y-1.5 text-xs font-semibold">
+          <p className="flex justify-between gap-6">
+            <span>Doanh thu:</span>
+            <span className="text-blue-400 font-bold">{money(rev)}</span>
+          </p>
+          <p className="flex justify-between gap-6">
+            <span>Giá vốn (COGS):</span>
+            <span className="text-rose-400 font-bold">{money(cogs)}</span>
+          </p>
+          <p className="flex justify-between gap-6 border-b border-slate-800 pb-1.5">
+            <span>Lợi nhuận gộp:</span>
+            <span className="text-emerald-400 font-bold">{money(profit)}</span>
+          </p>
+          <p className="flex justify-between gap-6 pt-0.5">
+            <span>Tỉ suất LN:</span>
+            <span className="text-amber-400 font-bold">{margin}%</span>
+          </p>
+          <p className="flex justify-between gap-6">
+            <span>Đơn hàng:</span>
+            <span className="text-indigo-300 font-bold">{data.orders} đơn</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 const ReportsPage = () => {
@@ -20,9 +78,6 @@ const ReportsPage = () => {
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // Interactive tooltip state for the SVG chart
-  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; item: RevenuePoint } | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -45,140 +100,157 @@ const ReportsPage = () => {
   }, [days]);
 
   // Aggregate metrics
-  const totalRevenue = revenue.reduce((sum, item) => sum + item.revenue, 0);
-  const totalOrders = revenue.reduce((sum, item) => sum + item.orders, 0);
-  const averageOrderVal = totalOrders ? totalRevenue / totalOrders : 0;
+  const totalRevenue = useMemo(() => revenue.reduce((sum, item) => sum + item.revenue, 0), [revenue]);
+  const totalOrders = useMemo(() => revenue.reduce((sum, item) => sum + item.orders, 0), [revenue]);
+  const totalCogs = useMemo(() => revenue.reduce((sum, item) => sum + (item.cogs || 0), 0), [revenue]);
+  const totalProfit = useMemo(() => revenue.reduce((sum, item) => sum + (item.profit || 0), 0), [revenue]);
+  
+  const profitMargin = useMemo(() => {
+    return totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+  }, [totalRevenue, totalProfit]);
 
-  // Chart configuration
-  const maxVal = Math.max(...revenue.map(r => r.revenue), 1);
-  const maxValRounded = Math.ceil(maxVal / 10000) * 10000; // Round up for clean Y axis intervals
+  const averageOrderVal = useMemo(() => {
+    return totalOrders ? totalRevenue / totalOrders : 0;
+  }, [totalRevenue, totalOrders]);
 
-  const svgWidth = 650;
-  const svgHeight = 280;
-  const paddingLeft = 70;
-  const paddingRight = 20;
-  const paddingTop = 30;
-  const paddingBottom = 40;
+  // Excel exporter
+  const handleExportToExcel = () => {
+    if (revenue.length === 0) {
+      toast.error('Không có dữ liệu để xuất');
+      return;
+    }
 
-  const chartWidth = svgWidth - paddingLeft - paddingRight;
-  const chartHeight = svgHeight - paddingTop - paddingBottom;
+    const exportData = revenue.map(item => ({
+      'Ngày': item.date.split('-').reverse().join('/'),
+      'Doanh thu (VND)': item.revenue,
+      'Giá vốn (COGS) (VND)': item.cogs || 0,
+      'Lợi nhuận gộp (VND)': item.profit || 0,
+      'Số đơn hàng': item.orders,
+      'Tỉ suất lợi nhuận (%)': item.revenue > 0 ? (((item.profit || 0) / item.revenue) * 100).toFixed(1) : '0'
+    }));
 
-  // Calculate points for the path
-  const points = revenue.map((item, idx) => {
-    const x = paddingLeft + (idx / Math.max(revenue.length - 1, 1)) * chartWidth;
-    const y = paddingTop + chartHeight - (item.revenue / maxValRounded) * chartHeight;
-    return { x, y, item };
-  });
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Báo cáo doanh thu');
 
-  // SVG paths
-  const linePath = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaPath = points.length > 0 
-    ? `${linePath} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`
-    : '';
-
-  // Gridlines and labels on Y-axis
-  const gridLines = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-    const y = paddingTop + chartHeight - ratio * chartHeight;
-    const val = ratio * maxValRounded;
-    return { y, val };
-  });
-
-  // X-axis label filtering (shows ~5 labels maximum to avoid overlap)
-  const getXLabels = () => {
-    if (revenue.length === 0) return [];
-    const interval = Math.max(Math.ceil(revenue.length / 5), 1);
-    return points.filter((_, idx) => idx % interval === 0);
+    XLSX.writeFile(workbook, `Bao_cao_SoraPOS_${days}_ngay.xlsx`);
+    toast.success('Xuất file Excel thành công!');
   };
 
+  // Format Y Axis label
   const formatYAxis = (val: number) => {
     if (val === 0) return '0đ';
-    if (val >= 1000000) return `${(val / 1000000).toFixed(1).replace('.0', '')}Mđ`;
-    if (val >= 1000) return `${(val / 1000).toLocaleString('vi-VN')}kđ`;
-    return `${val}đ`;
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1).replace('.0', '')}M`;
+    if (val >= 1000) return `${(val / 1000).toLocaleString('vi-VN')}k`;
+    return `${val}`;
   };
 
-  const formatDateLabel = (dateStr: string) => {
-    const parts = dateStr.split('-');
-    if (parts.length < 3) return dateStr;
-    return `${parts[2]}/${parts[1]}`;
-  };
-
-  // Top products calculation for progress bar
-  const maxProductQty = Math.max(...topProducts.map(p => p.quantity), 1);
+  // Top products calculations for progress bar
+  const maxProductQty = useMemo(() => {
+    return Math.max(...topProducts.map(p => p.quantity), 1);
+  }, [topProducts]);
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10" style={{ fontFamily: "'Montserrat', Arial, sans-serif" }}>
+    <div className="space-y-6 animate-fadeIn pb-10">
       {/* HEADER SECTION */}
       <header className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">Thống kê doanh thu</h1>
           <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Báo cáo dữ liệu bán hàng đồng bộ từ hóa đơn thực tế
+            Báo cáo tài chính doanh nghiệp: Doanh thu, Giá vốn hàng bán (COGS), Lợi nhuận và Lợi nhuận gộp
           </p>
         </div>
-        <div className="relative flex items-center self-start md:self-auto min-w-[150px]">
-          <HiOutlineCalendar className="absolute left-3.5 text-slate-400 pointer-events-none w-4 h-4" />
-          <select 
-            value={days} 
-            onChange={(event) => setDays(Number(event.target.value))} 
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none transition-all"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Calendar Selector */}
+          <div className="relative flex items-center min-w-[150px]">
+            <HiCal className="absolute left-3.5 text-slate-400 pointer-events-none w-4 h-4" />
+            <select 
+              value={days} 
+              onChange={(event) => setDays(Number(event.target.value))} 
+              className="w-full h-11 pl-10 pr-8 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none transition-all"
+            >
+              <option value={7}>Xem 7 ngày gần đây</option>
+              <option value={30}>Xem 30 ngày gần đây</option>
+              <option value={90}>Xem 90 ngày gần đây</option>
+            </select>
+          </div>
+
+          {/* Export button */}
+          <button
+            onClick={handleExportToExcel}
+            className="flex items-center gap-2 h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/10 transition-all active:scale-[0.98]"
           >
-            <option value={7}>Xem 7 ngày gần đây</option>
-            <option value={30}>Xem 30 ngày gần đây</option>
-            <option value={90}>Xem 90 ngày gần đây</option>
-          </select>
+            <HiOutlineDownload className="w-4 h-4" />
+            <span>Xuất Excel</span>
+          </button>
         </div>
       </header>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Revenue */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Tổng doanh thu</span>
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Doanh thu (Revenue)</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-              <HiOutlineCurrencyDollar className="w-5 h-5" />
+              <HiDollar className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">{money(totalRevenue)}</h3>
             <p className="mt-1 text-[11px] font-bold text-slate-400 flex items-center gap-1">
-              <HiOutlineTrendingUp className="text-emerald-500 w-3.5 h-3.5" />
-              Doanh thu tích lũy trong {days} ngày
+              <HiTrendUp className="text-emerald-500 w-3.5 h-3.5" />
+              Doanh thu phát sinh trong {days} ngày
             </p>
           </div>
         </div>
 
-        {/* Card 2: Orders */}
+        {/* Card 2: COGS */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Giá vốn hàng bán (COGS)</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <HiCalc className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{money(totalCogs)}</h3>
+            <p className="mt-1 text-[11px] font-bold text-slate-400">
+              Tổng chi phí nhập hàng đã bán
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3: Gross Profit */}
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lợi nhuận gộp (Profit)</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <HiTrendUp className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{money(totalProfit)}</h3>
+            <p className="mt-1 text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+              <span>Tỷ suất lợi nhuận gộp:</span>
+              <span className="font-extrabold">{profitMargin.toFixed(1)}%</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Orders & AOV */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-wider text-slate-400">Tổng số đơn hàng</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <HiOutlineShoppingCart className="w-5 h-5" />
+              <HiCart className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">{totalOrders.toLocaleString('vi-VN')} đơn</h3>
-            <p className="mt-1 text-[11px] font-bold text-slate-400 flex items-center gap-1">
-              <HiOutlineClock className="text-amber-500 w-3.5 h-3.5" />
-              Giao dịch hoàn thành
-            </p>
-          </div>
-        </div>
-
-        {/* Card 3: AOV */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300 sm:col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-black uppercase tracking-wider text-slate-400">Giá trị TB / đơn</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <HiOutlineCalculator className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{money(averageOrderVal)}</h3>
             <p className="mt-1 text-[11px] font-bold text-slate-400">
-              Giá trị đơn hàng trung bình
+              Giá trị TB/đơn (AOV): {money(averageOrderVal)}
             </p>
           </div>
         </div>
@@ -186,150 +258,94 @@ const ReportsPage = () => {
 
       {/* CHARTS AND LISTS SECTION */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* REVENUE CHART */}
+        {/* REVENUE VS COGS VS PROFIT CHART */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
           <div>
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">Xu hướng doanh thu</h2>
-            <p className="text-[11px] font-bold text-slate-400 mt-1">Biểu đồ biểu diễn doanh thu phát sinh theo từng ngày</p>
+            <h2 className="text-sm font-black uppercase tracking-wider text-slate-700">Xu hướng Tài chính Doanh nghiệp</h2>
+            <p className="text-[11px] font-semibold text-slate-400 mt-1">Biểu đồ so sánh trực quan giữa Doanh thu, Chi phí vốn (COGS) và Lợi nhuận ròng hàng ngày</p>
           </div>
           
-          <div className="relative mt-6 w-full overflow-x-auto select-none">
+          <div className="relative mt-6 w-full h-[320px]">
             {loading ? (
-              <div className="flex h-72 items-center justify-center min-w-[550px]">
+              <div className="flex h-full items-center justify-center">
                 <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
               </div>
             ) : revenue.length === 0 ? (
-              <div className="flex h-72 items-center justify-center text-sm font-semibold text-slate-400 min-w-[550px]">
+              <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">
                 Không có dữ liệu trong khoảng thời gian này
               </div>
             ) : (
-              <div className="relative min-w-[620px] pb-2">
-                <svg width="100%" height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="overflow-visible">
-                  {/* Define Gradients */}
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={revenue}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
                   <defs>
-                    <linearGradient id="chartGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                    </linearGradient>
+                    <linearGradient id="colorCogs" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-
-                  {/* Horizontal Gridlines */}
-                  {gridLines.map((line, idx) => (
-                    <g key={idx}>
-                      <line 
-                        x1={paddingLeft} 
-                        y1={line.y} 
-                        x2={svgWidth - paddingRight} 
-                        y2={line.y} 
-                        className="stroke-slate-100" 
-                        strokeWidth="1" 
-                        strokeDasharray={idx === 0 ? "0" : "4 4"}
-                      />
-                      <text 
-                        x={paddingLeft - 12} 
-                        y={line.y + 4} 
-                        className="fill-slate-400 text-[10px] font-bold text-right"
-                        textAnchor="end"
-                      >
-                        {formatYAxis(line.val)}
-                      </text>
-                    </g>
-                  ))}
-
-                  {/* Area fill */}
-                  <path d={areaPath} fill="url(#chartGlow)" />
-
-                  {/* Main Line path */}
-                  <path 
-                    d={linePath} 
-                    fill="none" 
-                    className="stroke-blue-600" 
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={formatDateLabel} 
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                    axisLine={{ stroke: '#e2e8f0' }}
+                    tickLine={false}
                   />
-
-                  {/* Points / Markers */}
-                  {points.map((p, idx) => (
-                    <circle 
-                      key={idx}
-                      cx={p.x}
-                      cy={p.y}
-                      r={hoveredPoint?.item.date === p.item.date ? "5" : "3.5"}
-                      className={`transition-all duration-200 cursor-pointer ${
-                        hoveredPoint?.item.date === p.item.date 
-                          ? 'fill-white stroke-blue-600 stroke-[3px]' 
-                          : 'fill-blue-600 stroke-white stroke-[1.5px] hover:fill-white hover:stroke-blue-600 hover:stroke-[3px]'
-                      }`}
-                    />
-                  ))}
-
-                  {/* Interactive vertical hover indicator */}
-                  {hoveredPoint && (
-                    <line 
-                      x1={hoveredPoint.x}
-                      y1={paddingTop}
-                      x2={hoveredPoint.x}
-                      y2={paddingTop + chartHeight}
-                      className="stroke-blue-400/50"
-                      strokeWidth="1"
-                      strokeDasharray="3 3"
-                    />
-                  )}
-
-                  {/* X Axis Date labels */}
-                  {getXLabels().map((p, idx) => (
-                    <text 
-                      key={idx} 
-                      x={p.x} 
-                      y={svgHeight - 12} 
-                      className="fill-slate-400 text-[10px] font-bold"
-                      textAnchor="middle"
-                    >
-                      {formatDateLabel(p.item.date)}
-                    </text>
-                  ))}
-                  
-                  {/* Transparent hover capture grid bars */}
-                  {points.map((p, idx) => {
-                    const barWidth = chartWidth / Math.max(revenue.length - 1, 1);
-                    return (
-                      <rect 
-                        key={idx}
-                        x={p.x - barWidth / 2}
-                        y={paddingTop}
-                        width={barWidth}
-                        height={chartHeight}
-                        fill="transparent"
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredPoint(p)}
-                        onMouseLeave={() => setHoveredPoint(null)}
-                      />
-                    );
-                  })}
-                </svg>
-
-                {/* Floating Chart Tooltip */}
-                {hoveredPoint && (
-                  <div 
-                    className="absolute z-20 rounded-xl bg-slate-900/95 p-3 text-white shadow-xl border border-slate-700/80 backdrop-blur-sm pointer-events-none transition-all duration-150"
-                    style={{
-                      left: `${hoveredPoint.x - 70}px`,
-                      top: `${hoveredPoint.y - 75}px`
-                    }}
-                  >
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                      {hoveredPoint.item.date.split('-').reverse().join('/')}
-                    </p>
-                    <p className="text-xs font-bold whitespace-nowrap">
-                      Doanh thu: <span className="text-blue-400">{money(hoveredPoint.item.revenue)}</span>
-                    </p>
-                    <p className="text-[10px] font-bold text-slate-300 mt-0.5">
-                      Đơn hàng: <span className="text-amber-400">{hoveredPoint.item.orders} đơn</span>
-                    </p>
-                  </div>
-                )}
-              </div>
+                  <YAxis 
+                    tickFormatter={formatYAxis} 
+                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    verticalAlign="top" 
+                    height={36} 
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', fontFamily: 'Inter' }}
+                  />
+                  <Area 
+                    name="Doanh thu" 
+                    type="monotone" 
+                    dataKey="revenue" 
+                    stroke="#2563eb" 
+                    strokeWidth={2.5} 
+                    fillOpacity={1} 
+                    fill="url(#colorRevenue)" 
+                  />
+                  <Area 
+                    name="Lợi nhuận gộp" 
+                    type="monotone" 
+                    dataKey="profit" 
+                    stroke="#10b981" 
+                    strokeWidth={2.5} 
+                    fillOpacity={1} 
+                    fill="url(#colorProfit)" 
+                  />
+                  <Area 
+                    name="Giá vốn (COGS)" 
+                    type="monotone" 
+                    dataKey="cogs" 
+                    stroke="#f43f5e" 
+                    strokeWidth={2} 
+                    fillOpacity={1} 
+                    fill="url(#colorCogs)" 
+                    strokeDasharray="4 4"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             )}
           </div>
         </div>
@@ -353,7 +369,6 @@ const ReportsPage = () => {
             ) : (
               topProducts.map((item, idx) => {
                 const percentage = (item.quantity / maxProductQty) * 100;
-                const isTopThree = idx < 3;
                 const rankColor = idx === 0 
                   ? 'bg-amber-100 text-amber-700 border-amber-200' 
                   : idx === 1 
@@ -400,4 +415,3 @@ const ReportsPage = () => {
 };
 
 export default ReportsPage;
-

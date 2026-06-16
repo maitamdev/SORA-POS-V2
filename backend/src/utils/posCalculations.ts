@@ -60,9 +60,10 @@ export const summarizePayments = (payments: PaymentInput[]): PaymentSummary => {
 export const calculateShiftCash = (
   openingCash: number,
   cashPayments: number,
-  closingCash: number
+  closingCash: number,
+  cashDrawerTxTotal = 0
 ): ShiftCashSummary => {
-  const expectedCash = toMoneyNumber(openingCash) + toMoneyNumber(cashPayments);
+  const expectedCash = toMoneyNumber(openingCash) + toMoneyNumber(cashPayments) + toMoneyNumber(cashDrawerTxTotal);
   const countedCash = toMoneyNumber(closingCash);
 
   return {

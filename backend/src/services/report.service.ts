@@ -137,9 +137,9 @@ export class ReportService {
       recentPaymentsResult,
       topProductsImagesResult
     ] = await Promise.all([
-      // Dependent Task 1: Fetch order details for today and yesterday summary
+      // Dependent Task 1: Fetch order details and cost price to compute COGS
       allCompletedOrderIds.length > 0
-        ? supabase.from('order_details').select('order_id, quantity').in('order_id', allCompletedOrderIds)
+        ? supabase.from('order_details').select('order_id, quantity, products(cost_price)').in('order_id', allCompletedOrderIds)
         : Promise.resolve({ data: null, error: null }),
 
       // Dependent Task 2: Fetch order details for category sales
@@ -170,18 +170,34 @@ export class ReportService {
     if (recentPaymentsResult.error) throw new AppError(500, recentPaymentsResult.error.message);
     if (topProductsImagesResult.error) throw new AppError(500, topProductsImagesResult.error.message);
 
-    // Dependent Task 1 parsing: Sold products today vs yesterday
+    // Dependent Task 1 parsing: Sold products today vs yesterday & COGS calculations
     let todaySoldProducts = 0;
     let yesterdaySoldProducts = 0;
+    let todayCogs = 0;
+    let yesterdayCogs = 0;
     const details = orderDetailsSummaryResult.data;
     if (details) {
-      todaySoldProducts = details
-        .filter((d) => todayOrderIds.includes(d.order_id))
-        .reduce((sum, d) => sum + Number(d.quantity || 0), 0);
-      yesterdaySoldProducts = details
-        .filter((d) => yesterdayOrderIds.includes(d.order_id))
-        .reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+      for (const d of details) {
+        const qty = Number(d.quantity || 0);
+        const costPrice = Number((d.products as any)?.cost_price || 0);
+        const cogs = costPrice * qty;
+
+        if (todayOrderIds.includes(d.order_id)) {
+          todaySoldProducts += qty;
+          todayCogs += cogs;
+        } else if (yesterdayOrderIds.includes(d.order_id)) {
+          yesterdaySoldProducts += qty;
+          yesterdayCogs += cogs;
+        }
+      }
     }
+
+    const todayProfit = todayRevenue - todayCogs;
+    const yesterdayProfit = yesterdayRevenue - yesterdayCogs;
+
+    const todayProfitGrowth = yesterdayProfit > 0 
+      ? Math.round(((todayProfit - yesterdayProfit) / yesterdayProfit) * 1000) / 10 
+      : todayProfit > 0 ? 100 : 0;
 
     const todaySoldGrowth = yesterdaySoldProducts > 0 
       ? Math.round(((todaySoldProducts - yesterdaySoldProducts) / yesterdaySoldProducts) * 1000) / 10 
@@ -303,6 +319,9 @@ export class ReportService {
         today_sold_growth: todaySoldGrowth,
         low_stock_count: stockCounts[0].count || 0,
         new_low_stock_count: stockCounts[1].count || 0,
+        today_cogs: todayCogs,
+        today_profit: todayProfit,
+        today_profit_growth: todayProfitGrowth,
       },
       revenue: revenueTrend,
       category_sales,
@@ -317,7 +336,7 @@ export class ReportService {
     const fromDate = new Date(endDate);
     fromDate.setDate(fromDate.getDate() - (days - 1));
 
-    const { data, error } = await supabase
+    const { data: orders, error } = await supabase
       .from('orders')
       .select('id, final_amount, created_at')
       .eq('status', 'completed')
@@ -327,20 +346,46 @@ export class ReportService {
 
     if (error) throw new AppError(500, error.message);
 
-    const buckets = new Map<string, { date: string; revenue: number; orders: number }>();
+    const orderIds = (orders || []).map((o) => o.id);
+    let details: any[] = [];
+    if (orderIds.length > 0) {
+      const { data, error: detailsErr } = await supabase
+        .from('order_details')
+        .select('order_id, quantity, products(cost_price)')
+        .in('order_id', orderIds);
+      if (detailsErr) throw new AppError(500, detailsErr.message);
+      details = data || [];
+    }
+
+    // Calculate COGS per order
+    const orderCogsMap = new Map<string, number>();
+    for (const d of details) {
+      const costPrice = Number((d.products as any)?.cost_price || 0);
+      const qty = Number(d.quantity || 0);
+      const cogs = costPrice * qty;
+      orderCogsMap.set(d.order_id, (orderCogsMap.get(d.order_id) || 0) + cogs);
+    }
+
+    const buckets = new Map<string, { date: string; revenue: number; orders: number; cogs: number; profit: number }>();
     for (let i = days - 1; i >= 0; i -= 1) {
       const date = new Date(endDate);
       date.setDate(date.getDate() - i);
       const dateStr = getLocalDateString(date);
-      buckets.set(dateStr, { date: dateStr, revenue: 0, orders: 0 });
+      buckets.set(dateStr, { date: dateStr, revenue: 0, orders: 0, cogs: 0, profit: 0 });
     }
 
-    for (const order of data || []) {
+    for (const order of orders || []) {
       const key = getLocalDateString(order.created_at);
       const bucket = buckets.get(key);
       if (!bucket) continue;
-      bucket.revenue += Number(order.final_amount || 0);
+
+      const rev = Number(order.final_amount || 0);
+      const cogs = orderCogsMap.get(order.id) || 0;
+
+      bucket.revenue += rev;
       bucket.orders += 1;
+      bucket.cogs += cogs;
+      bucket.profit += (rev - cogs);
     }
 
     return Array.from(buckets.values());

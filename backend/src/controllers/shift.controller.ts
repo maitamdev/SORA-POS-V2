@@ -42,4 +42,24 @@ export class ShiftController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(res, await ShiftService.closeByManager(req.params.id, req.body, req.user.userId), 'Quản lý chốt ca thành công');
   });
+
+  static logCashDrawerTxActive = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    successResponse(
+      res,
+      await ShiftService.logCashDrawerTxActive(req.body, req.user.userId),
+      'Ghi nhận giao dịch két tiền thành công',
+      201
+    );
+  });
+
+  static logCashDrawerTx = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    successResponse(
+      res,
+      await ShiftService.logCashDrawerTx(req.params.id, req.body, req.user.userId),
+      'Ghi nhận giao dịch két tiền thành công',
+      201
+    );
+  });
 }

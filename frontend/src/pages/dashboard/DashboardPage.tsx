@@ -79,7 +79,7 @@ const DashboardPage = () => {
 
   if (!data) {
     return (
-      <div className="flex h-[85vh] items-center justify-center font-sans" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+      <div className="flex h-[85vh] items-center justify-center font-sans">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#1b4d8e] border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-sm font-bold text-slate-500 tracking-wide animate-pulse">Đang tải dữ liệu dashboard thực tế...</p>
@@ -138,7 +138,7 @@ const DashboardPage = () => {
   const formattedTime = currentTime.toLocaleTimeString('vi-VN', { hour12: false });
 
   return (
-    <div className="space-y-6 animate-fadeIn font-sans" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+    <div className="space-y-6 animate-fadeIn font-sans">
       {/* HEADER SECTION */}
       <header className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200 pb-5">
         <div>

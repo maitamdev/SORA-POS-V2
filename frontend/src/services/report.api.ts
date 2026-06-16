@@ -6,6 +6,8 @@ export interface RevenuePoint {
   date: string;
   revenue: number;
   orders: number;
+  cogs?: number;
+  profit?: number;
 }
 
 export interface CategorySale {
@@ -63,6 +65,9 @@ export interface DashboardData {
     today_sold_growth: number;
     low_stock_count: number;
     new_low_stock_count: number;
+    today_cogs?: number;
+    today_profit?: number;
+    today_profit_growth?: number;
   };
   revenue: RevenuePoint[];
   category_sales: CategorySale[];

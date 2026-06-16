@@ -14,6 +14,7 @@ type OrderItemInput = {
 type CreateOrderInput = {
   client_order_number?: string;
   customer_id?: string | null;
+  shift_code?: string;
   discount_amount?: number;
   used_points?: number;
   note?: string | null;

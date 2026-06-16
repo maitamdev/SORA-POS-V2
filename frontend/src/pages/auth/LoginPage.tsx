@@ -93,7 +93,7 @@ const LoginPage = () => {
   return (
     <div
       className="flex min-h-screen antialiased"
-      style={{ fontFamily: "'Montserrat', Arial, sans-serif", backgroundColor: C.bgDeep }}
+      style={{ backgroundColor: C.bgDeep }}
     >
       {/* ════════════════════════════════════════════════ */}
       {/* LEFT PANEL — Hero                               */}

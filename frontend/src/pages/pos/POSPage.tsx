@@ -16,6 +16,11 @@ import {
   HiOutlineDeviceMobile,
   HiOutlinePhone,
   HiOutlineExclamationCircle,
+  HiOutlineShieldCheck,
+  HiOutlineArrowLeft,
+  HiOutlineDocumentText,
+  HiOutlineUser,
+  HiOutlineX,
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { orderAPI } from '../../services/order.api';
@@ -39,6 +44,8 @@ import {
 import { syncAllDataToLocal } from '../../services/offlineSync';
 import { POPULAR_BANKS } from '../../utils/banks';
 import QRCode from 'qrcode';
+import { printReceipt } from './utils/receiptPrinter';
+import { buildReceiptHtml } from './utils/receiptTemplate';
 
 interface CartItem {
   product: Product;
@@ -66,8 +73,57 @@ const BarcodeIcon = () => (
   </svg>
 );
 
+// Custom QrScanIcon svg
+const QrScanIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2m10 0h2a2 2 0 012 2v2m0 10v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 12h10" />
+  </svg>
+);
+
 const getProductImage = (product: Product) => {
   return product.image_url || '/assets/product-placeholder.svg';
+};
+
+const getBankLogoUrl = (bin: string): string | null => {
+  if (!bin) return null;
+  const binToCode: Record<string, string> = {
+    '970436': 'VCB', // Vietcombank
+    '970415': 'ICB', // VietinBank
+    '970418': 'BIDV', // BIDV
+    '970405': 'VBA', // Agribank
+    '970407': 'TCB', // Techcombank
+    '970422': 'MB', // MB Bank
+    '970416': 'ACB', // ACB
+    '970403': 'STB', // Sacombank
+    '970432': 'VPB', // VPBank
+    '970437': 'HDB', // HDBank
+    '970423': 'TPB', // TPBank
+    '970441': 'VIB', // VIB
+    '970426': 'MSB', // MSB
+    '970443': 'SHB', // SHB
+    '970448': 'OCB', // OCB
+    '970431': 'EIB', // Eximbank
+    '970454': 'BVB', // BVBank
+    '970428': 'NAB', // Nam A Bank
+    '970430': 'PGB', // PG Bank
+    '970400': 'SGB', // SaigonBank
+    '970452': 'KLB', // KienlongBank
+    '970425': 'ABB', // AB Bank
+    '970444': 'CBB', // CB Bank
+    '970421': 'VRB', // VRB
+    '970457': 'WVN', // Woori Bank
+    '970439': 'PBVN', // Public Bank
+    '970424': 'SHBVN', // Shinhan Bank
+    '970410': 'SCVN', // Standard Chartered
+    '970434': 'IVB', // Indovina Bank
+    '970442': 'HLBVN', // HongLeong Bank
+    '458761': 'HSBC', // HSBC
+    '970446': 'COOPBANK', // Co-op Bank
+  };
+  const code = binToCode[bin];
+  if (!code) return null;
+  return `https://api.vietqr.io/img/${code}.png`;
 };
 
 const POSPage = () => {
@@ -108,6 +164,13 @@ const POSPage = () => {
   const [loading, setLoading] = useState(false);
   const [operationSettings, setOperationSettings] = useState<OperationSettings>(defaultOperationSettings);
   const [activeShift, setActiveShift] = useState<ShiftSession | null>(null);
+
+  const [logoError, setLogoError] = useState(false);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [operationSettings.bankBin]);
+
   const [shiftLoading, setShiftLoading] = useState(false);
   const [openingCash, setOpeningCash] = useState('');
   
@@ -224,11 +287,27 @@ const POSPage = () => {
     setShiftLoading(true);
     try {
       const response = await shiftAPI.active();
-      setActiveShift(response.data.data);
+      const shiftData = response.data.data;
+      setActiveShift(shiftData);
+      if (shiftData) {
+        localStorage.setItem('sora_active_shift', JSON.stringify(shiftData));
+      } else {
+        localStorage.removeItem('sora_active_shift');
+      }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Không tải được ca làm hiện tại');
-      setActiveShift(null);
+      // Offline fallback: try to load from localStorage cache
+      const cached = localStorage.getItem('sora_active_shift');
+      if (cached) {
+        try {
+          const shiftObj = JSON.parse(cached);
+          setActiveShift(shiftObj);
+          toast.success('Đã phục hồi thông tin ca làm việc (ngoại tuyến)', { id: 'offline-shift-restore' });
+        } catch {
+          setActiveShift(null);
+        }
+      } else {
+        setActiveShift(null);
+      }
     } finally {
       setShiftLoading(false);
     }
@@ -254,7 +333,9 @@ const POSPage = () => {
     setShiftLoading(true);
     try {
       const response = await shiftAPI.checkIn(cash);
-      setActiveShift(response.data.data);
+      const shiftData = response.data.data;
+      setActiveShift(shiftData);
+      localStorage.setItem('sora_active_shift', JSON.stringify(shiftData));
       toast.success('Đã nhận ca, có thể bán hàng');
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -351,6 +432,10 @@ const POSPage = () => {
   const activeBank = useMemo(() => {
     if (!operationSettings.bankBin) return null;
     return POPULAR_BANKS.find((b) => b.bin === operationSettings.bankBin) || null;
+  }, [operationSettings.bankBin]);
+
+  const bankLogoUrl = useMemo(() => {
+    return getBankLogoUrl(operationSettings.bankBin || '970422');
   }, [operationSettings.bankBin]);
 
   useEffect(() => {
@@ -657,24 +742,13 @@ const POSPage = () => {
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('Vui lòng cho phép mở popup trên trình duyệt để in hóa đơn.');
-      return;
-    }
-
     const customerName = checkoutSuccessInfo?.customerName ?? (customers.find(c => c.id === customerId)?.name || 'Khách lẻ');
     const customerPhoneStr = checkoutSuccessInfo?.customerPhone ?? (customerPhone || customers.find(c => c.id === customerId)?.phone || '');
-    const safeCustomerName = escapeHtml(customerName);
-    const safeCustomerPhone = escapeHtml(customerPhoneStr);
-    const safeCashierName = escapeHtml(user?.full_name || 'Nhân viên');
-    const safeOrderNumber = escapeHtml(orderNumber);
 
     const printPointsBefore = checkoutSuccessInfo?.pointsBefore ?? 0;
     const printPointsUsed = checkoutSuccessInfo?.pointsUsed ?? 0;
     const printPointsEarned = checkoutSuccessInfo?.pointsEarned ?? 0;
     const printPointsAfter = checkoutSuccessInfo?.pointsAfter ?? 0;
-    const hasPointsInfo = customerName !== 'Khách lẻ' && (printPointsBefore > 0 || printPointsUsed > 0 || printPointsEarned > 0);
 
     const printTotal = itemsToRender.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0);
     const printFinal = checkoutSuccessInfo?.finalAmount ?? finalAmount;
@@ -682,353 +756,26 @@ const POSPage = () => {
     const printPaymentMethod = checkoutSuccessInfo?.paymentMethod ?? paymentMethod;
     const printChange = checkoutSuccessInfo?.change ?? Math.max((receivedAmount || printFinal) - printFinal, 0);
 
-    const cartRowsHtml = itemsToRender.map((item, idx) => `
-      <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-        <td style="padding: 10px 14px; font-size: 13px; color: #334155;">
-          <div style="font-weight: 600;">${escapeHtml(item.product.name)}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">${escapeHtml(item.product.sku || '')}</div>
-        </td>
-        <td style="text-align: center; padding: 10px 8px; font-size: 13px; color: #475569; font-weight: 600;">${item.quantity}</td>
-        <td style="text-align: right; padding: 10px 8px; font-size: 13px; color: #475569;">${money(item.product.sell_price)}</td>
-        <td style="text-align: right; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #1e293b;">${money(Number(item.product.sell_price) * item.quantity)}</td>
-      </tr>
-    `).join('');
+    const htmlContent = buildReceiptHtml({
+      orderNumber,
+      cart: itemsToRender,
+      total: printTotal,
+      finalAmount: printFinal,
+      discountAmount: printDiscount,
+      change: printChange,
+      paymentMethod: printPaymentMethod,
+      receivedAmount: paymentMethod === 'cash' ? (receivedAmount || printFinal) : printFinal,
+      customerName,
+      customerPhone: customerPhoneStr,
+      cashierName: user?.full_name || 'Nhân viên',
+      date: checkoutSuccessInfo?.date || new Date().toLocaleString('vi-VN'),
+      pointsBefore: printPointsBefore,
+      pointsUsed: printPointsUsed,
+      pointsEarned: printPointsEarned,
+      pointsAfter: printPointsAfter,
+    }, operationSettings);
 
-    const storeName = operationSettings.storeName || 'SORA MART';
-    const safeStoreName = escapeHtml(storeName);
-    const safeBranchName = escapeHtml(operationSettings.branchName || '');
-    const safeAddress = escapeHtml(operationSettings.address || '');
-    const safeHotline = escapeHtml(operationSettings.hotline || '');
-    const safeTaxCode = escapeHtml(operationSettings.taxCode || '');
-    const safeReceiptFooter = escapeHtml(operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!');
-    const nowStr = new Date().toLocaleString('vi-VN');
-    const dateStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Hóa đơn ${safeOrderNumber} - ${safeStoreName}</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-              font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-              color: #1e293b;
-              background: #f1f5f9;
-              padding: 20px;
-            }
-            .invoice-container {
-              max-width: 680px;
-              margin: 0 auto;
-              background: #ffffff;
-              border-radius: 4px;
-              border: 1px solid #cbd5e1;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-              overflow: hidden;
-            }
-            /* ── Header ── */
-            .invoice-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-              padding: 28px 28px 20px;
-              border-bottom: 1px solid #cbd5e1;
-            }
-            .store-info h1 {
-              font-size: 20px;
-              font-weight: 700;
-              color: #0f172a;
-              text-transform: uppercase;
-              letter-spacing: -0.2px;
-              margin-bottom: 4px;
-            }
-            .store-info p {
-              font-size: 11px;
-              color: #64748b;
-              line-height: 1.6;
-              font-weight: 500;
-            }
-            .invoice-number-block {
-              text-align: right;
-            }
-            .invoice-number-block h2 {
-              font-size: 24px;
-              font-weight: 700;
-              color: #0f172a;
-              letter-spacing: 0.5px;
-              text-transform: uppercase;
-            }
-            .invoice-number-block .order-code {
-              font-size: 13px;
-              font-weight: 700;
-              color: #1e293b;
-              margin-top: 2px;
-            }
-            .invoice-number-block .order-date {
-              font-size: 11px;
-              color: #64748b;
-              margin-top: 4px;
-              font-weight: 500;
-            }
-
-            /* ── Billing Info ── */
-            .billing-section {
-              display: flex;
-              justify-content: space-between;
-              padding: 16px 28px;
-              gap: 24px;
-              background: #f8fafc;
-              border-bottom: 1px solid #cbd5e1;
-            }
-            .billing-block { flex: 1; }
-            .billing-block .label {
-              font-size: 10px;
-              font-weight: 700;
-              color: #64748b;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-              margin-bottom: 4px;
-            }
-            .billing-block .value {
-              font-size: 13px;
-              font-weight: 700;
-              color: #1e293b;
-              line-height: 1.5;
-            }
-
-            /* ── Items Table ── */
-            .items-section { padding: 0; }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .items-table thead th {
-              background: #f8fafc;
-              padding: 10px 14px;
-              font-size: 10px;
-              font-weight: 700;
-              color: #334155;
-              text-transform: uppercase;
-              letter-spacing: 0.8px;
-              border-bottom: 1px solid #cbd5e1;
-            }
-            .items-table thead th:first-child { text-align: left; }
-            .items-table thead th:nth-child(2) { text-align: center; }
-            .items-table thead th:nth-child(3) { text-align: right; }
-            .items-table thead th:last-child { text-align: right; }
-            .items-table tbody td {
-              border-bottom: 1px solid #f1f5f9;
-            }
-
-            /* ── Totals ── */
-            .totals-section {
-              padding: 16px 28px 20px;
-              display: flex;
-              justify-content: flex-end;
-            }
-            .totals-table {
-              width: 260px;
-            }
-            .totals-row {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 5px 0;
-              font-size: 13px;
-            }
-            .totals-row .label { color: #64748b; font-weight: 600; }
-            .totals-row .value { font-weight: 700; color: #334155; }
-            .totals-row.discount .value { color: #dc2626; }
-            .totals-row.grand-total {
-              border-top: 1px solid #0f172a;
-              margin-top: 6px;
-              padding-top: 10px;
-              font-size: 16px;
-            }
-            .totals-row.grand-total .label { font-weight: 700; color: #0f172a; }
-            .totals-row.grand-total .value { font-weight: 800; color: #0f172a; }
-
-            /* ── Payment Info ── */
-            .payment-section {
-              padding: 14px 28px;
-              background: #f8fafc;
-              border-top: 1px solid #cbd5e1;
-            }
-            .payment-row {
-              display: flex;
-              justify-content: space-between;
-              font-size: 12px;
-              padding: 4px 0;
-            }
-            .payment-row .label { color: #64748b; font-weight: 600; }
-            .payment-row .value { color: #334155; font-weight: 700; }
-            .payment-row.change .value { color: #047857; font-weight: 700; }
-
-            /* ── Footer ── */
-            .invoice-footer {
-              text-align: center;
-              padding: 20px 28px;
-              border-top: 1px solid #cbd5e1;
-            }
-            .invoice-footer .thank-you {
-              font-size: 13px;
-              font-weight: 700;
-              color: #1e293b;
-              margin-bottom: 4px;
-            }
-            .invoice-footer .sub {
-              font-size: 11px;
-              color: #64748b;
-              font-weight: 500;
-            }
-            .invoice-footer .powered {
-              font-size: 8px;
-              color: #94a3b8;
-              margin-top: 10px;
-              font-weight: 700;
-              letter-spacing: 1px;
-              text-transform: uppercase;
-            }
-
-            @media print {
-              body { background: #fff; padding: 0; }
-              .invoice-container { box-shadow: none; border-radius: 0; border: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="invoice-container">
-            <!-- Header -->
-            <div class="invoice-header">
-              <div class="store-info">
-                <h1>${safeStoreName}</h1>
-                ${operationSettings.branchName ? `<p>${safeBranchName}</p>` : ''}
-                ${operationSettings.address ? `<p>${safeAddress}</p>` : ''}
-                ${operationSettings.hotline ? `<p>SĐT: ${safeHotline}</p>` : ''}
-                ${operationSettings.taxCode ? `<p>MST: ${safeTaxCode}</p>` : ''}
-              </div>
-              <div class="invoice-number-block">
-                <h2>HÓA ĐƠN</h2>
-                <div class="order-code">${safeOrderNumber}</div>
-                <div class="order-date">${dateStr}</div>
-              </div>
-            </div>
-
-            <!-- Billing -->
-            <div class="billing-section">
-              <div class="billing-block">
-                <div class="label">Khách hàng</div>
-                <div class="value">
-                  ${safeCustomerName}
-                  ${customerPhoneStr ? `<br/>${safeCustomerPhone}` : ''}
-                </div>
-              </div>
-              <div class="billing-block">
-                <div class="label">Thu ngân</div>
-                <div class="value">${safeCashierName}</div>
-              </div>
-              <div class="billing-block" style="text-align: right;">
-                <div class="label">Ngày giờ</div>
-                <div class="value">${nowStr}</div>
-              </div>
-            </div>
-
-            <!-- Items Table -->
-            <div class="items-section">
-              <table class="items-table">
-                <thead>
-                  <tr>
-                    <th style="width: 44%;">Sản phẩm</th>
-                    <th style="width: 12%;">SL</th>
-                    <th style="width: 22%;">Đơn giá</th>
-                    <th style="width: 22%;">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${cartRowsHtml}
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Totals -->
-            <div class="totals-section">
-              <div class="totals-table">
-                <div class="totals-row">
-                  <span class="label">Tạm tính:</span>
-                  <span class="value">${money(printTotal)}</span>
-                </div>
-                ${printDiscount > 0 ? `
-                  <div class="totals-row discount">
-                    <span class="label">Chiết khấu:</span>
-                    <span class="value">-${money(printDiscount)}</span>
-                  </div>
-                ` : ''}
-                <div class="totals-row grand-total">
-                  <span class="label">Tổng cộng:</span>
-                  <span class="value">${money(printFinal)}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Payment -->
-            <div class="payment-section">
-              <div class="payment-row">
-                <span class="label">Phương thức thanh toán:</span>
-                <span class="value">${printPaymentMethod === 'cash' ? 'Tiền mặt' : printPaymentMethod === 'transfer' ? 'Chuyển khoản QR' : 'Thẻ ngân hàng'}</span>
-              </div>
-              ${printPaymentMethod === 'cash' ? `
-                <div class="payment-row">
-                  <span class="label">Khách đưa:</span>
-                  <span class="value">${money(receivedAmount || printFinal)}</span>
-                </div>
-                <div class="payment-row change">
-                  <span class="label">Tiền thừa:</span>
-                  <span class="value">${money(printChange)}</span>
-                </div>
-              ` : ''}
-            </div>
-
-            ${hasPointsInfo ? `
-              <!-- Điểm tích lũy CGV -->
-              <div class="payment-section" style="border-top: none; padding-top: 0;">
-                <div class="payment-row">
-                  <span class="label">Điểm tích lũy trước:</span>
-                  <span class="value">${printPointsBefore}đp</span>
-                </div>
-                ${printPointsUsed > 0 ? `
-                  <div class="payment-row">
-                    <span class="label">Điểm đã sử dụng:</span>
-                    <span class="value" style="color: #dc2626;">-${printPointsUsed}đp</span>
-                  </div>
-                ` : ''}
-                <div class="payment-row">
-                  <span class="label">Điểm tích lũy mới:</span>
-                  <span class="value" style="color: #2563eb;">+${printPointsEarned}đp</span>
-                </div>
-                <div class="payment-row" style="border-top: 1px dashed #e2e8f0; margin-top: 4px; padding-top: 6px;">
-                  <span class="label">Số dư điểm hiện tại:</span>
-                  <span class="value" style="font-weight: 800; color: #0f172a;">${printPointsAfter}đp</span>
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Footer -->
-            <div class="invoice-footer">
-              <div class="thank-you">${safeReceiptFooter}</div>
-              <div class="sub">Hẹn gặp lại quý khách!</div>
-              <div class="powered">Powered by Sora POS</div>
-            </div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-            }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    printReceipt(htmlContent);
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -1076,6 +823,7 @@ const POSPage = () => {
     // ═══ Xây dựng payload đơn hàng ═══
     const orderPayload = {
       customer_id: matchedCustomer?.id || null,
+      shift_code: activeShift?.shift_code || undefined,
       discount_amount: discountAmount + pointsDiscount,
       used_points: isRedeemingPoints ? usedPoints : 0,
       note: null as string | null,
@@ -2062,139 +1810,225 @@ const POSPage = () => {
 
       {/* 3.1. VIETQR TRANSFER MODAL */}
       {showTransferPayment && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Thanh toán chuyển khoản VietQR</h3>
-                <p className="text-xs font-semibold text-slate-400 mt-0.5">Khách hàng quét mã QR dưới đây bằng ứng dụng Ngân hàng để thanh toán.</p>
-              </div>
-              <button
-                onClick={() => setShowTransferPayment(false)}
-                className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition"
-                aria-label="Thoát"
-              >
-                <HiOutlineXCircle className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              {/* Left Column: QR Code canvas */}
-              <div className="flex flex-col items-center justify-center bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
-                {/* Fallback warning if store hasn't configured bank details */}
-                {(!operationSettings.bankBin || !operationSettings.bankAccountNumber) && (
-                  <div className="absolute top-2 left-2 right-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-2 text-[10px] font-bold text-center leading-tight flex items-center justify-center gap-1">
-                    <HiOutlineExclamationCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                    <span>Chưa cấu hình ngân hàng. Đang hiển thị tài khoản demo!</span>
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-[24px] max-w-4xl w-full shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
+            
+            {/* Modal Content Columns */}
+            <div className="flex flex-col md:flex-row min-h-[500px]">
+              
+              {/* Left Column: QR Code & Header */}
+              <div className="w-full md:w-[42%] bg-[#f4f7fc] p-8 flex flex-col justify-between items-center border-r border-slate-100/60">
+                {/* Header */}
+                <div className="flex gap-3 items-start w-full">
+                  <div className="w-10 h-10 rounded-full bg-blue-100/50 flex items-center justify-center text-blue-600 flex-shrink-0 shadow-inner">
+                    <HiOutlineShieldCheck className="w-6 h-6" />
                   </div>
-                )}
-                <div className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200/60 flex items-center justify-center mt-6">
-                  <canvas ref={qrCanvasRef} className="w-[240px] h-[240px]" />
+                  <div className="space-y-1 text-left">
+                    <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">Thanh toán chuyển khoản</h3>
+                    <p className="text-xs font-semibold text-slate-400 leading-snug">
+                      Quét mã QR hoặc chuyển khoản theo thông tin bên cạnh để thanh toán.
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full text-[10px] font-black text-blue-700 uppercase tracking-wider">
-                  <span>VietQR / Napas 247</span>
+
+                {/* QR Canvas Container */}
+                <div className="my-8 flex justify-center w-full">
+                  <div className="relative bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/50 flex flex-col items-center justify-center w-[250px]">
+                    {/* VietQR absolute tag */}
+                    <div className="absolute -top-3 bg-[#e11d48] text-white px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border border-white">
+                      VIETQR
+                    </div>
+
+                    {/* QR Scan Area Corners */}
+                    <div className="relative p-3">
+                      <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-blue-600 rounded-tl-md"></div>
+                      <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-blue-600 rounded-tr-md"></div>
+                      <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-blue-600 rounded-bl-md"></div>
+                      <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-blue-600 rounded-br-md"></div>
+                      
+                      <canvas ref={qrCanvasRef} className="w-[180px] h-[180px]" />
+                    </div>
+
+                    {/* Scan Instruction */}
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                      <QrScanIcon className="w-4 h-4 text-slate-350" />
+                      <span>Quét mã để thanh toán</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Napas 247 logo */}
+                <div className="flex items-center justify-center gap-1.5 bg-white border border-slate-200/60 px-4 py-1.5 rounded-full text-[10px] font-black text-blue-700 uppercase tracking-wider shadow-sm self-center">
+                  <HiOutlineShieldCheck className="w-4 h-4 text-green-500 fill-green-50" />
+                  <span>NAPAS 247</span>
                 </div>
               </div>
 
               {/* Right Column: Account Details Text */}
-              <div className="space-y-4">
-                {/* Store active bank details */}
-                <div className="space-y-3.5 divide-y divide-slate-100 text-sm">
-                  <div className="pb-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ngân hàng thụ hưởng</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-extrabold text-slate-800">
-                        {activeBank ? `${activeBank.shortName} - ${activeBank.name}` : 'Ngân hàng TMCP Á Châu (ACB) [Demo]'}
+              <div className="w-full md:w-[58%] bg-white p-8 flex flex-col justify-between relative">
+                {/* Close button */}
+                <button
+                  onClick={() => setShowTransferPayment(false)}
+                  className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition"
+                  aria-label="Thoát"
+                >
+                  <HiOutlineX className="w-4 h-4" />
+                </button>
+
+                {/* Content: Beneficiary Details */}
+                <div className="space-y-4 pr-1 text-left">
+                  {/* Ngân hàng thụ hưởng */}
+                  <div className="flex items-center gap-3.5 pb-2 border-b border-slate-100">
+                    <div className="w-12 h-12 rounded-full border border-slate-200/60 flex items-center justify-center bg-white flex-shrink-0 shadow-sm overflow-hidden relative">
+                      {bankLogoUrl && !logoError ? (
+                        <img 
+                          src={bankLogoUrl} 
+                          alt={activeBank ? activeBank.shortName : 'Bank'} 
+                          className="w-full h-full object-contain p-2"
+                          onError={() => setLogoError(true)}
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white">
+                          <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2a1.5 1.5 0 011.5 1.5V6a1.5 1.5 0 01-3 0V3.5A1.5 1.5 0 0112 2zm0 16a1.5 1.5 0 011.5 1.5v2.5a1.5 1.5 0 01-3 0V19.5A1.5 1.5 0 0112 18zm-8-7.5A1.5 1.5 0 015.5 9H8a1.5 1.5 0 010 3H5.5a1.5 1.5 0 01-1.5-1.5zm14 0a1.5 1.5 0 011.5-1.5h2.5a1.5 1.5 0 010 3H19.5A1.5 1.5 0 0118 10.5zM6.343 6.343a1.5 1.5 0 012.122 0l1.768 1.768a1.5 1.5 0 11-2.122 2.121L6.343 8.464a1.5 1.5 0 010-2.121zm9.9 9.9a1.5 1.5 0 012.12 0l1.769 1.768a1.5 1.5 0 11-2.121 2.122l-1.768-1.769a1.5 1.5 0 010-2.121zm-9.9 2.121a1.5 1.5 0 010 2.122l-1.768 1.768a1.5 1.5 0 11-2.122-2.121l1.768-1.768a1.5 1.5 0 012.122 0zm9.9-9.9a1.5 1.5 0 010 2.121l-1.768 1.769a1.5 1.5 0 11-2.121-2.122l1.768-1.768a1.5 1.5 0 012.121 0z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ngân hàng thụ hưởng</p>
+                      <span className="font-extrabold text-slate-800 text-sm mt-0.5 block">
+                        {activeBank ? `${activeBank.shortName} - ${activeBank.name}` : 'MB Bank - Ngân hàng TMCP Quân đội'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 pb-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Số tài khoản</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-mono font-black text-slate-900 text-base">
-                        {operationSettings.bankAccountNumber || '257678859'}
-                      </span>
+                  {/* Cards List */}
+                  <div className="space-y-3">
+                    {/* Số tài khoản */}
+                    <div className="bg-white border border-slate-200/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
+                          <HiOutlineUser className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-400">Số tài khoản</p>
+                          <p className="font-mono font-black text-slate-800 text-sm mt-0.5">
+                            {operationSettings.bankAccountNumber || '0877724374'}
+                          </p>
+                        </div>
+                      </div>
                       <button
-                        onClick={() => copyToClipboard(operationSettings.bankAccountNumber || '257678859', 'Số tài khoản')}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        onClick={() => copyToClipboard(operationSettings.bankAccountNumber || '0877724374', 'Số tài khoản')}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
                         title="Sao chép số tài khoản"
                       >
-                        <HiOutlineDuplicate className="w-4 h-4" />
+                        <HiOutlineDuplicate className="w-5 h-5" />
                       </button>
                     </div>
-                  </div>
 
-                  <div className="pt-2.5 pb-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Chủ tài khoản</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-black text-slate-800 uppercase">
-                        {operationSettings.bankAccountName || 'NGUYEN XUAN NGHIA'}
-                      </span>
+                    {/* Chủ tài khoản */}
+                    <div className="bg-white border border-slate-200/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
+                          <HiOutlineUser className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-400">Chủ tài khoản</p>
+                          <p className="font-black text-slate-800 uppercase text-sm mt-0.5">
+                            {operationSettings.bankAccountName || 'MAI TRAN THIEN TAM'}
+                          </p>
+                        </div>
+                      </div>
                       <button
-                        onClick={() => copyToClipboard(operationSettings.bankAccountName || 'NGUYEN XUAN NGHIA', 'Tên chủ tài khoản')}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        onClick={() => copyToClipboard(operationSettings.bankAccountName || 'MAI TRAN THIEN TAM', 'Tên chủ tài khoản')}
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
                         title="Sao chép tên chủ tài khoản"
                       >
-                        <HiOutlineDuplicate className="w-4 h-4" />
+                        <HiOutlineDuplicate className="w-5 h-5" />
                       </button>
                     </div>
-                  </div>
 
-                  <div className="pt-2.5 pb-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Số tiền thanh toán</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-black text-blue-600 text-xl">
-                        {money(finalAmount)}
-                      </span>
+                    {/* Số tiền thanh toán */}
+                    <div className="bg-white border border-slate-200/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
+                          <HiOutlineCreditCard className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-400">Số tiền thanh toán</p>
+                          <p className="font-black text-blue-600 text-base mt-0.5">
+                            {money(finalAmount)}
+                          </p>
+                        </div>
+                      </div>
                       <button
                         onClick={() => copyToClipboard(String(finalAmount), 'Số tiền')}
-                        className="p-1 text-blue-600 hover:bg-blue-50 rounded transition"
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
                         title="Sao chép số tiền"
                       >
-                        <HiOutlineDuplicate className="w-4 h-4" />
+                        <HiOutlineDuplicate className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {/* Nội dung chuyển khoản (Memo) */}
+                    <div className="bg-amber-50/40 border border-amber-200/60 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-full bg-amber-100/60 flex items-center justify-center text-amber-600 flex-shrink-0">
+                          <HiOutlineDocumentText className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold text-amber-600">Nội dung chuyển khoản (Memo)</p>
+                          <p className="font-mono font-black text-slate-800 text-sm mt-0.5">
+                            {transferMemo}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(transferMemo, 'Nội dung chuyển khoản')}
+                        className="p-2 text-amber-500 hover:text-amber-700 hover:bg-amber-100 rounded-xl transition"
+                        title="Sao chép nội dung"
+                      >
+                        <HiOutlineDuplicate className="w-5 h-5 text-amber-600" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="pt-2.5 pb-1">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Nội dung chuyển khoản (Memo)</p>
-                    <div className="flex items-center justify-between mt-1 bg-amber-50/50 border border-amber-100 rounded-lg p-2.5">
-                      <span className="font-mono font-black text-amber-800">
-                        {transferMemo}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(transferMemo, 'Nội dung chuyển khoản')}
-                        className="p-1 text-amber-700 hover:bg-amber-100/50 rounded transition"
-                        title="Sao chép nội dung"
-                      >
-                        <HiOutlineDuplicate className="w-4 h-4" />
-                      </button>
-                    </div>
+                  {/* Info Warning Banner */}
+                  <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100/50">
+                    <HiOutlineShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <p className="text-[11px] font-semibold text-blue-700 leading-relaxed">
+                      Vui lòng nhập đúng nội dung chuyển khoản để được xác nhận nhanh chóng.
+                    </p>
                   </div>
                 </div>
               </div>
+
             </div>
 
             {/* Modal Footer Actions */}
-            <div className="grid grid-cols-2 gap-3 p-5 border-t border-slate-100 bg-slate-50">
+            <div className="flex flex-col sm:flex-row gap-3 p-6 border-t border-slate-150 bg-slate-50/80">
               <button
                 onClick={() => setShowTransferPayment(false)}
-                className="py-2.5 border border-slate-200 bg-white text-slate-600 text-xs font-black rounded-xl hover:bg-slate-100 transition"
+                className="flex-1 py-4 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 text-sm font-black rounded-2xl flex items-center justify-center gap-2 shadow-sm transition"
               >
-                Quay lại
+                <HiOutlineArrowLeft className="w-4.5 h-4.5 text-slate-500" />
+                <span>Quay lại</span>
               </button>
               <button
                 onClick={() => checkout(true, true)}
                 disabled={loading}
-                className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition disabled:opacity-50"
+                className="flex-1 sm:flex-[1.8] flex flex-col items-center justify-center py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-md shadow-blue-500/20 transition disabled:opacity-50"
               >
-                <HiOutlineCheck className="w-4 h-4 stroke-[3]" />
-                <span>Xác nhận đã nhận tiền (F9)</span>
+                <div className="flex items-center gap-2">
+                  <HiOutlineCheck className="w-5 h-5 stroke-[3]" />
+                  <span className="text-sm font-black">Tôi đã chuyển khoản</span>
+                </div>
+                <span className="text-[10px] font-bold text-blue-200/90 mt-0.5">Nhấn F9 để xác nhận nhanh</span>
               </button>
             </div>
+
           </div>
         </div>
       )}
