@@ -1,8 +1,8 @@
 -- Enterprise POS core migration for Sora POS.
 -- Run after database/schema.sql and database/app_settings.sql.
 --
--- This migration makes checkout/cancel operations transactional inside
--- PostgreSQL, adds audit logs, and records loyalty deltas on each order.
+-- This migration makes checkout/cancel and goods receipt operations transactional
+-- inside PostgreSQL, adds audit logs, records loyalty, and syncs stock alerts.
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -36,7 +36,11 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS loyalty_points_used integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS loyalty_points_earned integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS cancelled_at timestamptz,
-  ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES public.users(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS shift_code VARCHAR(16);
+
+CREATE INDEX IF NOT EXISTS idx_orders_shift_code 
+  ON public.orders(shift_code);
 
 DO $$
 BEGIN
@@ -49,6 +53,9 @@ END $$;
 
 CREATE SEQUENCE IF NOT EXISTS public.order_number_seq;
 
+-- ============================================
+-- 1. WRITE AUDIT LOG
+-- ============================================
 CREATE OR REPLACE FUNCTION public.write_audit_log(
   p_actor_id uuid,
   p_action text,
@@ -72,6 +79,9 @@ BEGIN
 END;
 $$;
 
+-- ============================================
+-- 2. SYNC STOCK ALERT
+-- ============================================
 CREATE OR REPLACE FUNCTION public.sync_stock_alert_in_tx(p_product_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -132,6 +142,9 @@ BEGIN
 END;
 $$;
 
+-- ============================================
+-- 3. CREATE POS ORDER (V2 with shift_code)
+-- ============================================
 CREATE OR REPLACE FUNCTION public.create_pos_order(
   p_payload jsonb,
   p_user_id uuid
@@ -144,6 +157,7 @@ AS $$
 DECLARE
   v_role text;
   v_shift_id uuid;
+  v_shift_code text;
   v_client_order_number text;
   v_existing_order_id uuid;
   v_order_number text;
@@ -173,6 +187,7 @@ BEGIN
     RAISE EXCEPTION 'Invalid order payload';
   END IF;
 
+  -- Get User Role
   SELECT r.name
   INTO v_role
   FROM public.users u
@@ -184,7 +199,21 @@ BEGIN
     RAISE EXCEPTION 'User is inactive or not found';
   END IF;
 
-  IF v_role = 'cashier' THEN
+  -- Extract shift_code from payload
+  v_shift_code := upper(NULLIF(trim(p_payload->>'shift_code'), ''));
+
+  -- Determine Shift ID
+  IF v_shift_code IS NOT NULL THEN
+    -- Try to match by shift_code
+    SELECT id
+    INTO v_shift_id
+    FROM public.shift_sessions
+    WHERE shift_code = v_shift_code
+    LIMIT 1;
+  END IF;
+
+  -- Fallback if shift_code is missing or not found on server
+  IF v_shift_id IS NULL AND v_role = 'cashier' THEN
     SELECT id
     INTO v_shift_id
     FROM public.shift_sessions
@@ -198,6 +227,7 @@ BEGIN
     END IF;
   END IF;
 
+  -- Get App Settings
   SELECT
     COALESCE((value->>'allowSellOutOfStock')::boolean, false),
     COALESCE((value->>'allowDiscount')::boolean, true),
@@ -210,6 +240,7 @@ BEGIN
   v_allow_discount := COALESCE(v_allow_discount, true);
   v_max_discount_percent := COALESCE(v_max_discount_percent, 100);
 
+  -- Validate Client Order Number (Idempotency check)
   v_client_order_number := upper(NULLIF(trim(p_payload->>'client_order_number'), ''));
   IF v_client_order_number IS NOT NULL THEN
     IF v_client_order_number !~ '^[A-Z0-9-]{6,50}$' THEN
@@ -235,6 +266,7 @@ BEGIN
     END IF;
   END IF;
 
+  -- Process Temp Table for Items
   DROP TABLE IF EXISTS pg_temp.pos_order_items;
 
   CREATE TEMP TABLE pos_order_items ON COMMIT DROP AS
@@ -253,12 +285,13 @@ BEGIN
 
   IF EXISTS (
     SELECT 1
-    FROM pos_order_items
+    FROM pg_temp.pos_order_items
     WHERE quantity <= 0 OR discount < 0
   ) THEN
     RAISE EXCEPTION 'Invalid item quantity or discount';
   END IF;
 
+  -- Validate Products & Stock
   FOR v_product IN
     SELECT
       p.id,
@@ -269,7 +302,7 @@ BEGIN
       p.is_active,
       i.quantity AS sale_quantity,
       i.discount AS line_discount
-    FROM pos_order_items i
+    FROM pg_temp.pos_order_items i
     JOIN public.products p ON p.id = i.product_id
     FOR UPDATE OF p
   LOOP
@@ -294,6 +327,7 @@ BEGIN
     RAISE EXCEPTION 'One or more products were not found';
   END IF;
 
+  -- Loyalty point processing
   v_customer_id := NULLIF(p_payload->>'customer_id', '')::uuid;
   v_points_used := GREATEST(COALESCE((p_payload->>'used_points')::integer, 0), 0);
   v_points_discount := v_points_used * 1000;
@@ -319,6 +353,7 @@ BEGIN
     END IF;
   END IF;
 
+  -- Calculate discount amounts
   v_discount_amount := LEAST(
     GREATEST(COALESCE((p_payload->>'discount_amount')::numeric, 0), 0),
     v_total_amount
@@ -340,6 +375,7 @@ BEGIN
   v_final_amount := GREATEST(v_total_amount - v_discount_amount, 0);
   v_points_earned := floor(v_final_amount / 10000)::integer;
 
+  -- Payment configurations
   v_payment_method := COALESCE(NULLIF(p_payload#>>'{payment,method}', ''), 'cash');
   IF v_payment_method NOT IN ('cash', 'card', 'transfer', 'momo', 'zalopay') THEN
     RAISE EXCEPTION 'Invalid payment method';
@@ -366,11 +402,13 @@ BEGIN
     'ORD-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(nextval('public.order_number_seq')::text, 8, '0')
   );
 
+  -- Insert new order
   INSERT INTO public.orders(
     order_number,
     customer_id,
     user_id,
     shift_id,
+    shift_code,
     total_amount,
     discount_amount,
     final_amount,
@@ -385,6 +423,7 @@ BEGIN
     v_customer_id,
     p_user_id,
     v_shift_id,
+    v_shift_code,
     v_total_amount,
     v_discount_amount,
     v_final_amount,
@@ -396,6 +435,7 @@ BEGIN
   )
   RETURNING id INTO v_order_id;
 
+  -- Insert order items
   INSERT INTO public.order_details(
     order_id,
     product_id,
@@ -413,9 +453,10 @@ BEGIN
     p.sell_price,
     i.discount,
     (p.sell_price * i.quantity - i.discount)
-  FROM pos_order_items i
+  FROM pg_temp.pos_order_items i
   JOIN public.products p ON p.id = i.product_id;
 
+  -- Insert payment record
   INSERT INTO public.payments(
     order_id,
     method,
@@ -435,12 +476,13 @@ BEGIN
     'completed'
   );
 
+  -- Deduct stock & log stock transaction
   FOR v_product IN
     SELECT
       p.id,
       p.stock_quantity,
       i.quantity AS sale_quantity
-    FROM pos_order_items i
+    FROM pg_temp.pos_order_items i
     JOIN public.products p ON p.id = i.product_id
   LOOP
     UPDATE public.products
@@ -472,6 +514,7 @@ BEGIN
     PERFORM public.sync_stock_alert_in_tx(v_product.id);
   END LOOP;
 
+  -- Update Customer loyalty fields
   IF v_customer_id IS NOT NULL THEN
     UPDATE public.customers
     SET total_spent = COALESCE(total_spent, 0) + v_final_amount,
@@ -479,6 +522,7 @@ BEGIN
     WHERE id = v_customer_id;
   END IF;
 
+  -- Log audit trail
   PERFORM public.write_audit_log(
     p_user_id,
     'order.create',
@@ -489,7 +533,8 @@ BEGIN
       'final_amount', v_final_amount,
       'item_count', v_item_count,
       'payment_method', v_payment_method,
-      'shift_id', v_shift_id
+      'shift_id', v_shift_id,
+      'shift_code', v_shift_code
     )
   );
 
@@ -497,6 +542,9 @@ BEGIN
 END;
 $$;
 
+-- ============================================
+-- 4. CANCEL POS ORDER
+-- ============================================
 CREATE OR REPLACE FUNCTION public.cancel_pos_order(
   p_order_id uuid,
   p_user_id uuid,
@@ -622,5 +670,180 @@ BEGIN
   );
 
   RETURN p_order_id;
+END;
+$$;
+
+-- ============================================
+-- 5. CREATE GOODS RECEIPT (Nhập kho)
+-- ============================================
+CREATE OR REPLACE FUNCTION public.create_goods_receipt(
+  p_payload jsonb,
+  p_user_id uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_receipt_id uuid;
+  v_receipt_number text;
+  v_supplier_id uuid;
+  v_note text;
+  v_paid_amount numeric(15, 2);
+  v_total_amount numeric(15, 2) := 0;
+  v_payment_status text := 'unpaid';
+  v_item record;
+  v_item_count integer;
+  v_previous_stock integer;
+  v_new_stock integer;
+  v_product record;
+BEGIN
+  IF p_payload IS NULL OR jsonb_typeof(p_payload) <> 'object' THEN
+    RAISE EXCEPTION 'Invalid goods receipt payload';
+  END IF;
+
+  v_supplier_id := NULLIF(p_payload->>'supplier_id', '')::uuid;
+  v_note := NULLIF(trim(p_payload->>'note'), '');
+  v_paid_amount := COALESCE((p_payload->>'paid_amount')::numeric, 0);
+  v_receipt_number := NULLIF(trim(p_payload->>'receipt_number'), '');
+
+  IF v_receipt_number IS NULL THEN
+    RAISE EXCEPTION 'Receipt number is required';
+  END IF;
+
+  -- Create temporary table for validation & processing
+  DROP TABLE IF EXISTS pg_temp.goods_receipt_items;
+  
+  CREATE TEMP TABLE goods_receipt_items ON COMMIT DROP AS
+  SELECT
+    (item->>'product_id')::uuid AS product_id,
+    (item->>'quantity')::integer AS quantity,
+    (item->>'unit_price')::numeric(15, 2) AS unit_price
+  FROM jsonb_to_recordset(COALESCE(p_payload->'items', '[]'::jsonb)) AS item(product_id uuid, quantity integer, unit_price numeric);
+
+  SELECT COUNT(*) INTO v_item_count FROM goods_receipt_items;
+  IF v_item_count = 0 THEN
+    RAISE EXCEPTION 'Danh sách sản phẩm nhập không được để trống';
+  END IF;
+
+  -- Validate inputs
+  IF EXISTS (
+    SELECT 1 FROM pg_temp.goods_receipt_items 
+    WHERE quantity <= 0 OR unit_price < 0
+  ) THEN
+    RAISE EXCEPTION 'Số lượng nhập phải lớn hơn 0 và giá nhập không được nhỏ hơn 0';
+  END IF;
+
+  -- Calculate total amount
+  SELECT SUM(quantity * unit_price) INTO v_total_amount FROM goods_receipt_items;
+
+  -- Determine payment status
+  IF v_paid_amount >= v_total_amount THEN
+    v_payment_status := 'paid';
+  ELSIF v_paid_amount > 0 THEN
+    v_payment_status := 'partial';
+  ELSE
+    v_payment_status := 'unpaid';
+  END IF;
+
+  -- Insert goods_receipts
+  INSERT INTO public.goods_receipts(
+    receipt_number,
+    supplier_id,
+    user_id,
+    total_amount,
+    paid_amount,
+    payment_status,
+    note
+  )
+  VALUES (
+    v_receipt_number,
+    v_supplier_id,
+    p_user_id,
+    v_total_amount,
+    v_paid_amount,
+    v_payment_status,
+    v_note
+  )
+  RETURNING id INTO v_receipt_id;
+
+  -- Insert details
+  INSERT INTO public.goods_receipt_details(
+    goods_receipt_id,
+    product_id,
+    quantity,
+    unit_price,
+    subtotal
+  )
+  SELECT
+    v_receipt_id,
+    product_id,
+    quantity,
+    unit_price,
+    (quantity * unit_price)
+  FROM pg_temp.goods_receipt_items;
+
+  -- Update products stock & cost price and insert stock transactions
+  FOR v_product IN
+    SELECT
+      i.product_id,
+      i.quantity,
+      i.unit_price,
+      p.stock_quantity
+    FROM pg_temp.goods_receipt_items i
+    JOIN public.products p ON p.id = i.product_id
+    FOR UPDATE OF p
+  LOOP
+    v_previous_stock := v_product.stock_quantity;
+    v_new_stock := v_previous_stock + v_product.quantity;
+
+    -- Update product
+    UPDATE public.products
+    SET stock_quantity = v_new_stock,
+        cost_price = v_product.unit_price
+    WHERE id = v_product.product_id;
+
+    -- Insert stock transaction
+    INSERT INTO public.stock_transactions(
+      product_id,
+      type,
+      quantity,
+      previous_stock,
+      new_stock,
+      reference_id,
+      note,
+      user_id
+    )
+    VALUES (
+      v_product.product_id,
+      'import',
+      v_product.quantity,
+      v_previous_stock,
+      v_new_stock,
+      v_receipt_id,
+      'Nhập kho theo phiếu ' || v_receipt_number,
+      p_user_id
+    );
+
+    -- Sync stock alert in transaction
+    PERFORM public.sync_stock_alert_in_tx(v_product.product_id);
+  END LOOP;
+
+  -- Write audit log
+  PERFORM public.write_audit_log(
+    p_user_id,
+    'goods_receipt.create',
+    'goods_receipts',
+    v_receipt_id,
+    jsonb_build_object(
+      'receipt_number', v_receipt_number,
+      'total_amount', v_total_amount,
+      'paid_amount', v_paid_amount,
+      'item_count', v_item_count
+    )
+  );
+
+  RETURN v_receipt_id;
 END;
 $$;

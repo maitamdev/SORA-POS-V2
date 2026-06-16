@@ -56,12 +56,12 @@ Sora POS sử dụng kiến trúc **Client-Server** 3 tầng (3-tier architectur
 
 | Công nghệ | Phiên bản | Lý do chọn |
 |-----------|-----------|-----------|
-| **ReactJS** | 18.3 | Thư viện UI phổ biến nhất, component-based, virtual DOM tối ưu hiệu năng |
-| **TypeScript** | 5.5 | Type-safe, giảm lỗi runtime, hỗ trợ IDE tốt hơn |
-| **Vite** | 5.4 | Build tool nhanh nhất hiện tại (HMR < 50ms), thay thế Webpack |
+| **ReactJS** | 19.0 | Thư viện UI phổ biến nhất, component-based, virtual DOM tối ưu hiệu năng |
+| **TypeScript** | 6.0 | Type-safe, giảm lỗi runtime, hỗ trợ IDE tốt hơn |
+| **Vite** | 8.0 | Build tool siêu nhanh, thay thế Webpack |
 | **Tailwind CSS** | 3.4 | Utility-first CSS, phát triển nhanh, bundle size nhỏ (chỉ CSS đã dùng) |
-| **Zustand** | 4.5 | State management đơn giản hơn Redux, không cần boilerplate |
-| **React Router** | 6.26 | Routing tiêu chuẩn cho React SPA |
+| **Zustand** | 5.0 | State management đơn giản hơn Redux, không cần boilerplate |
+| **React Router** | 7.16 | Routing tiêu chuẩn cho React SPA |
 | **Axios** | 1.7 | HTTP client với interceptors, auto-retry, cancel token |
 | **React Hook Form** | 7.53 | Form management hiệu năng cao (uncontrolled components) |
 | **Zod** | 3.23 | Schema validation type-safe, dùng chung frontend-backend |

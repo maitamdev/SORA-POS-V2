@@ -2,6 +2,50 @@ import { env } from '../config/env';
 import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
+import dns from 'node:dns';
+import { promisify } from 'node:util';
+
+const dnsLookup = promisify(dns.lookup);
+
+const isSafeUrl = async (urlStr: string): Promise<boolean> => {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname === 'localhost.localdomain' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal')
+    ) {
+      return false;
+    }
+    const { address } = await dnsLookup(hostname);
+    if (
+      /^127\./.test(address) ||
+      /^10\./.test(address) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(address) ||
+      /^192\.168\./.test(address) ||
+      /^169\.254\./.test(address) ||
+      address === '0.0.0.0'
+    ) {
+      return false;
+    }
+    if (
+      address === '::1' ||
+      address.toLowerCase().startsWith('fe80:') ||
+      address.toLowerCase().startsWith('fc00:') ||
+      address.toLowerCase().startsWith('fd00:')
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 type Priority = 'low' | 'medium' | 'high';
 type RestockStatus = 'out_of_stock' | 'low_stock' | 'needs_restock' | 'healthy';
@@ -829,20 +873,62 @@ Chỉ trả về JSON thuần túy:
     return { barcode: digitsOnly };
   }
 
+  private static async fetchWithSsrfProtection(url: string, headers: Record<string, string>, timeout = 8000): Promise<{ text: () => Promise<string>; ok: boolean } | null> {
+    let currentUrl = url;
+    const maxRedirects = 3;
+    
+    for (let redirectCount = 0; redirectCount < maxRedirects; redirectCount++) {
+      const isSafe = await isSafeUrl(currentUrl);
+      if (!isSafe) {
+        console.warn(`[SSRF Protection] Blocked unsafe URL: ${currentUrl}`);
+        return null;
+      }
+      
+      try {
+        const response = await fetch(currentUrl, {
+          headers,
+          signal: AbortSignal.timeout(timeout),
+          redirect: 'manual',
+        });
+        
+        if ([301, 302, 307, 308].includes(response.status)) {
+          const location = response.headers.get('location');
+          if (!location) {
+            return null;
+          }
+          currentUrl = new URL(location, currentUrl).toString();
+          continue;
+        }
+        
+        if (!response.ok) return null;
+        
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > 1024 * 1024) { // 1MB limit
+          console.warn(`[SSRF Protection] Blocked large payload from ${currentUrl}: ${contentLength} bytes`);
+          return null;
+        }
+        
+        return response;
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    console.warn(`[SSRF Protection] Exceeded max redirects for ${url}`);
+    return null;
+  }
+
   /**
    * Fetch thông tin sản phẩm từ URL QR code (scrape metadata OG tags)
    */
   private static async fetchProductFromQRUrl(url: string): Promise<NormalizedProductInfo | null> {
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
-        },
-        signal: AbortSignal.timeout(8000),
-        redirect: 'follow',
-      });
-      if (!response.ok) return null;
+      const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+      };
+      const response = await this.fetchWithSsrfProtection(url, headers, 8000);
+      if (!response || !response.ok) return null;
 
       const html = await response.text();
 

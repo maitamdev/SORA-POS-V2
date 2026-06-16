@@ -18,6 +18,7 @@ test('enterprise POS SQL defines transaction-safe checkout and cancel functions'
 
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.create_pos_order/);
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.cancel_pos_order/);
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.create_goods_receipt/);
   assert.match(sql, /FOR UPDATE OF p/);
   assert.match(sql, /INSERT INTO public\.stock_transactions/);
   assert.match(sql, /PERFORM public\.write_audit_log/);

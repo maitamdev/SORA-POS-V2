@@ -84,3 +84,24 @@ BEGIN
       ) NOT VALID;
   END IF;
 END $$;
+
+-- ============================================
+-- ENABLE ROW LEVEL SECURITY (RLS) FOR ALL TABLES
+-- ============================================
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shift_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.goods_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.goods_receipt_details ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cash_drawer_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;

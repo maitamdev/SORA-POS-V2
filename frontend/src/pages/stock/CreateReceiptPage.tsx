@@ -39,7 +39,7 @@ export default function CreateReceiptPage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Kết nối máy quét mã vạch từ xa qua Supabase Realtime
-  const { scannedBarcode, isConnected: isScannerConnected } = useBarcodeScanner();
+  const { scannedBarcode, isConnected: isScannerConnected, pairingCode } = useBarcodeScanner();
 
   const handleScanProduct = async (barcode: string) => {
     const code = barcode.trim();
@@ -239,11 +239,11 @@ export default function CreateReceiptPage() {
                 {isScannerConnected ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-black text-emerald-600">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Máy quét đang bật
+                    Quét ĐT: Bật
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-[10px] font-black text-slate-400">
-                    Máy quét ngoại tuyến
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-[10px] font-black text-slate-400" title="Quét mã QR ghép đôi trên trang POS hoặc cài đặt">
+                    Ghép ĐT ({pairingCode})
                   </span>
                 )}
               </div>

@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================
 -- 1. ROLES
 -- ============================================
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(50) UNIQUE NOT NULL, -- admin, manager, cashier
   description TEXT,
@@ -20,7 +20,7 @@ CREATE TABLE roles (
 -- ============================================
 -- 2. USERS
 -- ============================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE users (
 -- ============================================
 -- 3. CATEGORIES
 -- ============================================
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
   description TEXT,
@@ -50,7 +50,7 @@ CREATE TABLE categories (
 -- ============================================
 -- 4. SUPPLIERS
 -- ============================================
-CREATE TABLE suppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
   contact_person VARCHAR(255),
@@ -66,7 +66,7 @@ CREATE TABLE suppliers (
 -- ============================================
 -- 5. PRODUCTS
 -- ============================================
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   sku VARCHAR(100) UNIQUE NOT NULL,
   barcode VARCHAR(100),
@@ -88,7 +88,7 @@ CREATE TABLE products (
 -- ============================================
 -- 6. CUSTOMERS
 -- ============================================
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
@@ -102,57 +102,9 @@ CREATE TABLE customers (
 );
 
 -- ============================================
--- 7. ORDERS (Hóa đơn)
+-- 7. SHIFT SESSIONS (Ca làm nhân viên)
 -- ============================================
-CREATE TABLE orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_number VARCHAR(50) UNIQUE NOT NULL,      -- Mã hóa đơn: ORD-20240101-001
-  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
-  user_id UUID NOT NULL REFERENCES users(id),    -- Nhân viên tạo hóa đơn
-  total_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,     -- Tổng tiền trước giảm giá
-  discount_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,  -- Số tiền giảm giá
-  final_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,     -- Tổng tiền sau giảm giá
-  status VARCHAR(20) NOT NULL DEFAULT 'completed',     -- completed, cancelled, refunded
-  payment_status VARCHAR(20) NOT NULL DEFAULT 'paid',  -- paid, unpaid, partial
-  note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 8. ORDER DETAILS (Chi tiết hóa đơn)
--- ============================================
-CREATE TABLE order_details (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-  product_name VARCHAR(255) NOT NULL,   -- Lưu tên tại thời điểm mua
-  quantity INTEGER NOT NULL,
-  unit_price DECIMAL(15, 2) NOT NULL,   -- Giá bán tại thời điểm mua
-  discount DECIMAL(15, 2) DEFAULT 0,
-  subtotal DECIMAL(15, 2) NOT NULL,     -- quantity * unit_price - discount
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 9. PAYMENTS (Thanh toán)
--- ============================================
-CREATE TABLE payments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  method VARCHAR(50) NOT NULL DEFAULT 'cash', -- cash, card, transfer, momo, zalopay
-  amount DECIMAL(15, 2) NOT NULL,
-  received_amount DECIMAL(15, 2) DEFAULT 0,   -- Số tiền khách đưa
-  change_amount DECIMAL(15, 2) DEFAULT 0,     -- Tiền thừa
-  reference_code VARCHAR(100),                 -- Mã giao dịch (chuyển khoản/ví)
-  status VARCHAR(20) DEFAULT 'completed',      -- completed, failed, refunded
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- 9B. SHIFT SESSIONS (Ca lam nhan vien)
--- ============================================
-CREATE TABLE shift_sessions (
+CREATE TABLE IF NOT EXISTS shift_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   employee_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   opened_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -173,13 +125,107 @@ CREATE TABLE shift_sessions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-ALTER TABLE orders
-  ADD COLUMN shift_id UUID REFERENCES shift_sessions(id) ON DELETE SET NULL;
+-- ============================================
+-- 8. ORDERS (Hóa đơn)
+-- ============================================
+CREATE TABLE IF NOT EXISTS orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_number VARCHAR(50) UNIQUE NOT NULL,      -- Mã hóa đơn: ORD-20240101-001
+  customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+  user_id UUID NOT NULL REFERENCES users(id),    -- Nhân viên tạo hóa đơn
+  shift_id UUID REFERENCES shift_sessions(id) ON DELETE SET NULL,
+  shift_code VARCHAR(16),
+  total_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,     -- Tổng tiền trước giảm giá
+  discount_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,  -- Số tiền giảm giá
+  final_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,     -- Tổng tiền sau giảm giá
+  status VARCHAR(20) NOT NULL DEFAULT 'completed',     -- completed, cancelled, refunded
+  payment_status VARCHAR(20) NOT NULL DEFAULT 'paid',  -- paid, unpaid, partial
+  note TEXT,
+  loyalty_points_used INTEGER NOT NULL DEFAULT 0,
+  loyalty_points_earned INTEGER NOT NULL DEFAULT 0,
+  cancelled_at TIMESTAMP WITH TIME ZONE,
+  cancelled_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT orders_loyalty_points_check CHECK (loyalty_points_used >= 0 AND loyalty_points_earned >= 0)
+);
 
 -- ============================================
--- 10. STOCK TRANSACTIONS (Giao dịch kho)
+-- 9. ORDER DETAILS (Chi tiết hóa đơn)
 -- ============================================
-CREATE TABLE stock_transactions (
+CREATE TABLE IF NOT EXISTS order_details (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  product_name VARCHAR(255) NOT NULL,   -- Lưu tên tại thời điểm mua
+  quantity INTEGER NOT NULL,
+  unit_price DECIMAL(15, 2) NOT NULL,   -- Giá bán tại thời điểm mua
+  discount DECIMAL(15, 2) DEFAULT 0,
+  subtotal DECIMAL(15, 2) NOT NULL,     -- quantity * unit_price - discount
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 10. PAYMENTS (Thanh toán)
+-- ============================================
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  method VARCHAR(50) NOT NULL DEFAULT 'cash', -- cash, card, transfer, momo, zalopay
+  amount DECIMAL(15, 2) NOT NULL,
+  received_amount DECIMAL(15, 2) DEFAULT 0,   -- Số tiền khách đưa
+  change_amount DECIMAL(15, 2) DEFAULT 0,     -- Tiền thừa
+  reference_code VARCHAR(100),                 -- Mã giao dịch (chuyển khoản/ví)
+  status VARCHAR(20) DEFAULT 'completed',      -- completed, failed, refunded
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 11. CASH DRAWER TRANSACTIONS (Két tiền mặt)
+-- ============================================
+CREATE TABLE IF NOT EXISTS cash_drawer_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  shift_id UUID NOT NULL REFERENCES shift_sessions(id) ON DELETE CASCADE,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('cash_in', 'cash_out')),
+  amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
+  reason TEXT,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 12. GOODS RECEIPTS (Phiếu nhập kho)
+-- ============================================
+CREATE TABLE IF NOT EXISTS goods_receipts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  receipt_number VARCHAR(50) UNIQUE NOT NULL,                       -- Mã phiếu: GR-YYYYMMDD-XXXX
+  supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,     -- Nhà cung cấp
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,    -- Người nhập hàng
+  total_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,                  -- Tổng tiền hàng nhập
+  paid_amount DECIMAL(15, 2) NOT NULL DEFAULT 0,                   -- Số tiền đã thanh toán trước
+  payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid',            -- paid (đã trả), unpaid (chưa trả), partial (trả một phần)
+  note TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 13. GOODS RECEIPT DETAILS (Chi tiết phiếu nhập kho)
+-- ============================================
+CREATE TABLE IF NOT EXISTS goods_receipt_details (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  goods_receipt_id UUID NOT NULL REFERENCES goods_receipts(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),                  -- Số lượng nhập
+  unit_price DECIMAL(15, 2) NOT NULL CHECK (unit_price >= 0),      -- Giá nhập của mặt hàng đó
+  subtotal DECIMAL(15, 2) NOT NULL,                                -- Thành tiền = quantity * unit_price
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 14. STOCK TRANSACTIONS (Giao dịch kho)
+-- ============================================
+CREATE TABLE IF NOT EXISTS stock_transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
   type VARCHAR(20) NOT NULL,          -- import, sale, adjustment, return
@@ -193,9 +239,9 @@ CREATE TABLE stock_transactions (
 );
 
 -- ============================================
--- 11. STOCK ALERTS (Cảnh báo tồn kho)
+-- 15. STOCK ALERTS (Cảnh báo tồn kho)
 -- ============================================
-CREATE TABLE stock_alerts (
+CREATE TABLE IF NOT EXISTS stock_alerts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   current_stock INTEGER NOT NULL,
@@ -208,9 +254,9 @@ CREATE TABLE stock_alerts (
 );
 
 -- ============================================
--- 12. AI RECOMMENDATIONS (Gợi ý nhập hàng AI)
+-- 16. AI RECOMMENDATIONS (Gợi ý nhập hàng AI)
 -- ============================================
-CREATE TABLE ai_recommendations (
+CREATE TABLE IF NOT EXISTS ai_recommendations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   current_stock INTEGER NOT NULL,
@@ -227,31 +273,55 @@ CREATE TABLE ai_recommendations (
 );
 
 -- ============================================
+-- 17. AUDIT LOGS (Nhật ký kiểm toán)
+-- ============================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id UUID,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- INDEXES
 -- ============================================
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role_id ON users(role_id);
-CREATE INDEX idx_products_sku ON products(sku);
-CREATE INDEX idx_products_category_id ON products(category_id);
-CREATE INDEX idx_products_supplier_id ON products(supplier_id);
-CREATE INDEX idx_orders_user_id ON orders(user_id);
-CREATE INDEX idx_orders_shift_id ON orders(shift_id);
-CREATE INDEX idx_orders_customer_id ON orders(customer_id);
-CREATE INDEX idx_orders_created_at ON orders(created_at);
-CREATE INDEX idx_order_details_order_id ON order_details(order_id);
-CREATE INDEX idx_order_details_product_id ON order_details(product_id);
-CREATE INDEX idx_payments_order_id ON payments(order_id);
-CREATE INDEX idx_shift_sessions_employee_id ON shift_sessions(employee_id);
-CREATE INDEX idx_shift_sessions_opened_by ON shift_sessions(opened_by);
-CREATE INDEX idx_shift_sessions_shift_date ON shift_sessions(shift_date);
-CREATE INDEX idx_shift_sessions_status ON shift_sessions(status);
-CREATE UNIQUE INDEX idx_shift_sessions_employee_active ON shift_sessions(employee_id) WHERE status IN ('opened', 'checked_in');
-CREATE UNIQUE INDEX idx_shift_sessions_code_per_day ON shift_sessions(shift_date, shift_code) WHERE status IN ('opened', 'checked_in');
-CREATE INDEX idx_stock_transactions_product_id ON stock_transactions(product_id);
-CREATE INDEX idx_stock_transactions_type ON stock_transactions(type);
-CREATE INDEX idx_stock_alerts_product_id ON stock_alerts(product_id);
-CREATE INDEX idx_stock_alerts_status ON stock_alerts(status);
-CREATE INDEX idx_ai_recommendations_product_id ON ai_recommendations(product_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
+CREATE INDEX IF NOT EXISTS idx_products_supplier_id ON products(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_shift_id ON orders(shift_id);
+CREATE INDEX IF NOT EXISTS idx_orders_shift_code ON orders(shift_code);
+CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_order_details_order_id ON order_details(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_details_product_id ON order_details(product_id);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_shift_sessions_employee_id ON shift_sessions(employee_id);
+CREATE INDEX IF NOT EXISTS idx_shift_sessions_opened_by ON shift_sessions(opened_by);
+CREATE INDEX IF NOT EXISTS idx_shift_sessions_shift_date ON shift_sessions(shift_date);
+CREATE INDEX IF NOT EXISTS idx_shift_sessions_status ON shift_sessions(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_sessions_employee_active ON shift_sessions(employee_id) WHERE status IN ('opened', 'checked_in');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_sessions_code_per_day ON shift_sessions(shift_date, shift_code) WHERE status IN ('opened', 'checked_in');
+CREATE INDEX IF NOT EXISTS idx_cash_drawer_transactions_shift_id ON cash_drawer_transactions(shift_id);
+CREATE INDEX IF NOT EXISTS idx_cash_drawer_transactions_created_at ON cash_drawer_transactions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_goods_receipts_supplier_id ON goods_receipts(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_goods_receipts_user_id ON goods_receipts(user_id);
+CREATE INDEX IF NOT EXISTS idx_goods_receipts_receipt_number ON goods_receipts(receipt_number);
+CREATE INDEX IF NOT EXISTS idx_goods_receipt_details_receipt_id ON goods_receipt_details(goods_receipt_id);
+CREATE INDEX IF NOT EXISTS idx_goods_receipt_details_product_id ON goods_receipt_details(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transactions_product_id ON stock_transactions(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_transactions_type ON stock_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_stock_alerts_product_id ON stock_alerts(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_alerts_status ON stock_alerts(status);
+CREATE INDEX IF NOT EXISTS idx_ai_recommendations_product_id ON ai_recommendations(product_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
 -- ============================================
 -- TRIGGERS: Auto-update updated_at
@@ -274,3 +344,4 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXE
 CREATE TRIGGER update_shift_sessions_updated_at BEFORE UPDATE ON shift_sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_stock_alerts_updated_at BEFORE UPDATE ON stock_alerts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ai_recommendations_updated_at BEFORE UPDATE ON ai_recommendations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_goods_receipts_updated_at BEFORE UPDATE ON goods_receipts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -129,7 +129,9 @@ const getBankLogoUrl = (bin: string): string | null => {
 const POSPage = () => {
   const { user } = useAuthStore();
   const { isOnline, refreshPendingCount } = useNetworkStatus();
-  const { scannedBarcode, isConnected } = useBarcodeScanner();
+  const { scannedBarcode, isConnected, pairingCode } = useBarcodeScanner();
+  const [showPairingModal, setShowPairingModal] = useState(false);
+  const pairingQrCanvasRef = useRef<HTMLCanvasElement>(null);
   
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -656,6 +658,28 @@ const POSPage = () => {
     }
   }, [showTransferPayment, operationSettings, finalAmount, transferMemo]);
 
+  // Draw Scanner Pairing QR Code
+  useEffect(() => {
+    if (showPairingModal && pairingQrCanvasRef.current && pairingCode) {
+      const pairingString = `sora-pos-scanner:pair:${pairingCode}|${import.meta.env.VITE_SUPABASE_URL || ''}|${import.meta.env.VITE_SUPABASE_ANON_KEY || ''}`;
+      QRCode.toCanvas(
+        pairingQrCanvasRef.current,
+        pairingString,
+        {
+          width: 200,
+          margin: 1.5,
+          color: {
+            dark: '#0f172a',
+            light: '#ffffff',
+          },
+        },
+        (err) => {
+          if (err) console.error('Lỗi tạo QR ghép đôi:', err);
+        }
+      );
+    }
+  }, [showPairingModal, pairingCode]);
+
   // Keyboard hotkey implementation
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1121,15 +1145,23 @@ const POSPage = () => {
             <button type="submit" className="hidden">Submit</button>
           </form>
           {isConnected ? (
-            <div className="hidden xl:flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              Đã kết nối ĐT
-            </div>
+            <button
+              onClick={() => setShowPairingModal(true)}
+              className="hidden xl:flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 hover:bg-emerald-100 transition"
+              title="Đã kết nối máy quét điện thoại. Nhấn để xem mã ghép đôi."
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500 bg-emerald-500" style={{ boxShadow: '0 0 8px #10b981' }} />
+              Quét ĐT: Bật
+            </button>
           ) : (
-            <div className="hidden xl:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-black text-slate-500" title="Chưa kết nối điện thoại qua SSE">
+            <button
+              onClick={() => setShowPairingModal(true)}
+              className="hidden xl:flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-black text-slate-500 hover:bg-slate-100 transition"
+              title="Chưa kết nối điện thoại. Nhấn để quét mã QR ghép đôi."
+            >
               <span className="h-2 w-2 rounded-full bg-slate-400" />
-              Sẵn sàng quét
-            </div>
+              Ghép ĐT ({pairingCode})
+            </button>
           )}
         </div>
 
@@ -2402,6 +2434,35 @@ const POSPage = () => {
         </div>
         );
       })()}
+
+      {showPairingModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-[2px] z-[100] flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl max-w-sm w-full text-white shadow-2xl flex flex-col items-center">
+            <div className="flex justify-between items-center w-full mb-4">
+              <h3 className="text-xs font-black uppercase tracking-wider text-emerald-400">Kết nối máy quét ĐT</h3>
+              <button 
+                onClick={() => setShowPairingModal(false)}
+                className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition"
+              >
+                <HiOutlineX className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="bg-white p-3 rounded-xl shadow-inner mb-4">
+              <canvas ref={pairingQrCanvasRef}></canvas>
+            </div>
+            
+            <p className="text-[11px] text-slate-400 text-center mb-4 leading-relaxed">
+              Mở ứng dụng <strong className="text-white">Sora Scanner</strong> trên điện thoại và quét mã QR này để tự động thiết lập kết nối an toàn.
+            </p>
+            
+            <div className="w-full bg-slate-950/50 border border-slate-800 p-3 rounded-xl flex flex-col items-center gap-1">
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Mã Ghép Đôi</span>
+              <span className="text-base font-black tracking-widest text-emerald-400 select-all">{pairingCode}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

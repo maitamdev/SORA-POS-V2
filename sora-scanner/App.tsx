@@ -12,11 +12,18 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { supabase, SCANNER_CHANNEL, SCANNER_EVENT } from './src/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initSupabase, getSupabase, SCANNER_EVENT } from './src/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SCAN_BOX_SIZE = SCREEN_WIDTH * 0.7;
+
+interface PairingInfo {
+  url: string;
+  key: string;
+  pairingCode: string;
+}
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -27,6 +34,10 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [facing, setFacing] = useState<'front' | 'back'>('back');
+  
+  // Pairing states
+  const [pairingInfo, setPairingInfo] = useState<PairingInfo | null>(null);
+  const [loadingPairing, setLoadingPairing] = useState(true);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -75,27 +86,55 @@ export default function App() {
     return () => animation.stop();
   }, []);
 
-  // Setup Supabase channel
+  // Load pairing info from storage on startup
   useEffect(() => {
-    const channel = supabase.channel(SCANNER_CHANNEL);
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        setIsConnected(true);
-        console.log('✅ Connected to Supabase Broadcast');
-      } else {
-        setIsConnected(false);
-      }
-    });
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
+    const loadPairing = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('sora_pairing_info');
+        if (stored) {
+          const parsed = JSON.parse(stored) as PairingInfo;
+          setPairingInfo(parsed);
+          setupRealtime(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to load pairing info:', e);
+      } finally {
+        setLoadingPairing(false);
       }
     };
+    loadPairing();
   }, []);
 
-  const showFlash = (message: string, type: 'success' | 'error' = 'success') => {
+  // Initialize client and connect to private pairing channel
+  const setupRealtime = (info: PairingInfo) => {
+    // Clean up existing connection
+    if (channelRef.current) {
+      const client = getSupabase();
+      if (client) client.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    try {
+      const client = initSupabase(info.url, info.key);
+      const channelName = `scanner-events:${info.pairingCode}`;
+      const channel = client.channel(channelName);
+
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setIsConnected(true);
+          console.log(`✅ Connected to Supabase channel: ${channelName}`);
+        } else {
+          setIsConnected(false);
+        }
+      });
+      channelRef.current = channel;
+    } catch (err) {
+      console.error('Supabase initialization error:', err);
+      setIsConnected(false);
+    }
+  };
+
+  const showFlash = (message: string) => {
     setFlashMessage(message);
     Animated.sequence([
       Animated.timing(flashAnim, {
@@ -118,25 +157,59 @@ export default function App() {
 
     const { data: decodedText } = result;
 
-    // Haptic feedback
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // 1. Check if scanning a Pairing QR Code
+    if (decodedText.startsWith('sora-pos-scanner:pair:')) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      
+      try {
+        const payloadStr = decodedText.substring('sora-pos-scanner:pair:'.length);
+        const [code, url, key] = payloadStr.split('|');
+        
+        if (!code || !url || !key) {
+          showFlash('❌ QR ghép đôi không hợp lệ');
+          setIsProcessing(false);
+          return;
+        }
 
+        const info: PairingInfo = { pairingCode: code, url, key };
+        await AsyncStorage.setItem('sora_pairing_info', JSON.stringify(info));
+        setPairingInfo(info);
+        setupRealtime(info);
+        showFlash('🎉 Ghép đôi thành công!');
+      } catch (err) {
+        showFlash('❌ Lỗi ghép đôi thiết bị');
+        console.error(err);
+      } finally {
+        setTimeout(() => setIsProcessing(false), 1500);
+      }
+      return;
+    }
+
+    // 2. Otherwise handle normal barcode scan
+    if (!pairingInfo) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showFlash('⚠️ Vui lòng quét mã QR ghép đôi trước');
+      setTimeout(() => setIsProcessing(false), 1500);
+      return;
+    }
+
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLastScanned(decodedText);
     setScanCount((prev) => prev + 1);
 
     try {
-      if (channelRef.current) {
+      if (channelRef.current && isConnected) {
         await channelRef.current.send({
           type: 'broadcast',
           event: SCANNER_EVENT,
           payload: { barcode: decodedText, timestamp: Date.now() },
         });
-        showFlash('✅ Đã gửi lên máy tính!', 'success');
+        showFlash('✅ Đã gửi lên máy tính!');
       } else {
-        showFlash('❌ Chưa kết nối', 'error');
+        showFlash('❌ Mất kết nối mạng hoặc POS');
       }
     } catch (error) {
-      showFlash('❌ Lỗi gửi dữ liệu', 'error');
+      showFlash('❌ Lỗi gửi dữ liệu');
       console.error(error);
     }
 
@@ -144,6 +217,27 @@ export default function App() {
     setTimeout(() => {
       setIsProcessing(false);
     }, 1500);
+  };
+
+  const handleUnpair = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    
+    if (channelRef.current) {
+      const client = getSupabase();
+      if (client) client.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    try {
+      await AsyncStorage.removeItem('sora_pairing_info');
+      setPairingInfo(null);
+      setIsConnected(false);
+      setLastScanned(null);
+      setScanCount(0);
+      showFlash('🔌 Đã hủy ghép đôi POS');
+    } catch (err) {
+      console.error('Failed to clear pairing info:', err);
+    }
   };
 
   const toggleCamera = () => {
@@ -188,7 +282,9 @@ export default function App() {
           <Text style={styles.logoText}>⚡</Text>
           <View>
             <Text style={styles.headerTitle}>Sora Scanner</Text>
-            <Text style={styles.headerSubtitle}>Quét mã nhanh • Gửi lên POS</Text>
+            <Text style={styles.headerSubtitle}>
+              {pairingInfo ? `Ghép đôi: ${pairingInfo.pairingCode}` : 'Chưa ghép đôi thiết bị'}
+            </Text>
           </View>
         </View>
         <View style={styles.connectionBadge}>
@@ -241,15 +337,16 @@ export default function App() {
                 {/* Scan box with corners */}
                 <View style={styles.scanBox}>
                   {/* Corner decorations */}
-                  <View style={[styles.corner, styles.cornerTL]} />
-                  <View style={[styles.corner, styles.cornerTR]} />
-                  <View style={[styles.corner, styles.cornerBL]} />
-                  <View style={[styles.corner, styles.cornerBR]} />
+                  <View style={[styles.corner, styles.cornerTL, !pairingInfo && styles.pairingCorner]} />
+                  <View style={[styles.corner, styles.cornerTR, !pairingInfo && styles.pairingCorner]} />
+                  <View style={[styles.corner, styles.cornerBL, !pairingInfo && styles.pairingCorner]} />
+                  <View style={[styles.corner, styles.cornerBR, !pairingInfo && styles.pairingCorner]} />
 
                   {/* Scan line */}
                   <Animated.View
                     style={[
                       styles.scanLine,
+                      !pairingInfo && styles.pairingScanLine,
                       {
                         transform: [
                           {
@@ -268,7 +365,11 @@ export default function App() {
               {/* Bottom */}
               <View style={styles.overlayBottom}>
                 <Text style={styles.scanHint}>
-                  {isProcessing ? '⏳ Đang xử lý...' : '📦 Đưa mã vạch / QR vào khung'}
+                  {isProcessing
+                    ? '⏳ Đang xử lý...'
+                    : pairingInfo
+                    ? '📦 Đưa mã vạch / QR sản phẩm vào khung'
+                    : '⚡ Đưa mã QR ghép đôi trên POS vào khung'}
                 </Text>
               </View>
             </View>
@@ -325,6 +426,16 @@ export default function App() {
             >
               <Text style={styles.buttonIcon}>▶️</Text>
               <Text style={styles.buttonText}>Bắt đầu quét</Text>
+            </TouchableOpacity>
+          )}
+
+          {pairingInfo && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.unpairButton]}
+              onPress={handleUnpair}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>Hủy Ghép</Text>
             </TouchableOpacity>
           )}
 
@@ -502,13 +613,14 @@ const styles = StyleSheet.create({
   },
   scanHint: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     overflow: 'hidden',
+    textAlign: 'center',
   },
 
   // Scan box
@@ -522,6 +634,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderColor: '#34d399',
+  },
+  pairingCorner: {
+    borderColor: '#60a5fa', // Blue corner decorations for pairing mode
   },
   cornerTL: {
     top: 0,
@@ -562,6 +677,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 8,
     elevation: 5,
+  },
+  pairingScanLine: {
+    backgroundColor: '#60a5fa', // Blue scan line for pairing mode
+    shadowColor: '#60a5fa',
   },
 
   // Flash notification
@@ -659,6 +778,15 @@ const styles = StyleSheet.create({
     shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  unpairButton: {
+    flex: 1,
+    backgroundColor: '#475569',
+    shadowColor: '#475569',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 6,
   },
