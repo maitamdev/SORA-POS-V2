@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { MdCameraswitch, MdOutlineQrCodeScanner, MdLink, MdLinkOff } from 'react-icons/md';
+import { MdCameraswitch, MdOutlineQrCodeScanner, MdOutlineCheckCircle } from 'react-icons/md';
 import { supabaseClient } from '../services/supabase';
 import toast from 'react-hot-toast';
 
@@ -12,28 +12,11 @@ const ScannerPage: React.FC = () => {
   const [cameras, setCameras] = useState<any[]>([]);
   const [currentCameraId, setCurrentCameraId] = useState<string>('');
   
-  // Pairing states
-  const [pairingCode, setPairingCode] = useState<string>('');
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
-  // Load pairing code on mount
+  // Set up Supabase Realtime connection to 'scanner-events'
   useEffect(() => {
-    const code = localStorage.getItem('sora_scanner_web_pairing_code') || '';
-    setPairingCode(code);
-  }, []);
-
-  // Set up Supabase Realtime connection based on pairingCode
-  useEffect(() => {
-    if (!pairingCode) {
-      setIsConnected(false);
-      if (channelRef.current) {
-        supabaseClient.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      return;
-    }
-
-    const channelName = `scanner-events:${pairingCode}`;
+    const channelName = 'scanner-events';
     const channel = supabaseClient.channel(channelName);
 
     channel.subscribe((status, err) => {
@@ -54,7 +37,7 @@ const ScannerPage: React.FC = () => {
         channelRef.current = null;
       }
     };
-  }, [pairingCode]);
+  }, []);
 
   useEffect(() => {
     // Khởi tạo camera khi component mount
@@ -107,37 +90,6 @@ const ScannerPage: React.FC = () => {
           // Rung điện thoại báo hiệu
           if (navigator.vibrate) {
             navigator.vibrate(200);
-          }
-
-          // 1. Kiểm tra nếu là QR ghép đôi
-          if (decodedText.startsWith('sora-pos-scanner:pair:')) {
-            try {
-              const payloadStr = decodedText.substring('sora-pos-scanner:pair:'.length);
-              const [code] = payloadStr.split('|'); // Lấy code phần đầu
-              
-              if (!code) {
-                toast.error('QR ghép đôi không hợp lệ');
-                setIsProcessing(false);
-                return;
-              }
-
-              localStorage.setItem('sora_scanner_web_pairing_code', code);
-              setPairingCode(code);
-              toast.success('🎉 Ghép đôi thiết bị thành công!');
-            } catch (err) {
-              toast.error('Lỗi khi ghép đôi');
-              console.error(err);
-            } finally {
-              setTimeout(() => setIsProcessing(false), 1500);
-            }
-            return;
-          }
-
-          // 2. Xử lý mã vạch sản phẩm bình thường
-          if (!pairingCode) {
-            toast.error('Vui lòng quét QR ghép đôi trên màn hình POS trước');
-            setTimeout(() => setIsProcessing(false), 1500);
-            return;
           }
 
           toast.success(`Quét thành công: ${decodedText}`);
@@ -197,13 +149,6 @@ const ScannerPage: React.FC = () => {
     setTimeout(() => startScanning(), 300);
   };
 
-  const handleUnpair = () => {
-    localStorage.removeItem('sora_scanner_web_pairing_code');
-    setPairingCode('');
-    setIsConnected(false);
-    toast.success('🔌 Đã hủy ghép đôi POS');
-  };
-
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4 font-sans">
       <div className="w-full max-w-md bg-gray-800/80 backdrop-blur-md border border-gray-700 p-6 rounded-2xl shadow-2xl flex flex-col items-center">
@@ -216,27 +161,16 @@ const ScannerPage: React.FC = () => {
           </h1>
         </div>
 
-        {/* Pairing Status Header */}
+        {/* Connection Status Header */}
         <div className="w-full mb-6 text-center">
-          {pairingCode ? (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700/50 text-xs">
-              <MdLink className="text-emerald-400 text-base" />
-              <span className="text-slate-300">Ghép đôi: <strong className="text-emerald-400">{pairingCode}</strong></span>
-              <span className="h-1.5 w-1.5 rounded-full bg-slate-600"></span>
-              <span className={`flex items-center gap-1 font-semibold ${isConnected ? 'text-emerald-400' : 'text-red-400'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></span>
-                {isConnected ? 'Online' : 'Offline'}
-              </span>
-            </div>
-          ) : (
-            <div className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 leading-normal flex items-start gap-2 text-left">
-              <span className="text-base mt-0.5">⚠️</span>
-              <div>
-                <strong className="block mb-0.5 font-bold">Chưa ghép đôi thiết bị</strong>
-                Hãy nhấn nút "Ghép đôi máy quét" trên màn hình POS, sau đó dùng camera này quét mã QR để bắt đầu.
-              </div>
-            </div>
-          )}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-700/50 text-xs">
+            <MdOutlineCheckCircle className="text-emerald-400 text-base" />
+            <span className="text-slate-300">Kết nối POS: </span>
+            <span className={`flex items-center gap-1 font-semibold ${isConnected ? 'text-emerald-400' : 'text-red-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></span>
+              {isConnected ? 'Sẵn sàng' : 'Chưa kết nối'}
+            </span>
+          </div>
         </div>
 
         {/* Camera Scanner Box */}
@@ -261,9 +195,7 @@ const ScannerPage: React.FC = () => {
         {/* Camera Helper Text */}
         {isScanning && (
           <p className="mt-3 text-xs text-slate-400 text-center px-4 leading-relaxed">
-            {pairingCode 
-              ? '📦 Đưa mã vạch hoặc mã QR sản phẩm vào khung để quét' 
-              : '⚡ Đưa mã QR ghép đôi trên màn hình POS máy tính vào khung'}
+            📦 Đưa mã vạch hoặc mã QR sản phẩm vào khung để quét tự động gửi lên POS máy tính
           </p>
         )}
 
@@ -291,16 +223,6 @@ const ScannerPage: React.FC = () => {
                 className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-xl shadow-lg shadow-red-500/20 transition-all active:scale-95"
               >
                 Dừng quét
-              </button>
-            )}
-
-            {pairingCode && (
-              <button
-                onClick={handleUnpair}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-4 rounded-xl border border-slate-600 transition-all active:scale-95 flex items-center justify-center"
-                title="Hủy ghép đôi"
-              >
-                <MdLinkOff className="text-xl" />
               </button>
             )}
 
