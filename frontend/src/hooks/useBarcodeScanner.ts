@@ -7,6 +7,7 @@ const channelScanListeners = new Map<string, Set<(barcode: string) => void>>();
 const channelStatusListeners = new Map<string, Set<(isConnected: boolean) => void>>();
 const activeChannels = new Map<string, RealtimeChannel>();
 const channelConnectionStates = new Map<string, boolean>();
+const intentionallyClosingChannels = new Set<string>();
 
 export const useBarcodeScanner = () => {
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
@@ -83,7 +84,12 @@ export const useBarcodeScanner = () => {
           if (status === 'SUBSCRIBED') {
             console.log(`Barcode scanner connected via Supabase Realtime channel: ${channelName}`);
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-            console.error('Supabase Realtime scanner connection error/closed:', status, err);
+            if (intentionallyClosingChannels.has(channelName)) {
+              console.log(`Barcode scanner channel closed intentionally: ${channelName}`);
+              intentionallyClosingChannels.delete(channelName);
+            } else {
+              console.error('Supabase Realtime scanner connection error/closed:', status, err);
+            }
           }
 
           // Cập nhật trạng thái cho tất cả listeners đang kết nối
@@ -117,6 +123,7 @@ export const useBarcodeScanner = () => {
 
         const activeChannel = activeChannels.get(channelName);
         if (activeChannel) {
+          intentionallyClosingChannels.add(channelName);
           supabaseClient.removeChannel(activeChannel);
           activeChannels.delete(channelName);
         }
