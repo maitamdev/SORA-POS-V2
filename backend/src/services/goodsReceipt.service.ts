@@ -56,6 +56,12 @@ export class GoodsReceiptService {
     });
 
     if (error || !receiptId) {
+      if (error?.code === 'PGRST202') {
+        console.warn('[GoodsReceiptService.create] RPC create_goods_receipt not found in database schema cache. Running JS Fallback...');
+        const result = await this.createFallbackJS(payload, userId);
+        appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+        return result;
+      }
       console.error('[GoodsReceiptService.create] RPC error:', error);
       throw new AppError(400, 'Không thể tạo phiếu nhập kho: ' + (error?.message || 'Lỗi không xác định'));
     }
@@ -64,6 +70,188 @@ export class GoodsReceiptService {
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
 
     return this.getById(String(receiptId));
+  }
+
+  /**
+   * Fallback method using standard Supabase JS API calls when Postgres RPC is not available
+   */
+  static async createFallbackJS(payload: any, userId: string) {
+    const { receipt_number, supplier_id, note, paid_amount, items } = payload;
+
+    // 1. Calculate total amount
+    let totalAmount = 0;
+    for (const item of items) {
+      totalAmount += Number(item.quantity || 0) * Number(item.unit_price || 0);
+    }
+
+    // 2. Determine payment status
+    let paymentStatus = 'unpaid';
+    if (paid_amount >= totalAmount) {
+      paymentStatus = 'paid';
+    } else if (paid_amount > 0) {
+      paymentStatus = 'partial';
+    }
+
+    // 3. Insert goods receipt
+    const { data: receipt, error: receiptErr } = await supabase
+      .from('goods_receipts')
+      .insert({
+        receipt_number,
+        supplier_id: supplier_id || null,
+        user_id: userId,
+        total_amount: totalAmount,
+        paid_amount: Number(paid_amount || 0),
+        payment_status: paymentStatus,
+        note: note || null,
+      })
+      .select('*')
+      .single();
+
+    if (receiptErr || !receipt) {
+      console.error('[GoodsReceiptService.createFallbackJS] receiptErr:', receiptErr);
+      throw new AppError(400, 'Lỗi tạo phiếu nhập kho (JS Fallback): ' + (receiptErr?.message || 'Lỗi không xác định'));
+    }
+
+    const receiptId = receipt.id;
+
+    // 4. Process each item
+    for (const item of items) {
+      // Get current product stock for transaction log
+      const { data: product, error: prodErr } = await supabase
+        .from('products')
+        .select('stock_quantity, min_stock_level')
+        .eq('id', item.product_id)
+        .single();
+
+      if (prodErr || !product) {
+        console.error('[GoodsReceiptService.createFallbackJS] prodErr:', prodErr);
+        throw new AppError(400, `Không tìm thấy sản phẩm ${item.product_id}`);
+      }
+
+      const previousStock = Number(product.stock_quantity || 0);
+      const newStock = previousStock + Number(item.quantity || 0);
+
+      // Insert detail
+      const { error: detailErr } = await supabase
+        .from('goods_receipt_details')
+        .insert({
+          goods_receipt_id: receiptId,
+          product_id: item.product_id,
+          quantity: Number(item.quantity || 0),
+          unit_price: Number(item.unit_price || 0),
+          subtotal: Number(item.quantity || 0) * Number(item.unit_price || 0),
+        });
+
+      if (detailErr) {
+        console.error('[GoodsReceiptService.createFallbackJS] detailErr:', detailErr);
+        throw new AppError(400, 'Lỗi lưu chi tiết hàng hóa nhập');
+      }
+
+      // Update product stock and cost price
+      const { error: updateProdErr } = await supabase
+        .from('products')
+        .update({
+          stock_quantity: newStock,
+          cost_price: Number(item.unit_price || 0),
+        })
+        .eq('id', item.product_id);
+
+      if (updateProdErr) {
+        console.error('[GoodsReceiptService.createFallbackJS] updateProdErr:', updateProdErr);
+        throw new AppError(400, 'Lỗi cập nhật tồn kho sản phẩm');
+      }
+
+      // Insert stock transaction
+      const { error: txErr } = await supabase
+        .from('stock_transactions')
+        .insert({
+          product_id: item.product_id,
+          type: 'import',
+          quantity: Number(item.quantity || 0),
+          previous_stock: previousStock,
+          new_stock: newStock,
+          reference_id: receiptId,
+          note: `Nhập kho theo phiếu ${receipt_number}`,
+          user_id: userId,
+        });
+
+      if (txErr) {
+        console.error('[GoodsReceiptService.createFallbackJS] txErr:', txErr);
+      }
+
+      // Sync stock alerts
+      const currentStock = newStock;
+      const minStockLevel = Number(product.min_stock_level || 0);
+      
+      let alertStatus = null;
+      if (currentStock <= 0) {
+        alertStatus = 'out_of_stock';
+      } else if (currentStock <= minStockLevel) {
+        alertStatus = 'low_stock';
+      }
+
+      // Find active alert
+      const { data: activeAlert } = await supabase
+        .from('stock_alerts')
+        .select('*')
+        .eq('product_id', item.product_id)
+        .in('status', ['low_stock', 'out_of_stock'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (alertStatus === null) {
+        if (activeAlert) {
+          await supabase
+            .from('stock_alerts')
+            .update({
+              status: 'resolved',
+              resolved_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', activeAlert.id);
+        }
+      } else {
+        if (activeAlert) {
+          await supabase
+            .from('stock_alerts')
+            .update({
+              current_stock: currentStock,
+              min_stock_level: minStockLevel,
+              status: alertStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', activeAlert.id);
+        } else {
+          await supabase
+            .from('stock_alerts')
+            .insert({
+              product_id: item.product_id,
+              current_stock: currentStock,
+              min_stock_level: minStockLevel,
+              status: alertStatus,
+            });
+        }
+      }
+    }
+
+    // 5. Write audit log
+    await supabase
+      .from('audit_logs')
+      .insert({
+        actor_id: userId,
+        action: 'goods_receipt.create',
+        entity_type: 'goods_receipts',
+        entity_id: receiptId,
+        metadata: {
+          receipt_number,
+          total_amount: totalAmount,
+          paid_amount: Number(paid_amount || 0),
+          item_count: items.length,
+        },
+      });
+
+    return this.getById(receiptId);
   }
 
   /**

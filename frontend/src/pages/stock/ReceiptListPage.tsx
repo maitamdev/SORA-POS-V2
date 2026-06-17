@@ -35,7 +35,12 @@ const statusLabels = {
   unpaid: 'Chưa thanh toán (Nợ)',
 };
 
-export default function ReceiptListPage() {
+interface ReceiptListPageProps {
+  isEmbedded?: boolean;
+  refreshTrigger?: number;
+}
+
+export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0 }: ReceiptListPageProps) {
   const navigate = useNavigate();
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -135,6 +140,12 @@ export default function ReceiptListPage() {
     loadReceipts();
   }, [supplierId, paymentStatus, dateFrom, dateTo]);
 
+  useEffect(() => {
+    if (isEmbedded && refreshTrigger > 0) {
+      loadReceipts();
+    }
+  }, [refreshTrigger, isEmbedded]);
+
   // Tính toán KPIs
   const stats = useMemo(() => {
     const totalCount = receipts.length;
@@ -171,35 +182,36 @@ export default function ReceiptListPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      {/* 1. Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-5">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FiTruck className="text-blue-600" />
-            Nhập kho & Công nợ
-          </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
-            Quản lý lịch sử nhập hàng từ Nhà cung cấp, theo dõi chi tiết phiếu nhập và quản lý công nợ NCC.
-          </p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto shrink-0">
-          <button
-            onClick={() => navigate('/stock/receipts/new')}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
-          >
-            <FiPlus size={16} className="stroke-[2.5]" />
-            Lập phiếu nhập mới
-          </button>
-          <button
-            onClick={loadReceipts}
-            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 p-2.5 text-slate-600 transition-all flex items-center justify-center shadow-sm"
-            title="Làm mới dữ liệu"
-          >
-            <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
-          </button>
-        </div>
-      </header>
+    <div className={isEmbedded ? "space-y-6 animate-fadeIn" : "space-y-6 animate-fadeIn pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"}>
+      {!isEmbedded && (
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-5">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <FiTruck className="text-blue-600" />
+              Nhập kho & Công nợ
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
+              Quản lý lịch sử nhập hàng từ Nhà cung cấp, theo dõi chi tiết phiếu nhập và quản lý công nợ NCC.
+            </p>
+          </div>
+          <div className="flex gap-2 w-full sm:w-auto shrink-0">
+            <button
+              onClick={() => navigate('/stock/receipts/new')}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
+            >
+              <FiPlus size={16} className="stroke-[2.5]" />
+              Lập phiếu nhập mới
+            </button>
+            <button
+              onClick={loadReceipts}
+              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 p-2.5 text-slate-600 transition-all flex items-center justify-center shadow-sm"
+              title="Làm mới dữ liệu"
+            >
+              <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* 2. KPI Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

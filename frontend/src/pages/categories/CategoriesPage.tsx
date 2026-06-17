@@ -165,27 +165,6 @@ const CategoriesPage = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [generatingImage, setGeneratingImage] = useState(false);
 
-  const handleGenerateImage = async () => {
-    if (!name.trim()) {
-      toast.error('Vui lòng nhập tên danh mục trước khi dùng AI');
-      return;
-    }
-    setGeneratingImage(true);
-    try {
-      const res = await aiAPI.suggestCategoryImage(name.trim());
-      if (res.data.data.imageUrl) {
-        setImageUrl(res.data.data.imageUrl);
-        toast.success('Đã tìm thấy ảnh minh họa phù hợp!');
-      } else {
-        toast.error('AI không tìm thấy ảnh phù hợp. Vui lòng tự nhập.');
-      }
-    } catch (error) {
-      toast.error('Lỗi khi gọi AI gợi ý ảnh');
-    } finally {
-      setGeneratingImage(false);
-    }
-  };
-
   useEffect(() => {
     // Only auto-generate if name exists, image URL is empty
     if (!name.trim() || imageUrl.trim()) return;
@@ -213,8 +192,120 @@ const CategoriesPage = () => {
   const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
+  // Add products to category states
+  const [activeModalTab, setActiveModalTab] = useState<'list' | 'add'>('list');
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [searchProductsResults, setSearchProductsResults] = useState<Product[]>([]);
+  const [searchProductsLoading, setSearchProductsLoading] = useState(false);
+
+  // Search products effect when activeModalTab is 'add'
+  useEffect(() => {
+    if (activeModalTab !== 'add') return;
+    const trimmed = productSearchQuery.trim();
+    if (!trimmed) {
+      setSearchProductsResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchProductsLoading(true);
+      try {
+        const res = await catalogAPI.products.list({ search: trimmed, limit: 10 });
+        setSearchProductsResults(res.data.data.items);
+      } catch (err) {
+        console.error('Lỗi tìm sản phẩm:', err);
+      } finally {
+        setSearchProductsLoading(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [productSearchQuery, activeModalTab]);
+
+  const handleAddProductToCategory = async (productId: string) => {
+    if (!selectedCategoryForProducts) return;
+    try {
+      await catalogAPI.products.update(productId, { category_id: selectedCategoryForProducts.id });
+      toast.success('Đã thêm sản phẩm vào danh mục!');
+      
+      // Update local search results state
+      setSearchProductsResults((prev) =>
+        prev.map((p) => (p.id === productId ? { ...p, category_id: selectedCategoryForProducts.id } : p))
+      );
+      
+      // Reload products of the category in background
+      const res = await catalogAPI.products.list({ category_id: selectedCategoryForProducts.id, limit: 100 });
+      setCategoryProducts(res.data.data.items);
+      
+      // Update count on main page
+      setCategories((prev) =>
+        prev.map((cat) => {
+          if (cat.id === selectedCategoryForProducts.id) {
+            const currentCount = cat.products?.[0]?.count || 0;
+            return {
+              ...cat,
+              products: [{ count: currentCount + 1 }],
+            };
+          }
+          return cat;
+        })
+      );
+    } catch (error) {
+      toast.error('Không thể thêm sản phẩm vào danh mục');
+    }
+  };
+
+  const handleRemoveProductFromCategory = async (productId: string) => {
+    if (!selectedCategoryForProducts) return;
+    if (!window.confirm('Bạn có chắc muốn xóa sản phẩm này khỏi danh mục?')) return;
+    try {
+      await catalogAPI.products.update(productId, { category_id: null });
+      toast.success('Đã xóa sản phẩm khỏi danh mục.');
+      
+      // Filter out of current category list
+      setCategoryProducts((prev) => prev.filter((p) => p.id !== productId));
+      
+      // Update count on main page
+      setCategories((prev) =>
+        prev.map((cat) => {
+          if (cat.id === selectedCategoryForProducts.id) {
+            const currentCount = cat.products?.[0]?.count || 0;
+            return {
+              ...cat,
+              products: [{ count: Math.max(currentCount - 1, 0) }],
+            };
+          }
+          return cat;
+        })
+      );
+    } catch (error) {
+      toast.error('Không thể xóa sản phẩm khỏi danh mục');
+    }
+  };
+
+  const closeModal = () => {
+    setSelectedCategoryForProducts(null);
+    setActiveModalTab('list');
+    setProductSearchQuery('');
+    setSearchProductsResults([]);
+  };
+
   const viewProductsOfCategory = async (category: Category) => {
     setSelectedCategoryForProducts(category);
+    setLoadingProducts(true);
+    setCategoryProducts([]);
+    try {
+      const res = await catalogAPI.products.list({ category_id: category.id, limit: 100 });
+      setCategoryProducts(res.data.data.items);
+    } catch (error) {
+      toast.error('Không tải được danh sách sản phẩm');
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const openAddProductsToCategory = async (category: Category) => {
+    setSelectedCategoryForProducts(category);
+    setActiveModalTab('add');
     setLoadingProducts(true);
     setCategoryProducts([]);
     try {
@@ -397,17 +488,7 @@ const CategoriesPage = () => {
 
             {/* Image URL Input */}
             <label className="block space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="block text-xs font-bold uppercase text-slate-500">URL hình ảnh</span>
-                <button
-                  type="button"
-                  onClick={handleGenerateImage}
-                  disabled={generatingImage}
-                  className="text-xs font-black text-blue-600 hover:text-blue-800 disabled:opacity-50 transition flex items-center gap-1"
-                >
-                  {generatingImage ? 'Đang tìm...' : '✨ AI Gợi ý ảnh'}
-                </button>
-              </div>
+              <span className="block text-xs font-bold uppercase text-slate-500">URL hình ảnh</span>
               <input
                 type="text"
                 value={imageUrl}
@@ -510,6 +591,18 @@ const CategoriesPage = () => {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            openAddProductsToCategory(category);
+                          }}
+                          className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-1 text-xs font-black shadow-sm"
+                          title="Thêm sản phẩm"
+                        >
+                          <HiOutlinePlus className="h-3.5 w-3.5" />
+                          <span>Thêm SP</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             startEdit(category);
                           }}
                           className="p-1.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded-lg transition"
@@ -550,83 +643,209 @@ const CategoriesPage = () => {
                   Danh mục: {selectedCategoryForProducts.name}
                 </h3>
                 <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                  Danh sách sản phẩm thuộc danh mục này ({categoryProducts.length} sản phẩm)
+                  Quản lý sản phẩm thuộc danh mục này
                 </p>
               </div>
               <button
-                onClick={() => setSelectedCategoryForProducts(null)}
+                onClick={closeModal}
                 className="text-slate-400 hover:text-slate-700 transition font-black text-lg p-1"
               >
                 ✕
               </button>
             </div>
 
+            {/* Modal Tabs */}
+            <div className="flex border-b border-slate-100 mt-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('list')}
+                className={`py-2.5 px-4 text-xs font-black border-b-2 transition-all ${
+                  activeModalTab === 'list'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Sản phẩm trong danh mục ({categoryProducts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveModalTab('add')}
+                className={`py-2.5 px-4 text-xs font-black border-b-2 transition-all ${
+                  activeModalTab === 'add'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                ➕ Thêm sản phẩm vào danh mục
+              </button>
+            </div>
+
             {/* Modal Body */}
             <div className="flex-1 overflow-y-auto py-4 min-h-[200px]">
-              {loadingProducts ? (
-                <div className="flex flex-col items-center justify-center py-12 text-slate-400 font-semibold">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3" />
-                  Đang tải danh sách sản phẩm...
-                </div>
-              ) : categoryProducts.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 font-bold uppercase flex flex-col items-center">
-                  <HiOutlineFolder className="h-10 w-10 text-slate-300 stroke-[1.5] mb-2" />
-                  Không có sản phẩm nào thuộc danh mục này.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                        <th className="py-2.5 px-3 text-center w-12">Ảnh</th>
-                        <th className="py-2.5 px-3">Mã sản phẩm (SKU)</th>
-                        <th className="py-2.5 px-3">Tên sản phẩm</th>
-                        <th className="py-2.5 px-3 text-right">Giá bán</th>
-                        <th className="py-2.5 px-3 text-center">Tồn kho</th>
-                        <th className="py-2.5 px-3 text-center">Trạng thái</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                      {categoryProducts.map((p) => {
-                        const isOutOfStock = p.stock_quantity <= 0;
-                        const isLowStock = p.stock_quantity <= p.min_stock_level;
-                        const formattedPrice = `${Number(p.sell_price || 0).toLocaleString('vi-VN')}đ`;
-                        const productImage = p.image_url || '/assets/product-placeholder.svg';
+              {activeModalTab === 'list' ? (
+                loadingProducts ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400 font-semibold">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3" />
+                    Đang tải danh sách sản phẩm...
+                  </div>
+                ) : categoryProducts.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 font-bold uppercase flex flex-col items-center gap-3">
+                    <HiOutlineFolder className="h-10 w-10 text-slate-300 stroke-[1.5]" />
+                    <span>Không có sản phẩm nào thuộc danh mục này.</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveModalTab('add')}
+                      className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-sm"
+                    >
+                      Thêm sản phẩm ngay
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                          <th className="py-2.5 px-3 text-center w-12">Ảnh</th>
+                          <th className="py-2.5 px-3">Mã sản phẩm (SKU)</th>
+                          <th className="py-2.5 px-3">Tên sản phẩm</th>
+                          <th className="py-2.5 px-3 text-right">Giá bán</th>
+                          <th className="py-2.5 px-3 text-center">Tồn kho</th>
+                          <th className="py-2.5 px-3 text-center">Trạng thái</th>
+                          <th className="py-2.5 px-3 text-center">Bỏ khỏi DM</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                        {categoryProducts.map((p) => {
+                          const isOutOfStock = p.stock_quantity <= 0;
+                          const isLowStock = p.stock_quantity <= p.min_stock_level;
+                          const formattedPrice = `${Number(p.sell_price || 0).toLocaleString('vi-VN')}đ`;
+                          const productImage = p.image_url || '/assets/product-placeholder.svg';
 
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50/50 transition">
-                            <td className="py-2 px-3 text-center">
-                              <div className="w-8 h-8 rounded border border-slate-100 bg-white p-0.5 flex items-center justify-center overflow-hidden mx-auto shadow-sm">
-                                <img
-                                  src={productImage}
-                                  alt={p.name}
-                                  className="max-h-full max-w-full object-contain"
-                                />
-                              </div>
-                            </td>
-                            <td className="py-2 px-3 uppercase font-extrabold text-slate-500">{p.sku}</td>
-                            <td className="py-2 px-3">
-                              <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
-                              <span className="text-[9px] text-slate-400 font-bold block uppercase mt-0.5">Đơn vị: {p.unit || 'Cái'}</span>
-                            </td>
-                            <td className="py-2 px-3 text-right font-black text-slate-850">{formattedPrice}</td>
-                            <td className="py-2 px-3 text-center font-black text-slate-800">{p.stock_quantity}</td>
-                            <td className="py-2 px-3 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border whitespace-nowrap ${
-                                isOutOfStock
-                                  ? 'bg-red-50 text-red-600 border-red-200'
-                                  : isLowStock
-                                  ? 'bg-amber-50 text-amber-600 border-amber-250'
-                                  : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                              }`}>
-                                {isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'Còn hàng'}
-                              </span>
-                            </td>
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50/50 transition">
+                              <td className="py-2 px-3 text-center">
+                                <div className="w-8 h-8 rounded border border-slate-100 bg-white p-0.5 flex items-center justify-center overflow-hidden mx-auto shadow-sm">
+                                  <img
+                                    src={productImage}
+                                    alt={p.name}
+                                    className="max-h-full max-w-full object-contain"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 uppercase font-extrabold text-slate-500">{p.sku}</td>
+                              <td className="py-2 px-3">
+                                <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
+                                <span className="text-[9px] text-slate-400 font-bold block uppercase mt-0.5">Đơn vị: {p.unit || 'Cái'}</span>
+                              </td>
+                              <td className="py-2 px-3 text-right font-black text-slate-850">{formattedPrice}</td>
+                              <td className="py-2 px-3 text-center font-black text-slate-800">{p.stock_quantity}</td>
+                              <td className="py-2 px-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border whitespace-nowrap ${
+                                  isOutOfStock
+                                    ? 'bg-red-50 text-red-600 border-red-200'
+                                    : isLowStock
+                                    ? 'bg-amber-50 text-amber-600 border-amber-250'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                }`}>
+                                  {isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'Còn hàng'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveProductFromCategory(p.id)}
+                                  className="p-1 hover:bg-red-50 text-slate-450 hover:text-red-600 rounded transition"
+                                  title="Xóa khỏi danh mục"
+                                >
+                                  <HiOutlineTrash className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
+                <div className="space-y-4">
+                  {/* Search input for adding product */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder="Tìm sản phẩm bằng tên, SKU, barcode..."
+                      className="w-full h-10 rounded-xl border border-slate-200 pl-10 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-blue-500 bg-slate-50/50"
+                    />
+                    <HiOutlineSearch className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                  </div>
+
+                  {searchProductsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400 font-semibold">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mb-2" />
+                      Đang tìm kiếm sản phẩm...
+                    </div>
+                  ) : productSearchQuery.trim() && searchProductsResults.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 font-bold uppercase">
+                      Không tìm thấy sản phẩm nào.
+                    </div>
+                  ) : !productSearchQuery.trim() ? (
+                    <div className="text-center py-12 text-slate-400 font-semibold text-xs sm:text-sm">
+                      Nhập từ khóa tìm kiếm để bắt đầu thêm sản phẩm vào danh mục.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                            <th className="py-2.5 px-3">Mã sản phẩm (SKU)</th>
+                            <th className="py-2.5 px-3">Tên sản phẩm</th>
+                            <th className="py-2.5 px-3">Danh mục hiện tại</th>
+                            <th className="py-2.5 px-3 text-right">Giá bán</th>
+                            <th className="py-2.5 px-3 text-center">Hành động</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                          {searchProductsResults.map((p) => {
+                            const isInCurrentCategory = p.category_id === selectedCategoryForProducts.id;
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-50/50 transition">
+                                <td className="py-2 px-3 uppercase font-extrabold text-slate-500">{p.sku}</td>
+                                <td className="py-2 px-3">
+                                  <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
+                                </td>
+                                <td className="py-2 px-3 text-slate-450">
+                                  {isInCurrentCategory ? (
+                                    <span className="text-blue-600 font-bold">Danh mục này</span>
+                                  ) : (
+                                    p.categories?.name || 'Không có'
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right font-black text-slate-850">
+                                  {Number(p.sell_price || 0).toLocaleString('vi-VN')}đ
+                                </td>
+                                <td className="py-2 px-3 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddProductToCategory(p.id)}
+                                    disabled={isInCurrentCategory}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${
+                                      isInCurrentCategory
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                                    }`}
+                                  >
+                                    {isInCurrentCategory ? 'Đã thêm' : 'Thêm vào'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -634,7 +853,8 @@ const CategoriesPage = () => {
             {/* Modal Footer */}
             <div className="border-t border-slate-100 pt-4 flex justify-end flex-shrink-0">
               <button
-                onClick={() => setSelectedCategoryForProducts(null)}
+                type="button"
+                onClick={closeModal}
                 className="px-5 py-2 bg-slate-900 text-white font-bold text-xs uppercase rounded-xl hover:bg-slate-800 transition shadow-sm"
               >
                 Đóng lại

@@ -72,12 +72,6 @@ const menuItems = [
     roles: ['admin', 'manager', 'cashier'],
   },
   {
-    label: 'Nhập hàng',
-    icon: HiOutlineDownload,
-    path: '/stock/receipts',
-    roles: ['admin', 'manager'],
-  },
-  {
     label: 'Khách hàng',
     icon: HiOutlineUserGroup,
     path: '/customers',
@@ -186,9 +180,7 @@ const Sidebar = () => {
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
-                : item.path === '/stock'
-                  ? location.pathname === '/stock'
-                  : location.pathname.startsWith(item.path);
+                : location.pathname.startsWith(item.path);
 
             return (
               <li key={item.path}>

@@ -1,14 +1,16 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   FiCheck, FiRefreshCw, FiX, FiZap, FiChevronDown, FiChevronUp,
   FiAlertCircle, FiBox, FiShield, FiPlus, FiList, FiClock, FiSearch, 
-  FiSliders, FiArrowUpRight, FiArrowDownLeft, FiSettings, FiActivity, FiTag
+  FiSliders, FiArrowUpRight, FiArrowDownLeft, FiSettings, FiActivity, FiTag, FiTruck
 } from 'react-icons/fi';
 import { stockAPI } from '../../services/stock.api';
 import { aiAPI } from '../../services/ai.api';
 import { Product, StockAlert, StockTransaction, AIRecommendation, RestockAnalysis } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
+import ReceiptListPage from './ReceiptListPage';
 
 const priorityClass = {
   high: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -90,14 +92,32 @@ const getStockBarPercentage = (quantity: number, minLevel: number) => {
 
 const StockPage = () => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const canManageStock = user?.role === 'admin' || user?.role === 'manager';
+
+  const getInitialTab = (): 'inventory' | 'alerts' | 'transactions' | 'receipts' => {
+    if (tabParam === 'receipts' && canManageStock) return 'receipts';
+    if (tabParam === 'alerts') return 'alerts';
+    if (tabParam === 'transactions' && canManageStock) return 'transactions';
+    return 'inventory';
+  };
+
+  const [activeTab, setActiveTab] = useState<'inventory' | 'alerts' | 'transactions' | 'receipts'>(getInitialTab());
   const [inventory, setInventory] = useState<Product[]>([]);
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [mode, setMode] = useState<'import' | 'adjust'>('import');
   const [loading, setLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'inventory' | 'alerts' | 'transactions'>('inventory');
+  // Sync tab with URL parameter
+  useEffect(() => {
+    if (tabParam !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
+    }
+  }, [activeTab, tabParam, setSearchParams]);
 
   // Quick Action Modal state
   const [showActionModal, setShowActionModal] = useState(false);
@@ -116,8 +136,6 @@ const StockPage = () => {
   const [generating, setGenerating] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
-
-  const canManageStock = user?.role === 'admin' || user?.role === 'manager';
 
   const loadData = async () => {
     setLoading(true);
@@ -284,28 +302,46 @@ const StockPage = () => {
         <div className="flex flex-wrap gap-2.5 w-full sm:w-auto shrink-0">
           {canManageStock && (
             <>
-              <button
-                onClick={() => setShowActionModal(true)}
-                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
-              >
-                <FiPlus size={16} className="stroke-[2.5]" />
-                Cập nhật kho nhanh
-              </button>
-              <button
-                onClick={showAIPanel ? () => setShowAIPanel(false) : handleOpenAI}
-                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-200 border ${
-                  showAIPanel
-                    ? 'bg-slate-950 text-white border-slate-950 shadow-md'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
-                }`}
-              >
-                <FiZap className={showAIPanel ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-slate-400'} size={15} />
-                Trợ lý AI
-              </button>
+              {activeTab === 'receipts' ? (
+                <button
+                  onClick={() => navigate('/stock/receipts/new')}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
+                >
+                  <FiPlus size={16} className="stroke-[2.5]" />
+                  Lập phiếu nhập mới
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowActionModal(true)}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
+                >
+                  <FiPlus size={16} className="stroke-[2.5]" />
+                  Cập nhật kho nhanh
+                </button>
+              )}
+              {activeTab !== 'receipts' && (
+                <button
+                  onClick={showAIPanel ? () => setShowAIPanel(false) : handleOpenAI}
+                  className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-200 border ${
+                    showAIPanel
+                      ? 'bg-slate-950 text-white border-slate-950 shadow-md'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                  }`}
+                >
+                  <FiZap className={showAIPanel ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-slate-400'} size={15} />
+                  Trợ lý AI
+                </button>
+              )}
             </>
           )}
           <button
-            onClick={loadData}
+            onClick={() => {
+              if (activeTab === 'receipts') {
+                setRefreshTrigger((prev) => prev + 1);
+              } else {
+                loadData();
+              }
+            }}
             className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 p-2.5 text-slate-600 transition-all flex items-center justify-center shadow-sm hover:shadow-md"
             title="Làm mới dữ liệu"
           >
@@ -397,17 +433,30 @@ const StockPage = () => {
             )}
           </button>
           {canManageStock && (
-            <button
-              onClick={() => setActiveTab('transactions')}
-              className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
-                activeTab === 'transactions'
-                  ? 'bg-white text-slate-800 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <FiClock size={14} className="stroke-[2.5]" />
-              Nhật ký giao dịch
-            </button>
+            <>
+              <button
+                onClick={() => setActiveTab('transactions')}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                  activeTab === 'transactions'
+                    ? 'bg-white text-slate-800 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FiClock size={14} className="stroke-[2.5]" />
+                Nhật ký giao dịch
+              </button>
+              <button
+                onClick={() => setActiveTab('receipts')}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                  activeTab === 'receipts'
+                    ? 'bg-white text-slate-800 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FiTruck size={14} className="stroke-[2.5]" />
+                Phiếu nhập & Công nợ
+              </button>
+            </>
           )}
         </div>
 
@@ -730,6 +779,11 @@ const StockPage = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* Tab 4: Receipts & Debts */}
+        {activeTab === 'receipts' && canManageStock && (
+          <ReceiptListPage isEmbedded={true} refreshTrigger={refreshTrigger} />
         )}
       </div>
 

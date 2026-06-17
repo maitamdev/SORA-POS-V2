@@ -197,7 +197,7 @@ export default function CreateReceiptPage() {
 
       await goodsReceiptAPI.create(payload);
       toast.success('Lưu phiếu nhập kho và cập nhật tồn kho thành công!');
-      navigate('/stock/receipts');
+      navigate('/stock?tab=receipts');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi tạo phiếu nhập kho');
     } finally {
@@ -210,7 +210,7 @@ export default function CreateReceiptPage() {
       {/* Header */}
       <header className="flex items-center gap-4 border-b border-slate-200 pb-5">
         <button
-          onClick={() => navigate('/stock/receipts')}
+          onClick={() => navigate('/stock?tab=receipts')}
           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition"
         >
           <FiArrowLeft size={18} />
@@ -486,7 +486,7 @@ export default function CreateReceiptPage() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/stock/receipts')}
+                onClick={() => navigate('/stock?tab=receipts')}
                 className="w-full h-10 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
               >
                 Hủy bỏ

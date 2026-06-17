@@ -14,7 +14,6 @@ const ProductsPage = lazy(() => import('./pages/products/ProductsPage'));
 const CategoriesPage = lazy(() => import('./pages/categories/CategoriesPage'));
 const OrdersPage = lazy(() => import('./pages/orders/OrdersPage'));
 const StockPage = lazy(() => import('./pages/stock/StockPage'));
-const ReceiptListPage = lazy(() => import('./pages/stock/ReceiptListPage'));
 const CreateReceiptPage = lazy(() => import('./pages/stock/CreateReceiptPage'));
 const CustomersPage = lazy(() => import('./pages/customers/CustomersPage'));
 const SuppliersPage = lazy(() => import('./pages/suppliers/SuppliersPage'));
@@ -107,14 +106,6 @@ function App() {
             />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/stock" element={<StockPage />} />
-            <Route
-              path="/stock/receipts"
-              element={
-                <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                  <ReceiptListPage />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/stock/receipts/new"
               element={
