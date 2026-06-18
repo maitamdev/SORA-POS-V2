@@ -97,15 +97,16 @@ const StockPage = () => {
   const tabParam = searchParams.get('tab');
   const canManageStock = user?.role === 'admin' || user?.role === 'manager';
 
-  const getInitialTab = (): 'inventory' | 'alerts' | 'transactions' | 'receipts' | 'expiry' => {
+  const getInitialTab = (): 'inventory' | 'alerts' | 'transactions' | 'receipts' | 'expiry' | 'audit' => {
     if (tabParam === 'receipts' && canManageStock) return 'receipts';
     if (tabParam === 'alerts') return 'alerts';
     if (tabParam === 'transactions' && canManageStock) return 'transactions';
     if (tabParam === 'expiry' && canManageStock) return 'expiry';
+    if (tabParam === 'audit' && canManageStock) return 'audit';
     return 'inventory';
   };
 
-  const [activeTab, setActiveTab] = useState<'inventory' | 'alerts' | 'transactions' | 'receipts' | 'expiry'>(getInitialTab());
+  const [activeTab, setActiveTab] = useState<'inventory' | 'alerts' | 'transactions' | 'receipts' | 'expiry' | 'audit'>(getInitialTab());
   const [inventory, setInventory] = useState<Product[]>([]);
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -548,6 +549,17 @@ const StockPage = () => {
               >
                 <FiTruck size={14} className="stroke-[2.5]" />
                 Phiếu nhập & Công nợ
+              </button>
+              <button
+                onClick={() => setActiveTab('audit')}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                  activeTab === 'audit'
+                    ? 'bg-white text-slate-800 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FiSliders size={14} className="stroke-[2.5]" />
+                Kiểm kê kho
               </button>
             </>
           )}
@@ -1169,6 +1181,92 @@ const StockPage = () => {
             </div>
           </div>
         )}
+
+        {/* Tab 6: Inventory Audit Workspace */}
+        {activeTab === 'audit' && canManageStock && (
+          <div className="bg-white p-6 border border-slate-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.01)] space-y-5">
+            <div>
+              <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
+                <FiSliders className="text-blue-500" />
+                Kiểm kê tồn kho thực tế
+              </h2>
+              <p className="text-xs text-slate-400 font-semibold mt-1">
+                Nhập số lượng hàng thực tế kiểm đếm được của từng mặt hàng. Hệ thống sẽ tự động đối chiếu chênh lệch và cập nhật vào các lô hàng tương ứng.
+              </p>
+            </div>
+
+            {/* Search & Category Filter Bar */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 border border-slate-200/80 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+              <div className="relative flex-1">
+                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Tìm sản phẩm cần kiểm kê..."
+                  className="w-full h-10 rounded-xl border border-slate-200 pl-10 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-slate-50/50 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <div className="relative">
+                  <FiSliders className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 pl-8 pr-8 text-xs sm:text-sm font-semibold outline-none bg-white focus:border-slate-400 cursor-pointer appearance-none shadow-xs"
+                  >
+                    <option value="all">Tất cả danh mục</option>
+                    {categoriesList.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                </div>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+                    <tr>
+                      <th className="px-5 py-4 w-1/3">Sản phẩm</th>
+                      <th className="px-5 py-4 text-right">Tồn hệ thống</th>
+                      <th className="px-5 py-4 text-center" style={{ width: '150px' }}>Tồn thực tế</th>
+                      <th className="px-5 py-4 text-right">Chênh lệch</th>
+                      <th className="px-5 py-4">Lý do điều chỉnh</th>
+                      <th className="px-5 py-4 text-center" style={{ width: '130px' }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
+                          <FiRefreshCw className="inline animate-spin mr-2 text-blue-500" size={18} />
+                          Đang tải dữ liệu kiểm kho...
+                        </td>
+                      </tr>
+                    ) : filteredInventory.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
+                          <FiBox className="inline mb-2 text-slate-300 block mx-auto" size={32} />
+                          Không tìm thấy sản phẩm nào phù hợp.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInventory.map((product) => (
+                        <AuditRow key={product.id} product={product} onSaveSuccess={loadData} />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 5. AI Assistant Drawer (Bảng trượt từ bên phải) */}
@@ -1491,6 +1589,121 @@ const StockPage = () => {
         </div>
       )}
     </div>
+  );
+};
+
+interface AuditRowProps {
+  product: Product;
+  onSaveSuccess: () => Promise<void>;
+}
+
+const AuditRow = ({ product, onSaveSuccess }: AuditRowProps) => {
+  const [actualStock, setActualStock] = useState<string>('');
+  const [note, setNote] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
+  const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+
+  const systemStock = product.stock_quantity;
+  const parsedActual = actualStock !== '' ? parseInt(actualStock) : systemStock;
+  const deviation = parsedActual - systemStock;
+
+  const handleSave = async () => {
+    if (actualStock === '') {
+      toast.error('Vui lòng nhập số lượng tồn thực tế trước khi lưu!');
+      return;
+    }
+    const val = parseInt(actualStock);
+    if (isNaN(val) || val < 0) {
+      toast.error('Số lượng tồn thực tế phải là một số lớn hơn hoặc bằng 0!');
+      return;
+    }
+    setSaving(true);
+    try {
+      await stockAPI.adjustStock({
+        product_id: product.id,
+        new_stock: val,
+        note: note.trim() || 'Kiểm kê kho hàng định kỳ',
+      });
+      toast.success(`Cân đối tồn kho thành công cho "${product.name}"!`);
+      setActualStock('');
+      setNote('');
+      await onSaveSuccess();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi lưu kiểm kho.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <tr className="hover:bg-slate-50/50 transition duration-150">
+      {/* Product Info */}
+      <td className="px-5 py-4">
+        <p className="font-extrabold text-slate-900 leading-snug">{product.name}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">
+            {product.sku}
+          </span>
+          {product.barcode && (
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-sm">
+              {product.barcode}
+            </span>
+          )}
+        </div>
+      </td>
+
+      {/* System Stock */}
+      <td className="px-5 py-4 text-right">
+        <span className="font-black text-slate-900">{formatNumber(systemStock)}</span>
+        <span className="text-xs text-slate-400 ml-1 font-bold">{product.unit || 'cái'}</span>
+      </td>
+
+      {/* Actual Stock Input */}
+      <td className="px-5 py-4 text-center">
+        <input
+          type="number"
+          min={0}
+          value={actualStock}
+          onChange={(e) => setActualStock(e.target.value)}
+          placeholder={String(systemStock)}
+          className="w-24 h-9 rounded-lg border border-slate-200 text-center font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
+        />
+      </td>
+
+      {/* Deviation */}
+      <td className="px-5 py-4 text-right">
+        {deviation === 0 ? (
+          <span className="text-xs font-bold text-slate-400">-</span>
+        ) : deviation > 0 ? (
+          <span className="text-sm font-black text-blue-600">+{formatNumber(deviation)}</span>
+        ) : (
+          <span className="text-sm font-black text-rose-600">{formatNumber(deviation)}</span>
+        )}
+      </td>
+
+      {/* Note */}
+      <td className="px-5 py-4">
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Ví dụ: Thất thoát, hư hỏng..."
+          className="w-full h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold outline-none focus:border-slate-400 shadow-inner bg-slate-50/50 focus:bg-white transition"
+        />
+      </td>
+
+      {/* Action Button */}
+      <td className="px-5 py-4 text-center">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow-xs transition"
+        >
+          {saving ? 'Đang lưu...' : 'Lưu kiểm kê'}
+        </button>
+      </td>
+    </tr>
   );
 };
 

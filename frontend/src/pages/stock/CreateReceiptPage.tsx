@@ -14,6 +14,7 @@ interface SelectedItem {
   quantity: number;
   unit_price: number;
   expiry_date?: string;
+  batch_number?: string;
 }
 
 const formatCurrency = (value: number) => {
@@ -136,6 +137,9 @@ export default function CreateReceiptPage() {
       nextItems[existingIndex].quantity += 1;
       setSelectedItems(nextItems);
     } else {
+      const today = new Date();
+      const formattedDate = today.toISOString().split('T')[0].replace(/-/g, '');
+      const randomSuffix = Math.floor(100 + Math.random() * 900);
       setSelectedItems([
         ...selectedItems,
         {
@@ -143,6 +147,7 @@ export default function CreateReceiptPage() {
           quantity: 1,
           unit_price: product.cost_price || 0, // Giá nhập cũ làm mặc định
           expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Mặc định 1 năm
+          batch_number: `BAT-${product.sku || 'NPP'}-${formattedDate}-${randomSuffix}`,
         },
       ]);
     }
@@ -176,6 +181,14 @@ export default function CreateReceiptPage() {
     );
   };
 
+  const handleUpdateBatch = (productId: string, batchNumber: string) => {
+    setSelectedItems(
+      selectedItems.map((item) =>
+        item.product.id === productId ? { ...item, batch_number: batchNumber } : item
+      )
+    );
+  };
+
   const handleRemoveItem = (productId: string) => {
     setSelectedItems(selectedItems.filter((item) => item.product.id !== productId));
   };
@@ -203,6 +216,7 @@ export default function CreateReceiptPage() {
           quantity: item.quantity,
           unit_price: item.unit_price,
           expiry_date: item.expiry_date,
+          batch_number: item.batch_number?.trim() || null,
         })),
       };
 
@@ -313,14 +327,15 @@ export default function CreateReceiptPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full min-w-[700px] text-left text-sm">
+                  <table className="w-full min-w-[800px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs font-black uppercase text-slate-500 border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3">Sản phẩm / SKU</th>
                         <th className="px-4 py-3 text-right">Giá nhập cũ</th>
-                        <th className="px-4 py-3 text-center" style={{ width: '100px' }}>Số lượng</th>
-                        <th className="px-4 py-3 text-center" style={{ width: '140px' }}>Giá nhập mới</th>
-                        <th className="px-4 py-3 text-center" style={{ width: '170px' }}>Hạn sử dụng</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '90px' }}>Số lượng</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '130px' }}>Giá nhập mới</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '130px' }}>Số lô nhập</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '160px' }}>Hạn sử dụng</th>
                         <th className="px-4 py-3 text-right">Thành tiền</th>
                         <th className="px-4 py-3 text-center">Xóa</th>
                       </tr>
@@ -348,7 +363,17 @@ export default function CreateReceiptPage() {
                               min={0}
                               value={item.unit_price}
                               onChange={(e) => handleUpdatePrice(item.product.id, parseFloat(e.target.value) || 0)}
-                              className="w-28 h-9 rounded-lg border border-slate-200 text-right pr-2 font-bold text-slate-700 outline-none focus:border-slate-400"
+                              className="w-24 h-9 rounded-lg border border-slate-200 text-right pr-2 font-bold text-slate-700 outline-none focus:border-slate-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Số lô"
+                              value={item.batch_number || ''}
+                              onChange={(e) => handleUpdateBatch(item.product.id, e.target.value)}
+                              className="w-28 h-9 rounded-lg border border-slate-200 px-2 font-bold text-slate-700 outline-none focus:border-slate-400 text-center"
                             />
                           </td>
                           <td className="px-4 py-3 text-center">
