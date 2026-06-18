@@ -37,26 +37,42 @@ app.use((_req, res, next) => {
 
 // CORS
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
+  cors((req, callback) => {
+    const origin = req.header('Origin');
+    const host = req.header('Host');
+    
+    let isAllowed = false;
+    
+    if (!origin) {
+      isAllowed = true;
+    } else {
+      let isSameOrigin = false;
+      try {
+        const originUrl = new URL(origin);
+        isSameOrigin = originUrl.host === host;
+      } catch {}
+
       if (
+        isSameOrigin ||
         env.corsOrigins.includes(origin) ||
         (env.nodeEnv === 'development' && isAllowedDevOrigin(origin)) ||
-        (env.nodeEnv !== 'production' && (origin.endsWith('.vercel.app') || origin.endsWith('.qzz.io')))
+        origin.endsWith('.vercel.app') ||
+        origin.endsWith('.qzz.io')
       ) {
-        callback(null, true);
-        return;
+        isAllowed = true;
       }
+    }
 
+    if (isAllowed) {
+      callback(null, {
+        origin: true,
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+      });
+    } else {
       callback(new Error(`CORS origin not allowed: ${origin}`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    }
   })
 );
 
