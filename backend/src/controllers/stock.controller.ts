@@ -40,4 +40,8 @@ export class StockController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(res, await StockService.resolveAlert(req.params.id, req.user.userId), 'Đã xử lý cảnh báo');
   });
+
+  static expiryAlerts = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await StockService.expiryAlerts(req.query), 'Lấy cảnh báo hạn sử dụng thành công');
+  });
 }

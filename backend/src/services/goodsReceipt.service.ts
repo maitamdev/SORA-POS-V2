@@ -9,6 +9,8 @@ export interface ReceiptItemInput {
   product_id: string;
   quantity: number;
   unit_price: number;
+  expiry_date?: string | null;
+  batch_number?: string | null;
 }
 
 export interface CreateReceiptInput {
@@ -131,6 +133,9 @@ export class GoodsReceiptService {
       const previousStock = Number(product.stock_quantity || 0);
       const newStock = previousStock + Number(item.quantity || 0);
 
+      const batchNumber = item.batch_number || `BAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const expiryDate = item.expiry_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
       // Insert detail
       const { error: detailErr } = await supabase
         .from('goods_receipt_details')
@@ -140,11 +145,28 @@ export class GoodsReceiptService {
           quantity: Number(item.quantity || 0),
           unit_price: Number(item.unit_price || 0),
           subtotal: Number(item.quantity || 0) * Number(item.unit_price || 0),
+          expiry_date: expiryDate,
+          batch_number: batchNumber,
         });
 
       if (detailErr) {
         console.error('[GoodsReceiptService.createFallbackJS] detailErr:', detailErr);
         throw new AppError(400, 'Lỗi lưu chi tiết hàng hóa nhập');
+      }
+
+      // Insert tracking batch into product_batches
+      const { error: batchErr } = await supabase
+        .from('product_batches')
+        .insert({
+          product_id: item.product_id,
+          batch_number: batchNumber,
+          expiry_date: expiryDate,
+          original_quantity: Number(item.quantity || 0),
+          quantity: Number(item.quantity || 0),
+        });
+
+      if (batchErr) {
+        console.error('[GoodsReceiptService.createFallbackJS] batchErr:', batchErr);
       }
 
       // Update product stock and cost price

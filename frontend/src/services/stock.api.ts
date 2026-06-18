@@ -1,6 +1,6 @@
 import api from './api';
 import { ApiResponse } from '../types/user.type';
-import { ListResponse, Product, StockAlert, StockTransaction } from '../types/domain.type';
+import { ListResponse, Product, StockAlert, StockTransaction, ProductBatch } from '../types/domain.type';
 import { buildQuery } from './catalog.api';
 
 export const stockAPI = {
@@ -8,6 +8,8 @@ export const stockAPI = {
     api.get<ApiResponse<ListResponse<Product>>>(`/stock/inventory${buildQuery(params)}`),
   alerts: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<StockAlert>>>(`/stock/alerts${buildQuery(params)}`),
+  expiryAlerts: (params?: Record<string, unknown>) =>
+    api.get<ApiResponse<ListResponse<ProductBatch>>>(`/stock/expiry-alerts${buildQuery(params)}`),
   transactions: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<StockTransaction>>>(`/stock/transactions${buildQuery(params)}`),
   importStock: (data: { product_id: string; quantity: number; note?: string }) =>

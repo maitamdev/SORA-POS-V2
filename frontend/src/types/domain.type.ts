@@ -264,6 +264,8 @@ export interface GoodsReceiptDetail {
   quantity: number;
   unit_price: number;
   subtotal: number;
+  expiry_date?: string | null;
+  batch_number?: string | null;
   created_at: string;
   products?: {
     id: string;
@@ -288,4 +290,16 @@ export interface GoodsReceipt {
   suppliers?: Pick<Supplier, 'id' | 'name'> | null;
   users?: { id: string; full_name: string; email?: string } | null;
   items?: GoodsReceiptDetail[];
+}
+
+export interface ProductBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  expiry_date: string;
+  original_quantity: number;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+  products?: Product;
 }

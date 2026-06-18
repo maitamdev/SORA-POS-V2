@@ -78,6 +78,32 @@ export class StockService {
       throw new AppError(400, updateError.message);
     }
 
+    // Sync to product_batches
+    const { data: latestBatch } = await supabase
+      .from('product_batches')
+      .select('*')
+      .eq('product_id', productId)
+      .order('expiry_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestBatch) {
+      await supabase
+        .from('product_batches')
+        .update({ quantity: Number(latestBatch.quantity) + quantity })
+        .eq('id', latestBatch.id);
+    } else {
+      await supabase
+        .from('product_batches')
+        .insert({
+          product_id: productId,
+          batch_number: 'BAT-IMPORTED',
+          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          original_quantity: quantity,
+          quantity: quantity,
+        });
+    }
+
     const { data: transaction, error: transactionError } = await supabase
       .from('stock_transactions')
       .insert({
@@ -117,6 +143,32 @@ export class StockService {
       .eq('id', productId);
     if (updateError) throw new AppError(400, updateError.message);
 
+    // Sync to product_batches
+    const { data: latestBatch } = await supabase
+      .from('product_batches')
+      .select('*')
+      .eq('product_id', productId)
+      .order('expiry_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestBatch) {
+      await supabase
+        .from('product_batches')
+        .update({ quantity: Math.max(0, Number(latestBatch.quantity) + delta) })
+        .eq('id', latestBatch.id);
+    } else {
+      await supabase
+        .from('product_batches')
+        .insert({
+          product_id: productId,
+          batch_number: 'BAT-ADJUSTED',
+          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          original_quantity: newStock,
+          quantity: newStock,
+        });
+    }
+
     const { data: transaction, error: transactionError } = await supabase
       .from('stock_transactions')
       .insert({
@@ -150,5 +202,61 @@ export class StockService {
       .single();
     if (error) throw new AppError(400, error.message);
     return data;
+  }
+
+  static async expiryAlerts(queryParams: Record<string, unknown>) {
+    const { page, limit, from, to } = parsePagination(queryParams);
+    const currentDate = new Date().toISOString().split('T')[0];
+
+    let query = supabase
+      .from('product_batches')
+      .select('*, products(id, name, sku, barcode, unit, category_id, categories(id, name))', { count: 'exact' })
+      .gt('quantity', 0)
+      .range(from, to);
+
+    if (queryParams.status === 'expired') {
+      query = query.lt('expiry_date', currentDate);
+    } else if (queryParams.status === 'near_expiry') {
+      const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      query = query.gte('expiry_date', currentDate).lte('expiry_date', warningDate);
+    } else if (queryParams.status === 'watchlist') {
+      const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const watchlistDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      query = query.gt('expiry_date', warningDate).lte('expiry_date', watchlistDate);
+    } else if (queryParams.status === 'safe') {
+      const watchlistDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      query = query.gt('expiry_date', watchlistDate);
+    }
+
+    query = query.order('expiry_date', { ascending: true });
+
+    const { data, error, count } = await query;
+    if (error) throw new AppError(500, error.message);
+
+    let filteredData = data || [];
+    if (typeof queryParams.search === 'string' && queryParams.search.trim()) {
+      const term = queryParams.search.trim().toLowerCase();
+      filteredData = filteredData.filter((item: any) => {
+        const matchesProduct = 
+          item.products?.name?.toLowerCase().includes(term) ||
+          item.products?.sku?.toLowerCase().includes(term) ||
+          item.products?.barcode?.includes(term);
+        const matchesBatch = item.batch_number?.toLowerCase().includes(term);
+        return matchesProduct || matchesBatch;
+      });
+    }
+
+    if (queryParams.category_id) {
+      filteredData = filteredData.filter((item: any) => item.products?.category_id === queryParams.category_id);
+    }
+
+    return {
+      items: filteredData,
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+      },
+    };
   }
 }

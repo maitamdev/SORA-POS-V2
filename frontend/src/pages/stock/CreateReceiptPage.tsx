@@ -13,6 +13,7 @@ interface SelectedItem {
   product: Product;
   quantity: number;
   unit_price: number;
+  expiry_date?: string;
 }
 
 const formatCurrency = (value: number) => {
@@ -141,6 +142,7 @@ export default function CreateReceiptPage() {
           product,
           quantity: 1,
           unit_price: product.cost_price || 0, // Giá nhập cũ làm mặc định
+          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Mặc định 1 năm
         },
       ]);
     }
@@ -162,6 +164,14 @@ export default function CreateReceiptPage() {
     setSelectedItems(
       selectedItems.map((item) =>
         item.product.id === productId ? { ...item, unit_price: price } : item
+      )
+    );
+  };
+
+  const handleUpdateExpiry = (productId: string, expiry: string) => {
+    setSelectedItems(
+      selectedItems.map((item) =>
+        item.product.id === productId ? { ...item, expiry_date: expiry } : item
       )
     );
   };
@@ -192,6 +202,7 @@ export default function CreateReceiptPage() {
           product_id: item.product.id,
           quantity: item.quantity,
           unit_price: item.unit_price,
+          expiry_date: item.expiry_date,
         })),
       };
 
@@ -307,8 +318,9 @@ export default function CreateReceiptPage() {
                       <tr>
                         <th className="px-4 py-3">Sản phẩm / SKU</th>
                         <th className="px-4 py-3 text-right">Giá nhập cũ</th>
-                        <th className="px-4 py-3 text-center" style={{ width: '120px' }}>Số lượng</th>
-                        <th className="px-4 py-3 text-center" style={{ width: '160px' }}>Giá nhập mới (VND)</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '100px' }}>Số lượng</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '140px' }}>Giá nhập mới</th>
+                        <th className="px-4 py-3 text-center" style={{ width: '170px' }}>Hạn sử dụng</th>
                         <th className="px-4 py-3 text-right">Thành tiền</th>
                         <th className="px-4 py-3 text-center">Xóa</th>
                       </tr>
@@ -327,7 +339,7 @@ export default function CreateReceiptPage() {
                               min={1}
                               value={item.quantity}
                               onChange={(e) => handleUpdateQty(item.product.id, parseInt(e.target.value) || 0)}
-                              className="w-20 h-9 rounded-lg border border-slate-200 text-center font-bold text-slate-700 outline-none focus:border-slate-400"
+                              className="w-16 h-9 rounded-lg border border-slate-200 text-center font-bold text-slate-700 outline-none focus:border-slate-400"
                             />
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -336,7 +348,16 @@ export default function CreateReceiptPage() {
                               min={0}
                               value={item.unit_price}
                               onChange={(e) => handleUpdatePrice(item.product.id, parseFloat(e.target.value) || 0)}
-                              className="w-32 h-9 rounded-lg border border-slate-200 text-right pr-2 font-bold text-slate-700 outline-none focus:border-slate-400"
+                              className="w-28 h-9 rounded-lg border border-slate-200 text-right pr-2 font-bold text-slate-700 outline-none focus:border-slate-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <input
+                              type="date"
+                              required
+                              value={item.expiry_date || ''}
+                              onChange={(e) => handleUpdateExpiry(item.product.id, e.target.value)}
+                              className="w-36 h-9 rounded-lg border border-slate-200 px-2 text-center font-bold text-slate-700 outline-none focus:border-slate-400 cursor-pointer"
                             />
                           </td>
                           <td className="px-4 py-3 text-right text-slate-900 font-black">

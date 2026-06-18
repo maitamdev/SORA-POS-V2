@@ -24,7 +24,7 @@ export const useBarcodeScanner = () => {
     }
     setPairingCode(code);
 
-    const channelName = 'scanner-events';
+    const channelName = `scanner-events:${code}`;
 
     // Callback nhận mã vạch quét
     const onScan = (barcode: string) => {
