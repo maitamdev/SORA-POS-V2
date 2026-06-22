@@ -30,4 +30,15 @@ export const aiAPI = {
     api.post<ApiResponse<{ categoryId: string | null }>>('/ai/suggest-category', { productName, categories }),
   suggestCategoryImage: (categoryName: string) =>
     api.post<ApiResponse<{ imageUrl: string | null }>>('/ai/suggest-category-image', { categoryName }),
+  suggestSupplier: (supplierName: string) =>
+    api.post<
+      ApiResponse<{
+        name?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        tax_code?: string;
+        website?: string;
+      }>
+    >('/ai/suggest-supplier', { supplierName }),
 };

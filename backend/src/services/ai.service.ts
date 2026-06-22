@@ -1221,4 +1221,55 @@ Chỉ trả về ID duy nhất.`;
     }
     return null;
   }
+
+  static async suggestSupplier(supplierName: string) {
+    if (!env.groqApiKey) return null;
+    const prompt = `Phân tích tên đối tác/nhà cung cấp: "${supplierName}".
+Hãy tìm kiếm hoặc tự động suy luận thông tin doanh nghiệp chính xác của thương hiệu này tại Việt Nam.
+Trả về một đối tượng JSON duy nhất với cấu trúc sau:
+{
+  "name": "Tên đầy đủ chính thức của công ty (Ví dụ: Công ty Cổ phần Sữa Việt Nam)",
+  "email": "Email liên hệ chính thức hoặc đoán theo domain (Ví dụ: contact@vinamilk.com.vn)",
+  "phone": "Số điện thoại liên hệ chính thức hoặc hotline",
+  "address": "Địa chỉ văn phòng trụ sở chính chính xác tại Việt Nam",
+  "tax_code": "Mã số thuế chính xác của công ty nếu biết, nếu không biết hãy bỏ trống",
+  "website": "Domain trang web chính thức (Ví dụ: vinamilk.com.vn)"
+}
+
+Chỉ trả về JSON thuần túy, không có giải thích, không markdown.`;
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: 'Bạn là trợ lý dữ liệu POS chuyên nghiệp. Bạn chỉ trả về duy nhất chuỗi JSON hợp lệ theo đúng cấu trúc yêu cầu, không thêm bất kỳ văn bản giải thích nào.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.1,
+          max_tokens: 400,
+        }),
+      });
+
+      if (!response.ok) return null;
+      const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const raw = data.choices?.[0]?.message?.content?.trim() || null;
+      if (!raw) return null;
+
+      const jsonStr = raw.match(/\{[\s\S]*\}/)?.[0];
+      if (!jsonStr) return null;
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('Lỗi khi gợi ý thông tin nhà cung cấp:', e);
+    }
+    return null;
+  }
 }

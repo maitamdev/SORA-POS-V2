@@ -44,4 +44,11 @@ router.post(
   AIController.suggestCategoryImage
 );
 
+router.post(
+  '/suggest-supplier',
+  rateLimitMiddleware({ keyPrefix: 'ai-supplier', windowMs: 60_000, max: 30 }),
+  roleMiddleware('admin', 'manager'),
+  AIController.suggestSupplier
+);
+
 export default router;

@@ -63,4 +63,11 @@ export class AIController {
     const imageUrl = await AIService.suggestCategoryImage(categoryName);
     successResponse(res, { imageUrl }, 'Gợi ý ảnh danh mục thành công');
   });
+
+  static suggestSupplier = asyncHandler(async (req: Request, res: Response) => {
+    const { supplierName } = req.body;
+    if (!supplierName) throw new AppError(400, 'Vui lòng cung cấp tên nhà cung cấp');
+    const result = await AIService.suggestSupplier(supplierName);
+    successResponse(res, result, 'Gợi ý thông tin nhà cung cấp thành công');
+  });
 }

@@ -90,7 +90,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-link.active {
-  @apply bg-blue-600 text-white font-bold shadow-md shadow-blue-600/10;
+  @apply bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/10;
 }
 
 /* ============================================ */
@@ -254,17 +254,7 @@ h1, h2, h3, h4, h5, h6 {
   background-position: center;
 }
 
-/* ============================================ */
-/* FORCED SQUARE STYLE (ALL BORDER-RADIUS TO 0) */
-/* ============================================ */
-.rounded,
-[class*="rounded-"]:not(.rounded-full):not([class*="rounded-full"]),
-input:not(.rounded-full):not([class*="rounded-full"]),
-select:not(.rounded-full):not([class*="rounded-full"]),
-textarea:not(.rounded-full):not([class*="rounded-full"]),
-button:not(.rounded-full):not([class*="rounded-full"]) {
-  border-radius: 0px !important;
-}
+
 
 /* ============================================ */
 /* Network Status Bar Animation                  */
