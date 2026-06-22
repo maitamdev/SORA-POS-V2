@@ -16,6 +16,8 @@ export default defineConfig({
       workbox: {
         // Precache tất cả asset tĩnh khi build production
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff,woff2}'],
+        // Cho phép precache file lớn (mặc định 2MB, nâng lên 5MB)
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Runtime caching cho Google Fonts CDN
         runtimeCaching: [
           {
