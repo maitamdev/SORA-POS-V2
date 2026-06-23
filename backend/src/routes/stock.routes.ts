@@ -10,7 +10,7 @@ const router = Router();
 router.use(authMiddleware);
 router.get('/inventory', StockController.inventory);
 router.get('/alerts', StockController.alerts);
-router.get('/expiry-alerts', roleMiddleware('admin', 'manager'), StockController.expiryAlerts);
+router.get('/expiry-alerts', roleMiddleware('admin', 'manager', 'cashier'), StockController.expiryAlerts);
 router.get('/transactions', roleMiddleware('admin', 'manager'), StockController.transactions);
 router.post('/import', roleMiddleware('admin', 'manager'), validateMiddleware(stockImportSchema), StockController.importStock);
 router.post('/adjust', roleMiddleware('admin', 'manager'), validateMiddleware(stockAdjustSchema), StockController.adjustStock);

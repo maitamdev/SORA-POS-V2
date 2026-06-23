@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
 import { AppError } from '../utils/AppError';
 import { appCache } from '../utils/cache';
+import { JwtPayload } from '../types/user.type';
 
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
@@ -44,7 +45,7 @@ const mapRpcError = (message?: string) => {
 };
 
 export class OrderService {
-  static async list(queryParams: Record<string, unknown>) {
+  static async list(queryParams: Record<string, unknown>, currentUser?: JwtPayload) {
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('orders')
@@ -52,10 +53,22 @@ export class OrderService {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (queryParams.status) query = query.eq('status', queryParams.status);
-    if (queryParams.payment_status) query = query.eq('payment_status', queryParams.payment_status);
-    if (queryParams.date_from) query = query.gte('created_at', `${queryParams.date_from}`);
-    if (queryParams.date_to) query = query.lte('created_at', `${queryParams.date_to}T23:59:59.999Z`);
+    if (currentUser?.role === 'cashier') {
+      // Cashiers can only view their own orders created today
+      query = query.eq('user_id', currentUser.userId);
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      query = query.gte('created_at', startOfToday.toISOString())
+                   .lte('created_at', endOfToday.toISOString());
+    } else {
+      // Admins/Managers can filter arbitrarily
+      if (queryParams.status) query = query.eq('status', queryParams.status);
+      if (queryParams.payment_status) query = query.eq('payment_status', queryParams.payment_status);
+      if (queryParams.date_from) query = query.gte('created_at', `${queryParams.date_from}`);
+      if (queryParams.date_to) query = query.lte('created_at', `${queryParams.date_to}T23:59:59.999Z`);
+      if (queryParams.employee_id) query = query.eq('user_id', queryParams.employee_id);
+    }
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);

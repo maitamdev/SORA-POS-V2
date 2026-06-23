@@ -23,6 +23,8 @@ export const shiftAPI = {
     api.post<ApiResponse<ShiftSession>>('/shifts/active/close', data),
   closeByManager: (id: string, data: { closing_cash: number; note?: string | null }) =>
     api.post<ApiResponse<ShiftSession>>(`/shifts/${id}/close`, data),
+  cancel: (id: string, reason?: string | null) =>
+    api.post<ApiResponse<ShiftSession>>(`/shifts/${id}/cancel`, { reason }),
   logCashDrawerTxActive: (data: { type: 'cash_in' | 'cash_out'; amount: number; reason?: string | null }) =>
     api.post<ApiResponse<CashDrawerTransaction>>('/shifts/active/cash-drawer', data),
   logCashDrawerTx: (id: string, data: { type: 'cash_in' | 'cash_out'; amount: number; reason?: string | null }) =>

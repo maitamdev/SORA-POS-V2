@@ -111,10 +111,11 @@ export class ShiftService {
   static async verifyCashierLogin(employeeId: string) {
     const { data, error } = await supabase
       .from('shift_sessions')
-      .select('id')
+      .select('id, shift_date')
       .eq('employee_id', employeeId)
-      .eq('shift_date', todayString())
       .in('status', ['opened', 'checked_in'])
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (error) throw new AppError(500, error.message);
@@ -169,6 +170,8 @@ export class ShiftService {
       .range(from, to);
 
     if (queryParams.date) query = query.eq('shift_date', String(queryParams.date));
+    if (queryParams.date_from) query = query.gte('shift_date', String(queryParams.date_from));
+    if (queryParams.date_to) query = query.lte('shift_date', String(queryParams.date_to));
     if (queryParams.employee_id) query = query.eq('employee_id', String(queryParams.employee_id));
     if (queryParams.status) query = query.eq('status', String(queryParams.status));
 
@@ -305,12 +308,16 @@ export class ShiftService {
       .single();
 
     if (getErr || !shift) throw new AppError(404, 'Không tìm thấy ca làm');
-    if (shift.status !== 'checked_in') throw new AppError(400, 'Ca này chưa được nhận hoặc đã chốt');
+    if (shift.status === 'closed' || shift.status === 'cancelled') {
+      throw new AppError(400, 'Ca này đã chốt hoặc đã hủy');
+    }
 
     const summary = await this.summary(shiftId);
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
     const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash, summary.cash_drawer_tx_total);
+
+    const notePrefix = shift.status === 'opened' ? 'Chốt bởi quản lý (chưa nhận ca)' : 'Được chốt bởi quản lý';
 
     const { data, error } = await supabase
       .from('shift_sessions')
@@ -319,7 +326,7 @@ export class ShiftService {
         closing_cash: closingCash,
         expected_cash: cashSummary.expected_cash,
         cash_difference: cashSummary.cash_difference,
-        note: shift.note || `Được chốt bởi quản lý`,
+        note: shift.note || notePrefix,
         manager_note: input.note || null,
         closed_at: new Date().toISOString(),
       })
@@ -330,6 +337,34 @@ export class ShiftService {
     if (error || !data) throw new AppError(400, error?.message || 'Không chốt được ca');
     const [enriched] = await this.attachUsers([mapShift(data)]);
     return { ...enriched, summary: await this.summary(data.id), orders: await this.orders(data.id) };
+  }
+
+  static async cancelByManager(shiftId: string, managerId: string, reason?: string | null) {
+    const { data: shift, error: getErr } = await supabase
+      .from('shift_sessions')
+      .select('*')
+      .eq('id', shiftId)
+      .single();
+
+    if (getErr || !shift) throw new AppError(404, 'Không tìm thấy ca làm');
+    if (shift.status !== 'opened') {
+      throw new AppError(400, 'Chỉ có thể hủy ca chưa được nhận (trạng thái opened)');
+    }
+
+    const { data, error } = await supabase
+      .from('shift_sessions')
+      .update({
+        status: 'cancelled',
+        manager_note: reason || 'Hủy bởi quản lý',
+        closed_at: new Date().toISOString(),
+      })
+      .eq('id', shiftId)
+      .select('*')
+      .single();
+
+    if (error || !data) throw new AppError(400, error?.message || 'Không hủy được ca');
+    const [enriched] = await this.attachUsers([mapShift(data)]);
+    return enriched;
   }
 
   static async requireActiveShiftForOrder(userId: string) {

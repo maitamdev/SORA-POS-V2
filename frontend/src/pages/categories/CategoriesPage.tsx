@@ -163,29 +163,7 @@ const CategoriesPage = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [generatingImage, setGeneratingImage] = useState(false);
 
-  useEffect(() => {
-    // Only auto-generate if name exists, image URL is empty
-    if (!name.trim() || imageUrl.trim()) return;
-
-    const timer = setTimeout(async () => {
-      setGeneratingImage(true);
-      try {
-        const res = await aiAPI.suggestCategoryImage(name.trim());
-        if (res.data.data.imageUrl) {
-          setImageUrl(res.data.data.imageUrl);
-          toast.success('AI đã tự động tìm ảnh minh họa!');
-        }
-      } catch (error) {
-        console.error('Lỗi khi auto-gọi AI gợi ý ảnh:', error);
-      } finally {
-        setGeneratingImage(false);
-      }
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [name]); // Only trigger when name changes
 
   // Products modal states
   const [selectedCategoryForProducts, setSelectedCategoryForProducts] = useState<Category | null>(null);
@@ -492,7 +470,21 @@ const CategoriesPage = () => {
               <input
                 type="text"
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (val.includes('google.com/imgres')) {
+                    try {
+                      const urlObj = new URL(val);
+                      const realImgUrl = urlObj.searchParams.get('imgurl');
+                      if (realImgUrl) {
+                        val = realImgUrl;
+                      }
+                    } catch (err) {
+                      console.error('Lỗi khi phân tích URL Google Images:', err);
+                    }
+                  }
+                  setImageUrl(val);
+                }}
                 placeholder="https://example.com/image.jpg"
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold outline-none focus:border-blue-500 transition"
               />
@@ -506,6 +498,7 @@ const CategoriesPage = () => {
               <div className="h-40 w-full rounded-xl border border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                 {imageUrl.trim() || name.trim() ? (
                   <img
+                    key={imageUrl}
                     src={imageUrl.trim() || getCategoryFallbackImage(name)}
                     alt="Preview"
                     className="h-full w-full object-cover"

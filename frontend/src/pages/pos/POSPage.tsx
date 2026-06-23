@@ -523,8 +523,34 @@ const POSPage = () => {
         return;
       }
 
-      const response = await catalogAPI.products.list({ search: query, is_active: true, limit: 5 });
-      const dbMatch = response.data.data.items.find((product) => product.barcode === query || product.sku === query);
+      // Bước 1: Exact-match barcode hoặc sku — đảm bảo luôn tìm đúng sản phẩm
+      let dbMatch: Product | undefined;
+
+      // Thử exact barcode trước
+      const exactBarcodeRes = await catalogAPI.products.list({
+        barcode: query,
+        is_active: true,
+        limit: 1,
+      });
+      dbMatch = exactBarcodeRes.data.data.items[0];
+
+      // Nếu không có, thử exact SKU
+      if (!dbMatch) {
+        const exactSkuRes = await catalogAPI.products.list({
+          sku_exact: query,
+          is_active: true,
+          limit: 1,
+        });
+        dbMatch = exactSkuRes.data.data.items[0];
+      }
+
+      // Bước 2: Fallback — fuzzy search (phòng trường hợp scanner gửi tên SP)
+      if (!dbMatch) {
+        const fuzzyRes = await catalogAPI.products.list({ search: query, is_active: true, limit: 10 });
+        dbMatch = fuzzyRes.data.data.items.find(
+          (p) => p.barcode === query || p.sku === query
+        );
+      }
 
       if (dbMatch) {
         addOrSelectProduct(dbMatch);
@@ -724,13 +750,7 @@ const POSPage = () => {
         return;
       }
 
-      if (event.key === 'F2') {
-        event.preventDefault();
-        focusBarcodeInput();
-      } else if (event.key === 'F3') {
-        event.preventDefault();
-        document.getElementById('product-search-input')?.focus();
-      } else if (event.key === 'F9') {
+      if (event.key === 'F9') {
         event.preventDefault();
         if (paymentMethod === 'transfer' && showTransferPayment) {
           checkout(true, true);
@@ -1122,7 +1142,7 @@ const POSPage = () => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              placeholder="Tìm sản phẩm (F3)"
+              placeholder="Tìm sản phẩm"
               className="w-60 lg:w-80 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 bg-slate-50 transition"
             />
             {search && (
@@ -1139,7 +1159,7 @@ const POSPage = () => {
               id="barcode-search-input"
               value={barcodeSearch}
               onChange={(e) => setBarcodeSearch(e.target.value)}
-              placeholder="Quét mã vạch (F2)"
+              placeholder="Quét mã vạch"
               className="w-48 lg:w-56 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 bg-slate-50 transition"
             />
             <button type="submit" className="hidden">Submit</button>
@@ -1233,9 +1253,7 @@ const POSPage = () => {
           {/* Subfilters Row (sort + view toggle) */}
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
             <p className="w-full sm:w-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {pagination.total > 0
-                ? `Hiển thị ${itemsStart}-${itemsEnd} / ${pagination.total} sản phẩm`
-                : 'Chưa có sản phẩm phù hợp'}
+              Danh sách sản phẩm
             </p>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">

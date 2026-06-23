@@ -43,6 +43,11 @@ export class ShiftController {
     successResponse(res, await ShiftService.closeByManager(req.params.id, req.body, req.user.userId), 'Quản lý chốt ca thành công');
   });
 
+  static cancel = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    successResponse(res, await ShiftService.cancelByManager(req.params.id, req.user.userId, req.body.reason), 'Hủy ca thành công');
+  });
+
   static logCashDrawerTxActive = asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(

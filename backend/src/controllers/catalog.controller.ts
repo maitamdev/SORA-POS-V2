@@ -35,7 +35,8 @@ export class SupplierController {
   });
 
   static delete = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await CatalogService.deleteSupplier(req.params.id), 'Xóa nhà cung cấp thành công');
+    const hard = req.query.hard === 'true';
+    successResponse(res, await CatalogService.deleteSupplier(req.params.id, hard), 'Xóa nhà cung cấp thành công');
   });
 }
 

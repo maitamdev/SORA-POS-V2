@@ -157,10 +157,32 @@ export class CatalogService {
     return updated;
   }
 
-  static async deleteSupplier(id: string) {
+  static async deleteSupplier(id: string, hard?: boolean) {
+    if (hard) {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id')
+        .eq('supplier_id', id)
+        .limit(1);
+
+      const { data: receipts } = await supabase
+        .from('goods_receipts')
+        .select('id')
+        .eq('supplier_id', id)
+        .limit(1);
+
+      if ((products && products.length > 0) || (receipts && receipts.length > 0)) {
+        throw new AppError(400, 'Không thể xóa hoàn toàn nhà cung cấp này vì đã có sản phẩm hoặc phiếu nhập liên kết. Vui lòng chọn Ngưng hợp tác.');
+      }
+
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
+      if (error) throw new AppError(400, error.message);
+      return { message: 'Đã xóa hoàn toàn nhà cung cấp khỏi hệ thống.' };
+    }
+
     const { error } = await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
     if (error) throw new AppError(400, error.message);
-    return null;
+    return { message: 'Đã ngưng hợp tác với nhà cung cấp thành công.' };
   }
 
   static async listCustomers(queryParams: Query) {
@@ -219,6 +241,9 @@ export class CatalogService {
       .range(from, to);
 
     query = applySearch(query, queryParams.search, ['name', 'sku', 'barcode']);
+    // Exact-match cho scanner — tìm chính xác barcode/SKU, không phụ thuộc vào fuzzy search
+    if (queryParams.barcode) query = query.eq('barcode', String(queryParams.barcode));
+    if (queryParams.sku_exact) query = query.eq('sku', String(queryParams.sku_exact));
     if (queryParams.category_id) query = query.eq('category_id', queryParams.category_id);
     if (queryParams.supplier_id) query = query.eq('supplier_id', queryParams.supplier_id);
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
@@ -241,9 +266,17 @@ export class CatalogService {
   }
 
   static async createProduct(data: Entity) {
+    const cleanedData = emptyToNull(data);
+    const sku = cleanedData.sku as string | null;
+    const barcode = cleanedData.barcode as string | null;
+
+    // Dọn dẹp các sản phẩm đã xóa (inactive) còn trùng SKU hoặc barcode
+    // Xử lý trường hợp soft-delete không đổi SKU được (RLS block silent)
+    await this.cleanupInactiveConflicts(sku, barcode);
+
     const { data: created, error } = await supabase
       .from('products')
-      .insert(emptyToNull(data))
+      .insert(cleanedData)
       .select('*')
       .single();
     if (error) this.handleDBError(error);
@@ -251,6 +284,51 @@ export class CatalogService {
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return created;
   }
+
+  /**
+   * Trước khi tạo sản phẩm mới, tìm và giải phóng bất kỳ SP nào
+   * (active hoặc inactive) đang chiếm SKU hoặc barcode trùng.
+   * Xử lý trường hợp delete bị kẹt (FK block, RLS...) dẫn đến
+   * product vẫn còn trong DB với SKU/barcode cũ.
+   */
+  private static async cleanupInactiveConflicts(sku: string | null, barcode: string | null) {
+    if (!sku && !barcode) return;
+
+    // Tìm TẤT CẢ SP (kể cả active) trùng SKU hoặc barcode
+    // Dùng 2 query riêng để tránh vấn đề syntax với or() khi giá trị có ký tự đặc biệt
+    const conflictIds = new Set<string>();
+
+    if (sku) {
+      const { data: bySku } = await supabase
+        .from('products')
+        .select('id, is_active')
+        .eq('sku', sku);
+      bySku?.forEach((p: any) => conflictIds.add(p.id));
+    }
+
+    if (barcode) {
+      const { data: byBarcode } = await supabase
+        .from('products')
+        .select('id, is_active')
+        .eq('barcode', barcode);
+      byBarcode?.forEach((p: any) => conflictIds.add(p.id));
+    }
+
+    if (conflictIds.size === 0) return;
+
+    const ts = Date.now();
+    let i = 0;
+    for (const conflictId of conflictIds) {
+      // Đổi SKU + null barcode để giải phóng (soft-free)
+      // Không hard-delete vì có thể bị FK từ nhiều bảng khác
+      await supabase.from('products').update({
+        is_active: false,
+        sku: `${sku ?? 'DEL'}_FREED_${ts}_${i++}`,
+        barcode: null,
+      }).eq('id', conflictId);
+    }
+  }
+
 
   static async createProductsBulk(products: Entity[]) {
     if (!Array.isArray(products) || products.length === 0) {
@@ -345,7 +423,9 @@ export class CatalogService {
   }
 
   static async deleteProduct(id: string) {
-    // Lấy SKU hiện tại để tạo SKU mới không trùng
+    // Luôn soft-delete bằng UPDATE để tránh vi phạm FK constraint
+    // từ stock_alerts, stock_transactions, product_batches, goods_receipt_items...
+    // UPDATE không bao giờ bị FK constraint (chỉ thay đổi is_active, sku, barcode)
     const { data: product } = await supabase
       .from('products')
       .select('sku')
@@ -356,7 +436,7 @@ export class CatalogService {
       ? `${product.sku}_DEL_${Date.now()}`
       : `DELETED_${Date.now()}`;
 
-    // Soft-delete: ẩn sản phẩm + giải phóng barcode/sku để có thể tạo lại
+    // Giải phóng SKU và barcode để có thể thêm lại sản phẩm tương tự
     const { error } = await supabase
       .from('products')
       .update({
@@ -366,6 +446,7 @@ export class CatalogService {
       })
       .eq('id', id);
     if (error) throw new AppError(400, error.message);
+
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     return null;
   }
@@ -379,10 +460,12 @@ export class CatalogService {
 
   private static handleDBError(error: any): never {
     const msg = error.message || '';
-    if (msg.includes('products_sku_key')) {
+    // SKU unique constraint (check both possible names)
+    if (msg.includes('products_sku_key') || msg.includes('idx_products_sku_unique')) {
       throw new AppError(400, 'Mã SKU này đã tồn tại trong hệ thống. Vui lòng nhập mã khác.');
     }
-    if (msg.includes('products_barcode_key')) {
+    // Barcode unique constraint (check both possible names)
+    if (msg.includes('products_barcode_key') || msg.includes('idx_products_barcode_unique')) {
       throw new AppError(400, 'Mã vạch (Barcode) này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
     }
     if (msg.includes('categories_name_key')) {

@@ -210,7 +210,7 @@ export class StockService {
 
     let query = supabase
       .from('product_batches')
-      .select('*, products(id, name, sku, barcode, unit, category_id, categories(id, name))', { count: 'exact' })
+      .select('*, products(id, name, sku, barcode, unit, category_id, categories(id, name), suppliers(id, name))', { count: 'exact' })
       .gt('quantity', 0)
       .range(from, to);
 

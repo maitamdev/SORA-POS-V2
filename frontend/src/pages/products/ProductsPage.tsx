@@ -510,33 +510,7 @@ const ProductsPage = () => {
     }
   };
 
-  const suggestedSellPriceInfo = useMemo(() => {
-    if (costPrice <= 0) return null;
-    
-    const catName = categoryName.toLowerCase();
-    
-    let margin = 0.25; // default 25% profit margin
-    if (catName.includes('nước') || catName.includes('giải khát') || catName.includes('đồ uống')) {
-      margin = 0.35; // 35% margin for beverages
-    } else if (catName.includes('mì') || catName.includes('ăn liền') || catName.includes('thực phẩm')) {
-      margin = 0.15; // 15% margin for noodles
-    } else if (catName.includes('bánh') || catName.includes('kẹo') || catName.includes('snack')) {
-      margin = 0.30; // 30% margin for snacks
-    } else if (catName.includes('sữa')) {
-      margin = 0.18; // 18% margin for milk
-    } else if (catName.includes('gia dụng') || catName.includes('đồ dùng')) {
-      margin = 0.40; // 40% margin for household
-    }
-    
-    const suggested = Math.round((costPrice / (1 - margin)) / 500) * 500;
-    const actualMargin = ((suggested - costPrice) / suggested) * 100;
-    
-    return {
-      price: suggested,
-      margin: Math.round(actualMargin),
-      marginPercentStr: `${Math.round(actualMargin)}%`
-    };
-  }, [costPrice, categoryName]);
+
 
   const handleCreateClick = () => {
     if (!canManageProducts) {
@@ -1610,19 +1584,7 @@ const ProductsPage = () => {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label className="block font-black text-slate-500 uppercase">Giá bán *</label>
-                    {suggestedSellPriceInfo && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSellPrice(suggestedSellPriceInfo.price);
-                          toast.success(`Đã áp dụng giá gợi ý AI: ${money(suggestedSellPriceInfo.price)}`);
-                        }}
-                        className="text-[9px] font-black text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 transition"
-                        title="Click để áp dụng giá bán đề xuất của AI"
-                      >
-                        AI Gợi ý: {money(suggestedSellPriceInfo.price)} (+{suggestedSellPriceInfo.marginPercentStr})
-                      </button>
-                    )}
+
                   </div>
                   <input
                     type="number"
@@ -1636,7 +1598,7 @@ const ProductsPage = () => {
 
                 {/* Stock Quantity */}
                 <div className="space-y-1">
-                  <label className="block font-black text-slate-500 uppercase">Số lượng tồn kho</label>
+                  <label className="block font-black text-slate-500 uppercase">Số lượng</label>
                   <input
                     type="number"
                     value={stockQuantity}
@@ -1665,7 +1627,21 @@ const ProductsPage = () => {
                 <input
                   type="text"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val.includes('google.com/imgres')) {
+                      try {
+                        const urlObj = new URL(val);
+                        const realImgUrl = urlObj.searchParams.get('imgurl');
+                        if (realImgUrl) {
+                          val = realImgUrl;
+                        }
+                      } catch (err) {
+                        console.error('Lỗi khi phân tích URL Google Images:', err);
+                      }
+                    }
+                    setImageUrl(val);
+                  }}
                   placeholder="https://example.com/image.jpg"
                   className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                 />

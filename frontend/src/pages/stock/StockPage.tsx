@@ -101,7 +101,7 @@ const StockPage = () => {
     if (tabParam === 'receipts' && canManageStock) return 'receipts';
     if (tabParam === 'alerts') return 'alerts';
     if (tabParam === 'transactions' && canManageStock) return 'transactions';
-    if (tabParam === 'expiry' && canManageStock) return 'expiry';
+    if (tabParam === 'expiry') return 'expiry';
     if (tabParam === 'audit' && canManageStock) return 'audit';
     return 'inventory';
   };
@@ -144,22 +144,19 @@ const StockPage = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [inventoryRes, alertsRes] = await Promise.all([
+      const [inventoryRes, alertsRes, expiryRes] = await Promise.all([
         stockAPI.inventory({ limit: 100 }),
         stockAPI.alerts({ limit: 50 }),
+        stockAPI.expiryAlerts({ limit: 100 }),
       ]);
       setInventory(inventoryRes.data.data.items);
       setAlerts(alertsRes.data.data.items);
+      setExpiryAlerts(expiryRes.data.data.items);
       if (canManageStock) {
-        const [transactionsRes, expiryRes] = await Promise.all([
-          stockAPI.transactions({ limit: 100 }),
-          stockAPI.expiryAlerts({ limit: 100 }),
-        ]);
+        const transactionsRes = await stockAPI.transactions({ limit: 100 });
         setTransactions(transactionsRes.data.data.items);
-        setExpiryAlerts(expiryRes.data.data.items);
       } else {
         setTransactions([]);
-        setExpiryAlerts([]);
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -502,32 +499,32 @@ const StockPage = () => {
               </span>
             )}
           </button>
-          {canManageStock && (
-            <>
-              <button
-                onClick={() => setActiveTab('expiry')}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
-                  activeTab === 'expiry'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <FiCalendar size={14} className="stroke-[2.5]" />
-                Cảnh báo HSD
+          <button
+            onClick={() => setActiveTab('expiry')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+              activeTab === 'expiry'
+                ? 'bg-white text-slate-800 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FiCalendar size={14} className="stroke-[2.5]" />
+            Cảnh báo HSD
+            {expiryAlerts.filter(item => {
+              const diff = new Date(item.expiry_date).getTime() - new Date().getTime();
+              const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
+              return days <= 30;
+            }).length > 0 && (
+              <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white leading-none">
                 {expiryAlerts.filter(item => {
                   const diff = new Date(item.expiry_date).getTime() - new Date().getTime();
                   const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
                   return days <= 30;
-                }).length > 0 && (
-                  <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white leading-none">
-                    {expiryAlerts.filter(item => {
-                      const diff = new Date(item.expiry_date).getTime() - new Date().getTime();
-                      const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
-                      return days <= 30;
-                    }).length}
-                  </span>
-                )}
-              </button>
+                }).length}
+              </span>
+            )}
+          </button>
+          {canManageStock && (
+            <>
               <button
                 onClick={() => setActiveTab('transactions')}
                 className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
@@ -892,118 +889,118 @@ const StockPage = () => {
         )}
 
         {/* Tab 5: Expiration Warnings Dashboard */}
-        {activeTab === 'expiry' && canManageStock && (
-          <div className="space-y-6">
+        {activeTab === 'expiry' && (
+          <div className="space-y-5">
             {/* Expiry Overview Stats Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {/* Expired Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'expired' ? 'all' : 'expired')}
-                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all duration-300 text-left ${
+                className={`group flex items-center gap-4.5 p-4 rounded-xl border transition-all duration-200 text-left ${
                   expiryFilter === 'expired'
-                    ? 'border-rose-500 bg-rose-50/50 shadow-md ring-2 ring-rose-500/10'
-                    : 'border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-rose-200 hover:-translate-y-0.5'
+                    ? 'border-rose-500 bg-rose-50/50 shadow-sm ring-2 ring-rose-500/5'
+                    : 'border-slate-200 bg-white shadow-xs hover:shadow-sm hover:border-rose-200 hover:-translate-y-0.5'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner ${
+                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner ${
                   expiryFilter === 'expired'
                     ? 'bg-rose-500 text-white'
-                    : 'bg-rose-50/60 text-rose-600 border border-rose-100/50'
+                    : 'bg-rose-50 text-rose-600 border border-rose-100/50'
                 }`}>
-                  <FiAlertCircle size={22} className="stroke-[2.5]" />
+                  <FiAlertCircle size={20} className="stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Đã hết hạn</p>
-                  <h4 className="text-2xl font-black text-rose-600 mt-0.5 tracking-tight">{expiryStats.expired} Lô</h4>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Đã hết hạn</p>
+                  <h4 className="text-xl font-extrabold text-rose-600 mt-0.5 tracking-tight">{expiryStats.expired} Lô</h4>
                 </div>
               </button>
 
               {/* Near Expiry Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'near_expiry' ? 'all' : 'near_expiry')}
-                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all duration-300 text-left ${
+                className={`group flex items-center gap-4.5 p-4 rounded-xl border transition-all duration-200 text-left ${
                   expiryFilter === 'near_expiry'
-                    ? 'border-orange-500 bg-orange-50/50 shadow-md ring-2 ring-orange-500/10'
-                    : 'border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-orange-200 hover:-translate-y-0.5'
+                    ? 'border-orange-500 bg-orange-50/50 shadow-sm ring-2 ring-orange-500/5'
+                    : 'border-slate-200 bg-white shadow-xs hover:shadow-sm hover:border-orange-200 hover:-translate-y-0.5'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner ${
+                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner ${
                   expiryFilter === 'near_expiry'
                     ? 'bg-orange-500 text-white'
-                    : 'bg-orange-50/60 text-orange-600 border border-orange-100/50'
+                    : 'bg-orange-50 text-orange-600 border border-orange-100/50'
                 }`}>
-                  <FiCalendar size={22} className="stroke-[2.5]" />
+                  <FiCalendar size={20} className="stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Sắp hết hạn (≤ 30 ngày)</p>
-                  <h4 className="text-2xl font-black text-orange-600 mt-0.5 tracking-tight">{expiryStats.nearExpiry} Lô</h4>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Sắp hết hạn (≤ 30 ngày)</p>
+                  <h4 className="text-xl font-extrabold text-orange-600 mt-0.5 tracking-tight">{expiryStats.nearExpiry} Lô</h4>
                 </div>
               </button>
 
               {/* Watchlist Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'watchlist' ? 'all' : 'watchlist')}
-                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all duration-300 text-left ${
+                className={`group flex items-center gap-4.5 p-4 rounded-xl border transition-all duration-200 text-left ${
                   expiryFilter === 'watchlist'
-                    ? 'border-amber-500 bg-amber-50/50 shadow-md ring-2 ring-amber-500/10'
-                    : 'border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-amber-200 hover:-translate-y-0.5'
+                    ? 'border-amber-500 bg-amber-50/50 shadow-sm ring-2 ring-amber-500/5'
+                    : 'border-slate-200 bg-white shadow-xs hover:shadow-sm hover:border-amber-200 hover:-translate-y-0.5'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner ${
+                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner ${
                   expiryFilter === 'watchlist'
                     ? 'bg-amber-500 text-white'
-                    : 'bg-amber-50/60 text-amber-600 border border-amber-100/50'
+                    : 'bg-amber-50 text-amber-600 border border-amber-100/50'
                 }`}>
-                  <FiClock size={22} className="stroke-[2.5]" />
+                  <FiClock size={20} className="stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Theo dõi (31-90 ngày)</p>
-                  <h4 className="text-2xl font-black text-amber-600 mt-0.5 tracking-tight">{expiryStats.watchlist} Lô</h4>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Theo dõi (31-90 ngày)</p>
+                  <h4 className="text-xl font-extrabold text-amber-600 mt-0.5 tracking-tight">{expiryStats.watchlist} Lô</h4>
                 </div>
               </button>
 
               {/* Safe Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'safe' ? 'all' : 'safe')}
-                className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all duration-300 text-left ${
+                className={`group flex items-center gap-4.5 p-4 rounded-xl border transition-all duration-200 text-left ${
                   expiryFilter === 'safe'
-                    ? 'border-emerald-500 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/10'
-                    : 'border-slate-200/80 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-emerald-200 hover:-translate-y-0.5'
+                    ? 'border-emerald-500 bg-emerald-50/50 shadow-sm ring-2 ring-emerald-500/5'
+                    : 'border-slate-200 bg-white shadow-xs hover:shadow-sm hover:border-emerald-200 hover:-translate-y-0.5'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner ${
+                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner ${
                   expiryFilter === 'safe'
                     ? 'bg-emerald-500 text-white'
-                    : 'bg-emerald-50/60 text-emerald-600 border border-emerald-100/50'
+                    : 'bg-emerald-50 text-emerald-600 border border-emerald-100/50'
                 }`}>
-                  <FiShield size={22} className="stroke-[2.5]" />
+                  <FiShield size={20} className="stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">An toàn (&gt; 90 ngày)</p>
-                  <h4 className="text-2xl font-black text-emerald-600 mt-0.5 tracking-tight">{expiryStats.safe} Lô</h4>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">An toàn (&gt; 90 ngày)</p>
+                  <h4 className="text-xl font-extrabold text-emerald-600 mt-0.5 tracking-tight">{expiryStats.safe} Lô</h4>
                 </div>
               </button>
             </div>
 
             {/* Search and Category Filter Bar */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 border border-slate-200/80 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-3 border border-slate-200 rounded-xl shadow-xs">
               <div className="relative flex-1">
-                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Tìm lô theo tên SP, SKU, barcode hoặc số lô..."
-                  className="w-full h-10 rounded-xl border border-slate-200 pl-10 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-slate-50/50 focus:bg-white transition-all shadow-inner"
+                  className="w-full h-9 rounded-lg border border-slate-200 pl-9 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-slate-50/50 focus:bg-white transition-all shadow-inner"
                 />
               </div>
               <div className="flex gap-2 shrink-0">
                 <div className="relative">
-                  <FiSliders className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <FiSliders className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 pl-8 pr-8 text-xs sm:text-sm font-semibold outline-none bg-white focus:border-slate-400 cursor-pointer appearance-none shadow-xs"
+                    className="h-9 rounded-lg border border-slate-200 pl-7 pr-8 text-xs sm:text-sm font-semibold outline-none bg-white focus:border-slate-400 cursor-pointer appearance-none shadow-xs"
                   >
                     <option value="all">Tất cả danh mục</option>
                     {categoriesList.map((cat) => (
@@ -1012,7 +1009,7 @@ const StockPage = () => {
                       </option>
                     ))}
                   </select>
-                  <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                  <FiChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
                 </div>
 
                 {(expiryFilter !== 'all' || searchTerm || selectedCategory !== 'all') && (
@@ -1022,41 +1019,42 @@ const StockPage = () => {
                       setSearchTerm('');
                       setSelectedCategory('all');
                     }}
-                    className="h-10 px-4 rounded-xl border border-slate-200 hover:border-slate-350 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-600 transition shadow-xs flex items-center gap-1.5"
+                    className="h-9 px-3 rounded-lg border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-600 transition shadow-xs flex items-center gap-1.5"
                   >
-                    <FiX size={14} />
+                    <FiX size={13} />
                     Xóa bộ lọc
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Batches Table Container */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
-              <div className="overflow-x-auto">
+            {/* Batches Table / Cards Wrapper */}
+            <div className="bg-transparent md:bg-white md:border md:border-slate-200 md:rounded-xl md:shadow-xs overflow-hidden">
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b border-slate-200 tracking-wider">
                     <tr>
-                      <th className="px-5 py-4 w-1/3">Sản phẩm</th>
-                      <th className="px-5 py-4">Số lô</th>
-                      <th className="px-5 py-4">Hạn sử dụng (HSD)</th>
-                      <th className="px-5 py-4 text-center">Trạng thái HSD</th>
-                      <th className="px-5 py-4 w-40">Mức độ an toàn</th>
-                      <th className="px-5 py-4 text-right">Tồn kho lô</th>
+                      <th className="px-5 py-3.5 w-1/3">Sản phẩm</th>
+                      <th className="px-5 py-3.5">Số lô</th>
+                      <th className="px-5 py-3.5">Hạn sử dụng (HSD)</th>
+                      <th className="px-5 py-3.5 text-center">Trạng thái HSD</th>
+                      <th className="px-5 py-3.5 w-40">Mức độ an toàn</th>
+                      <th className="px-5 py-3.5 text-right">Tồn kho lô</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
+                        <td colSpan={6} className="py-16 text-center text-slate-400 font-bold">
                           <FiRefreshCw className="inline animate-spin mr-2 text-blue-500" size={18} />
                           Đang tải dữ liệu hạn sử dụng...
                         </td>
                       </tr>
                     ) : filteredExpiryAlerts.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
-                          <FiBox className="inline mb-2 text-slate-300 block mx-auto" size={32} />
+                        <td colSpan={6} className="py-16 text-center text-slate-400 font-bold">
+                          <FiBox className="inline mb-2 text-slate-350 block mx-auto" size={28} />
                           Không tìm thấy lô sản phẩm nào phù hợp.
                         </td>
                       </tr>
@@ -1077,7 +1075,7 @@ const StockPage = () => {
                           progressPercent = 100;
                         } else if (remainingDays === 0) {
                           statusLabelText = 'Hết hạn hôm nay';
-                          statusBadgeClass = 'bg-orange-100 text-orange-800 border-orange-300 animate-pulse';
+                          statusBadgeClass = 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse';
                           progressColor = 'bg-orange-500';
                           progressPercent = 5;
                         } else if (remainingDays <= 30) {
@@ -1098,22 +1096,27 @@ const StockPage = () => {
                         }
 
                         return (
-                          <tr key={batch.id} className="hover:bg-slate-50/50 transition duration-150">
+                          <tr key={batch.id} className="hover:bg-slate-50/30 transition duration-150">
                             {/* Product Info */}
-                            <td className="px-5 py-4">
+                            <td className="px-5 py-3.5">
                               <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded-xl border flex items-center justify-center text-xs font-black shrink-0 shadow-inner ${getAvatarColor(batch.products?.name || '')}`}>
+                                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-black shrink-0 shadow-inner ${getAvatarColor(batch.products?.name || '')}`}>
                                   {getInitials(batch.products?.name || '')}
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-extrabold text-slate-900 leading-snug truncate">{batch.products?.name}</p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                                       {batch.products?.sku}
                                     </span>
                                     {batch.products?.barcode && (
-                                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-sm">
+                                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
                                         {batch.products.barcode}
+                                      </span>
+                                    )}
+                                    {batch.products?.suppliers?.name && (
+                                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                        NCC: {batch.products.suppliers.name}
                                       </span>
                                     )}
                                   </div>
@@ -1122,14 +1125,14 @@ const StockPage = () => {
                             </td>
 
                             {/* Batch Number */}
-                            <td className="px-5 py-4">
-                              <span className="font-bold text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 border border-slate-200">
+                            <td className="px-5 py-3.5">
+                              <span className="font-bold text-xs text-slate-650 bg-slate-100 rounded px-2 py-0.5 border border-slate-200/80">
                                 {batch.batch_number}
                               </span>
                             </td>
 
                             {/* Expiry Date */}
-                            <td className="px-5 py-4">
+                            <td className="px-5 py-3.5">
                               <div className="flex items-center gap-1.5 font-bold text-sm text-slate-800">
                                 <FiCalendar size={14} className="text-slate-400" />
                                 {new Date(batch.expiry_date).toLocaleDateString('vi-VN', {
@@ -1141,24 +1144,24 @@ const StockPage = () => {
                             </td>
 
                             {/* Remaining Days status badge */}
-                            <td className="px-5 py-4 text-center">
-                              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-extrabold shadow-2xs ${statusBadgeClass}`}>
+                            <td className="px-5 py-3.5 text-center">
+                              <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-extrabold shadow-2xs whitespace-nowrap ${statusBadgeClass}`}>
                                 {statusLabelText}
                               </span>
                             </td>
 
                             {/* Safety level progress bar */}
-                            <td className="px-5 py-4">
-                              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                            <td className="px-5 py-3.5">
+                              <div className="w-full bg-slate-100 rounded h-1.5 overflow-hidden shadow-inner">
                                 <div
-                                  className={`h-full transition-all duration-500 rounded-full ${progressColor}`}
+                                  className={`h-full transition-all duration-500 rounded ${progressColor}`}
                                   style={{ width: `${progressPercent}%` }}
                                 />
                               </div>
                             </td>
 
                             {/* Stock Quantity */}
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-5 py-3.5 text-right">
                               <div className="text-right">
                                 <span className="font-black text-slate-900 text-sm">
                                   {formatNumber(batch.quantity)}
@@ -1177,6 +1180,141 @@ const StockPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile View */}
+              <div className="block md:hidden space-y-3.5">
+                {loading ? (
+                  <div className="bg-white p-8 border border-slate-200 rounded-xl text-center text-slate-400 font-bold shadow-xs">
+                    <FiRefreshCw className="inline animate-spin mr-2 text-blue-500" size={18} />
+                    Đang tải dữ liệu hạn sử dụng...
+                  </div>
+                ) : filteredExpiryAlerts.length === 0 ? (
+                  <div className="bg-white p-8 border border-slate-200 rounded-xl text-center text-slate-400 font-bold shadow-xs">
+                    <FiBox className="inline mb-2 text-slate-350 block mx-auto" size={28} />
+                    Không tìm thấy lô sản phẩm nào phù hợp.
+                  </div>
+                ) : (
+                  filteredExpiryAlerts.map((batch) => {
+                    const diffTime = new Date(batch.expiry_date).getTime() - new Date().setHours(0, 0, 0, 0);
+                    const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    let statusLabelText = '';
+                    let statusBadgeClass = '';
+                    let progressColor = 'bg-emerald-500';
+                    let progressPercent = 100;
+
+                    if (remainingDays < 0) {
+                      statusLabelText = `Hết hạn ${Math.abs(remainingDays)} ngày`;
+                      statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                      progressColor = 'bg-rose-500';
+                      progressPercent = 100;
+                    } else if (remainingDays === 0) {
+                      statusLabelText = 'Hết hạn hôm nay';
+                      statusBadgeClass = 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse';
+                      progressColor = 'bg-orange-500';
+                      progressPercent = 5;
+                    } else if (remainingDays <= 30) {
+                      statusLabelText = `Còn ${remainingDays} ngày`;
+                      statusBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
+                      progressColor = 'bg-orange-500';
+                      progressPercent = Math.max(5, (remainingDays / 30) * 100);
+                    } else if (remainingDays <= 90) {
+                      statusLabelText = `Còn ${remainingDays} ngày`;
+                      statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                      progressColor = 'bg-amber-500';
+                      progressPercent = Math.max(5, ((remainingDays - 30) / 60) * 100);
+                    } else {
+                      statusLabelText = `Còn ${remainingDays} ngày`;
+                      statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      progressColor = 'bg-emerald-500';
+                      progressPercent = 100;
+                    }
+
+                    return (
+                      <div key={batch.id} className="bg-white p-4 border border-slate-200 rounded-xl shadow-xs space-y-3">
+                        {/* Header: Avatar, Name, Unit */}
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-black shrink-0 shadow-inner ${getAvatarColor(batch.products?.name || '')}`}>
+                            {getInitials(batch.products?.name || '')}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-sm leading-snug truncate">{batch.products?.name}</h4>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                {batch.products?.sku}
+                              </span>
+                              {batch.products?.barcode && (
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                  {batch.products.barcode}
+                                </span>
+                              )}
+                              {batch.products?.suppliers?.name && (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                  NCC: {batch.products.suppliers.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Batch & Expiry Info Grid */}
+                        <div className="grid grid-cols-2 gap-2 text-xs border-t border-slate-100 pt-2.5">
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Số lô</p>
+                            <p className="font-bold text-slate-700 mt-0.5 truncate" title={batch.batch_number}>
+                              {batch.batch_number}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hạn sử dụng</p>
+                            <div className="flex items-center gap-1 font-bold text-slate-700 mt-0.5">
+                              <FiCalendar size={12} className="text-slate-400" />
+                              <span>
+                                {new Date(batch.expiry_date).toLocaleDateString('vi-VN', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status, Progress & Stock */}
+                        <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2.5">
+                          <div className="flex-1 min-w-0">
+                            <span className={`inline-flex rounded border px-2 py-0.5 text-[11px] font-bold shadow-2xs whitespace-nowrap ${statusBadgeClass}`}>
+                              {statusLabelText}
+                            </span>
+                            {/* Progress bar under status */}
+                            <div className="w-full bg-slate-100 rounded h-1 mt-2">
+                              <div
+                                className={`h-full transition-all duration-500 rounded ${progressColor}`}
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tồn kho</p>
+                            <p className="mt-0.5">
+                              <span className="font-black text-slate-900 text-sm">
+                                {formatNumber(batch.quantity)}
+                              </span>
+                              <span className="text-[11px] text-slate-400 ml-0.5 font-bold">
+                                {batch.products?.unit || 'cái'}
+                              </span>
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-bold">
+                              Nhập: {formatNumber(batch.original_quantity)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

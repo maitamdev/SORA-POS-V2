@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fi';
 import { orderAPI } from '../../services/order.api';
 import { Order } from '../../types/domain.type';
+import { useAuthStore } from '../../stores/auth.store';
 
 const money = (value: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -33,6 +34,7 @@ const statusLabels = {
 };
 
 const OrdersPage = () => {
+  const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,6 +139,12 @@ const OrdersPage = () => {
           <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
             Tra cứu lịch sử đơn hàng, xem chi tiết hóa đơn bán lẻ và quản lý hủy đơn hoàn kho từ POS.
           </p>
+          {user?.role === 'cashier' && (
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-750 text-[11px] font-bold rounded-xl border border-blue-100/60">
+              <FiAlertCircle className="text-blue-500" />
+              Bạn đang xem các hóa đơn trong ngày hôm nay do chính bạn thực hiện.
+            </div>
+          )}
         </div>
         <div className="flex gap-2 w-full sm:w-auto shrink-0">
           <button
@@ -150,7 +158,8 @@ const OrdersPage = () => {
       </header>
 
       {/* 2. KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {user?.role !== 'cashier' && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {/* Metric 1: Tổng doanh thu */}
         <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50/65 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-110 transition-transform duration-300">
@@ -199,6 +208,7 @@ const OrdersPage = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* 3. Filter Section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-2">
@@ -240,38 +250,40 @@ const OrdersPage = () => {
         </div>
 
         {/* Date Inputs */}
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 shadow-xs">
-            <FiCalendar className="text-slate-400" />
-            <span className="text-slate-400">Từ</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
-            />
-            <span className="text-slate-400">Đến</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
-            />
-          </div>
+        {user?.role !== 'cashier' && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 shadow-xs">
+              <FiCalendar className="text-slate-400" />
+              <span className="text-slate-400">Từ</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
+              />
+              <span className="text-slate-400">Đến</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="bg-transparent border-none outline-none font-bold text-slate-700 cursor-pointer"
+              />
+            </div>
 
-          {(dateFrom || dateTo || statusFilter !== 'all') && (
-            <button
-              onClick={() => {
-                setDateFrom('');
-                setDateTo('');
-                setStatusFilter('all');
-              }}
-              className="h-8 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-500 transition"
-            >
-              Xóa lọc
-            </button>
-          )}
-        </div>
+            {(dateFrom || dateTo || statusFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                  setStatusFilter('all');
+                }}
+                className="h-8 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-500 transition"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 4. Table view */}
@@ -354,7 +366,7 @@ const OrdersPage = () => {
                           >
                             <FiEye size={14} />
                           </button>
-                          {order.status !== 'cancelled' && (
+                          {order.status !== 'cancelled' && user?.role !== 'cashier' && (
                             <button
                               onClick={() => cancel(order)}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-white text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all shadow-xs"
@@ -500,7 +512,7 @@ const OrdersPage = () => {
                 </div>
 
                 {/* Drawer Footer Actions */}
-                {selected && selected.status !== 'cancelled' && (
+                {selected && selected.status !== 'cancelled' && user?.role !== 'cashier' && (
                   <div className="p-4 border-t border-slate-150/40 bg-white shrink-0">
                     <button
                       onClick={() => cancel(selected)}

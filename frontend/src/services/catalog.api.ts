@@ -24,7 +24,8 @@ export const catalogAPI = {
       api.get<ApiResponse<ListResponse<Supplier>>>(`/suppliers${buildQuery(params)}`),
     create: (data: Partial<Supplier>) => api.post<ApiResponse<Supplier>>('/suppliers', data),
     update: (id: string, data: Partial<Supplier>) => api.put<ApiResponse<Supplier>>(`/suppliers/${id}`, data),
-    remove: (id: string) => api.delete<ApiResponse<null>>(`/suppliers/${id}`),
+    remove: (id: string, params?: Record<string, unknown>) =>
+      api.delete<ApiResponse<any>>(`/suppliers/${id}${buildQuery(params)}`),
   },
   customers: {
     list: (params?: Record<string, unknown>) =>

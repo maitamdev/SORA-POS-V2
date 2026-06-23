@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { catalogAPI } from '../../services/catalog.api';
 import { aiAPI } from '../../services/ai.api';
 import { Supplier } from '../../types/domain.type';
+import { useAuthStore } from '../../stores/auth.store';
 import {
   FiSliders,
   FiSearch,
@@ -156,6 +157,9 @@ const SupplierAvatar = ({ name, email }: { name: string; email?: string | null }
 };
 
 const SuppliersPage = () => {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+  const canManageSuppliers = user?.role === 'admin' || user?.role === 'manager';
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -418,6 +422,21 @@ const SuppliersPage = () => {
     setOpenDropdownId(null);
   };
 
+  const handleHardDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA HOÀN TOÀN nhà cung cấp "${name}" khỏi hệ thống? Hành động này sẽ không thể hoàn tác.`)) return;
+    try {
+      const res = await catalogAPI.suppliers.remove(id, { hard: true });
+      const msg = res.data?.data?.message || 'Đã xóa hoàn toàn nhà cung cấp khỏi hệ thống.';
+      toast.success(msg);
+      fetchSuppliers();
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.message || 'Không thể xóa hoàn toàn nhà cung cấp';
+      toast.error(errMsg);
+    }
+    setOpenDropdownId(null);
+  };
+
   const handleToggleActive = async (supplier: Supplier) => {
     const currentStatus = parseSupplierStatus(supplier);
     const newActive = currentStatus === 'inactive';
@@ -460,13 +479,15 @@ const SuppliersPage = () => {
             <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           </div>
           {/* Add Supplier Button */}
-          <button
-            onClick={openCreateModal}
-            className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 text-xs sm:text-sm font-black text-white transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
-          >
-            <FiPlus size={16} className="stroke-[3]" />
-            Thêm nhà cung cấp
-          </button>
+          {canManageSuppliers && (
+            <button
+              onClick={openCreateModal}
+              className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 text-xs sm:text-sm font-black text-white transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+            >
+              <FiPlus size={16} className="stroke-[3]" />
+              Thêm nhà cung cấp
+            </button>
+          )}
         </div>
       </header>
 
@@ -631,20 +652,20 @@ const SuppliersPage = () => {
                   <th className="px-5 py-4 w-[15%]">Liên hệ</th>
                   <th className="px-5 py-4 w-[15%]">Email</th>
                   <th className="px-5 py-4 w-[10%] text-center">Trạng thái</th>
-                  <th className="px-5 py-4 w-[5%] text-center">Thao tác</th>
+                  {canManageSuppliers && <th className="px-5 py-4 w-[5%] text-center">Thao tác</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
+                    <td colSpan={canManageSuppliers ? 6 : 5} className="py-20 text-center text-slate-400 font-bold">
                       <FiRefreshCw className="inline animate-spin mr-2 text-emerald-650" size={18} />
                       Đang tải danh sách đối tác...
                     </td>
                   </tr>
                 ) : paginatedSuppliers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-20 text-center text-slate-400 font-bold">
+                    <td colSpan={canManageSuppliers ? 6 : 5} className="py-20 text-center text-slate-400 font-bold">
                       Không tìm thấy nhà cung cấp nào.
                     </td>
                   </tr>
@@ -728,63 +749,78 @@ const SuppliersPage = () => {
                         </td>
 
                         {/* 6. Operations */}
-                        <td className="px-5 py-4 text-center relative">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* Fast Edit Button */}
-                            <button
-                              onClick={() => openEditModal(supplier)}
-                              className="p-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg border border-slate-100 hover:border-emerald-150 transition"
-                              title="Sửa nhanh"
-                            >
-                              <FiEdit size={13} className="stroke-[2.5]" />
-                            </button>
-                            
-                            {/* Dropdown Toggle */}
-                            <div className="relative">
+                        {canManageSuppliers && (
+                          <td className="px-5 py-4 text-center relative">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Fast Edit Button */}
                               <button
-                                onClick={() => setOpenDropdownId(openDropdownId === supplier.id ? null : supplier.id)}
-                                className={`p-1.5 rounded-lg border transition ${
-                                  openDropdownId === supplier.id 
-                                    ? 'bg-slate-900 border-slate-950 text-white' 
-                                    : 'bg-slate-50 border-slate-100 hover:bg-slate-150 text-slate-450'
-                                }`}
+                                onClick={() => openEditModal(supplier)}
+                                className="p-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg border border-slate-100 hover:border-emerald-150 transition"
+                                title="Sửa nhanh"
                               >
-                                <FiMoreVertical size={13} className="stroke-[2.5]" />
+                                <FiEdit size={13} className="stroke-[2.5]" />
                               </button>
                               
-                              {/* Dropdown Menu */}
-                              {openDropdownId === supplier.id && (
-                                <>
-                                  <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
-                                  <div className="absolute right-0 mt-1.5 w-40 bg-white border border-slate-150 rounded-xl shadow-lg py-1.5 z-20 animate-fadeIn">
-                                    <button
-                                      onClick={() => openEditModal(supplier)}
-                                      className="w-full text-left px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
-                                    >
-                                      <FiEdit size={12} />
-                                      Sửa thông tin
-                                    </button>
-                                    <button
-                                      onClick={() => handleToggleActive(supplier)}
-                                      className="w-full text-left px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
-                                    >
-                                      <FiLock size={12} />
-                                      {status === 'inactive' ? 'Kích hoạt lại' : 'Tạm khóa'}
-                                    </button>
-                                    <hr className="my-1 border-slate-100" />
-                                    <button
-                                      onClick={() => handleDelete(supplier.id, supplier.name)}
-                                      className="w-full text-left px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition flex items-center gap-2"
-                                    >
-                                      <FiX size={12} />
-                                      Ngừng hợp tác
-                                    </button>
-                                  </div>
-                                </>
-                              )}
+                              {/* Dropdown Toggle */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenDropdownId(openDropdownId === supplier.id ? null : supplier.id)}
+                                  className={`p-1.5 rounded-lg border transition ${
+                                    openDropdownId === supplier.id 
+                                      ? 'bg-slate-900 border-slate-950 text-white' 
+                                      : 'bg-slate-50 border-slate-100 hover:bg-slate-150 text-slate-450'
+                                  }`}
+                                >
+                                  <FiMoreVertical size={13} className="stroke-[2.5]" />
+                                </button>
+                                
+                                {/* Dropdown Menu */}
+                                {openDropdownId === supplier.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
+                                    <div className="absolute right-0 mt-1.5 w-40 bg-white border border-slate-150 rounded-xl shadow-lg py-1.5 z-20 animate-fadeIn">
+                                      <button
+                                        onClick={() => openEditModal(supplier)}
+                                        className="w-full text-left px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
+                                      >
+                                        <FiEdit size={12} />
+                                        Sửa thông tin
+                                      </button>
+                                      <button
+                                        onClick={() => handleToggleActive(supplier)}
+                                        className="w-full text-left px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
+                                      >
+                                        <FiLock size={12} />
+                                        {status === 'inactive' ? 'Kích hoạt lại' : 'Tạm khóa'}
+                                      </button>
+                                      <hr className="my-1 border-slate-100" />
+                                      <button
+                                        onClick={() => handleDelete(supplier.id, supplier.name)}
+                                        className="w-full text-left px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition flex items-center gap-2"
+                                      >
+                                        <FiX size={12} />
+                                        Ngừng hợp tác
+                                      </button>
+                                      {isAdmin && (
+                                        <>
+                                          <hr className="my-1 border-slate-100" />
+                                          <button
+                                            onClick={() => handleHardDelete(supplier.id, supplier.name)}
+                                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-rose-650 hover:bg-rose-50 transition flex items-center gap-2"
+                                            title="Xóa vĩnh viễn nhà cung cấp khỏi hệ thống"
+                                          >
+                                            <FiX size={12} className="text-rose-500 stroke-[2.5]" />
+                                            Xóa vĩnh viễn
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
+                        )}
                       </tr>
                     );
                   })

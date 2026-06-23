@@ -6,7 +6,7 @@ import { AppError } from '../utils/AppError';
 
 export class OrderController {
   static list = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await OrderService.list(req.query), 'Lấy danh sách hóa đơn thành công');
+    successResponse(res, await OrderService.list(req.query, req.user), 'Lấy danh sách hóa đơn thành công');
   });
 
   static get = asyncHandler(async (req: Request, res: Response) => {

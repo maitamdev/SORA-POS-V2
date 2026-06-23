@@ -1099,21 +1099,61 @@ Chỉ trả về JSON thuần túy:
 
   static async suggestCategory(productName: string, categories: Array<{ id: string; name: string }>) {
     if (categories.length === 0) return null;
+    if (!env.groqApiKey) {
+      return this.localSuggestCategory(productName, categories);
+    }
 
     const categoriesList = categories.map((c) => `- ID: ${c.id}, Name: ${c.name}`).join('\n');
     const prompt = `Phân tích tên sản phẩm: "${productName}".
-Dựa trên danh sách danh mục sau, hãy chọn một danh mục phù hợp nhất và chỉ trả về duy nhất ID của danh mục đó.
+Dựa trên danh sách danh mục sau, hãy chọn một danh mục phù hợp nhất và trả về một đối tượng JSON chứa "categoryId" duy nhất của danh mục đó.
+Ví dụ: {"categoryId": "uuid-cua-danh-muc"}
 
 Danh sách danh mục:
 ${categoriesList}
 
-Chỉ trả về ID duy nhất.`;
+Chỉ trả về JSON thuần túy.`;
 
-    const suggestedId = await this.groqInsight(prompt);
-    if (suggestedId && categories.some((c) => c.id === suggestedId.trim())) {
-      return suggestedId.trim();
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a POS data assistant. Identify the most appropriate category for the product name. Respond with JSON containing "categoryId" only.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          max_tokens: 100,
+        }),
+      });
+
+      if (response.ok) {
+        const resData = await response.json() as any;
+        const raw = resData.choices?.[0]?.message?.content?.trim() || null;
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const suggestedId = parsed.categoryId?.trim();
+          if (suggestedId && categories.some((c) => c.id === suggestedId)) {
+            return suggestedId;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Lỗi khi gợi ý danh mục bằng AI:', e);
     }
 
+    return this.localSuggestCategory(productName, categories);
+  }
+
+  private static localSuggestCategory(productName: string, categories: Array<{ id: string; name: string }>) {
     const nameLower = productName.toLowerCase();
 
     for (const cat of categories) {
@@ -1147,13 +1187,18 @@ Chỉ trả về ID duy nhất.`;
       ) {
         return cat.id;
       }
+      
+      // Ưu tiên trùng khớp snack cụ thể
+      if (nameLower.includes('snack') && (catLower.includes('snack') || catLower.includes('vặt') || catLower.includes('ăn vặt'))) {
+        return cat.id;
+      }
+
       if (
         (nameLower.includes('bánh') ||
           nameLower.includes('kẹo') ||
           nameLower.includes('oreo') ||
           nameLower.includes('lay') ||
           nameLower.includes('khoai tây') ||
-          nameLower.includes('snack') ||
           nameLower.includes('chupa chups')) &&
         (catLower.includes('bánh') || catLower.includes('kẹo') || catLower.includes('snack'))
       ) {
@@ -1196,14 +1241,37 @@ Chỉ trả về ID duy nhất.`;
     const prompt = `Translate this product category name to English for image search. Category: "${categoryName}". Return ONLY a JSON object with a single key "keyword". Example: {"keyword": "fried rice"}`;
     
     try {
-      const result = await this.groqInsight(prompt);
-      const jsonStr = result?.match(/\{[\s\S]*\}/)?.[0];
-      if (!jsonStr) return null;
-      const parsed = JSON.parse(jsonStr);
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a translation assistant. Translate the product category to a simple, descriptive English keyword suitable for image search. Return ONLY a valid JSON object.',
+            },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+          max_tokens: 100,
+        }),
+      });
+
+      if (!response.ok) return null;
+      const responseData = await response.json() as any;
+      const raw = responseData.choices?.[0]?.message?.content?.trim() || null;
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
       const searchKeyword = parsed.keyword?.toLowerCase().trim();
       if (!searchKeyword) return null;
       
-      const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(searchKeyword)}&gsrnamespace=6&gsrlimit=3&pithumbsize=600`, {
+      const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch=filetype:bitmap%20${encodeURIComponent(searchKeyword)}&gsrnamespace=6&gsrlimit=10&pithumbsize=600`, {
         signal: AbortSignal.timeout(6000)
       });
       
@@ -1211,7 +1279,23 @@ Chỉ trả về ID duy nhất.`;
       const data = await res.json() as any;
       if (data?.query?.pages) {
         const pages = Object.values(data.query.pages) as any[];
-        const image = pages.find(p => p.thumbnail?.source);
+        
+        // Sort by search relevance index
+        pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+        
+        // Filter out non-product/building images
+        const blacklistedKeywords = [
+          'geograph.org.uk', 'factory', 'industrial', 'building', 'street',
+          'road', 'map', 'logo', 'banner', 'diagram', 'sign', 'outside',
+          'entrance', 'exterior', 'storefront', 'shopfront', 'office'
+        ];
+        
+        const filteredPages = pages.filter(p => {
+          const title = (p.title || '').toLowerCase();
+          return !blacklistedKeywords.some(kw => title.includes(kw));
+        });
+
+        const image = filteredPages.find(p => p.thumbnail?.source);
         if (image?.thumbnail?.source) {
           return image.thumbnail.source;
         }
@@ -1222,18 +1306,120 @@ Chỉ trả về ID duy nhất.`;
     return null;
   }
 
+  private static async fetchSearchSnippets(supplierName: string): Promise<string[]> {
+    try {
+      const query = `${supplierName} địa chỉ số điện thoại website`;
+      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!res.ok) return [];
+      const html = await res.text();
+      
+      const snippets: string[] = [];
+      let idx = html.indexOf('class="result__snippet"');
+      while (idx !== -1) {
+        const end = html.indexOf('</a>', idx);
+        if (end === -1) break;
+        const snippet = html.substring(idx, end).replace(/<[^>]*>/g, '').trim();
+        snippets.push(snippet);
+        idx = html.indexOf('class="result__snippet"', end);
+      }
+      return snippets.slice(0, 10);
+    } catch (e) {
+      console.error('Lỗi khi cào DuckDuckGo:', e);
+      return [];
+    }
+  }
+
+  private static async resolveCompanyDetails(supplierName: string) {
+    try {
+      const query = `mst ${supplierName}`;
+      const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+      const res = await fetch(searchUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!res.ok) return null;
+      const html = await res.text();
+      const regex = /\b\d{10}\b/g;
+      const matches = html.match(regex);
+      if (!matches || matches.length === 0) return null;
+      
+      const uniqueMsts = Array.from(new Set(matches)).slice(0, 3);
+      for (const mst of uniqueMsts) {
+        const detailRes = await fetch(`https://api.vietqr.io/v2/business/${mst}`, {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (detailRes.ok) {
+          const detailData = await detailRes.json() as any;
+          if (detailData.code === '00' && detailData.data) {
+            return {
+              name: detailData.data.name,
+              address: detailData.data.address,
+              tax_code: detailData.data.id,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Lỗi khi tra cứu MST nhà cung cấp:', e);
+    }
+    return null;
+  }
+
   static async suggestSupplier(supplierName: string) {
     if (!env.groqApiKey) return null;
+
+    // Lấy thông tin từ cả 2 nguồn: VietQR và Crawl snippets
+    const [facts, snippets] = await Promise.all([
+      this.resolveCompanyDetails(supplierName),
+      this.fetchSearchSnippets(supplierName)
+    ]);
+
+    let promptContext = '';
+    if (facts) {
+      promptContext += `
+Dữ liệu đăng ký mã số thuế chính thức:
+- Tên công ty: ${facts.name}
+- Mã số thuế: ${facts.tax_code}
+- Địa chỉ đăng ký thuế: ${facts.address}
+`;
+    }
+
+    if (snippets && snippets.length > 0) {
+      promptContext += `
+Dữ liệu tra cứu thực tế trên Internet (snippets):
+---
+${snippets.join('\n---\n')}
+---
+`;
+    }
+
     const prompt = `Phân tích tên đối tác/nhà cung cấp: "${supplierName}".
-Hãy tìm kiếm hoặc tự động suy luận thông tin doanh nghiệp chính xác của thương hiệu này tại Việt Nam.
+Hãy tổng hợp thông tin doanh nghiệp chính xác nhất của thương hiệu này tại Việt Nam dựa trên các dữ liệu sau:
+${promptContext}
+
+Lưu ý quan trọng:
+1. Đối với địa chỉ (address): 
+   - Kiểm tra kỹ địa chỉ đăng ký thuế và các snippet thực tế. Nếu địa chỉ đăng ký thuế bị sai địa giới (ví dụ ghép phường Vĩnh Tân, VSIP II-A của Bình Dương vào "TP Hồ Chí Minh"), hãy sửa lại cho đúng tỉnh thành (Vĩnh Tân, Tân Uyên, Bình Dương).
+   - Nếu có cả văn phòng đại diện ở TP.HCM (ví dụ: Trương Quốc Dung, Phú Nhuận) và nhà máy ở Bình Dương, hãy chọn địa chỉ văn phòng đại diện chính xác hoặc địa chỉ nhà máy đúng tỉnh thành. Tuyệt đối không ghép lẫn lộn.
+2. Đối với số điện thoại (phone): Hãy tìm số điện thoại hotline hoặc số bàn (ví dụ: 02862883139 hoặc hotline di động) xuất hiện trong các snippet thực tế.
+3. Đối với email và website: email phỏng đoán bắt buộc phải sử dụng chung tên miền (domain) với website gợi ý (Ví dụ: nếu website gợi ý là "maithu.com.vn" thì email bắt buộc phải là "info@maithu.com.vn" hoặc "contact@maithu.com.vn", TUYỆT ĐỐI KHÔNG sử dụng tên miền khác như "@baobimai.com.vn" cho email).
+
 Trả về một đối tượng JSON duy nhất với cấu trúc sau:
 {
-  "name": "Tên đầy đủ chính thức của công ty (Ví dụ: Công ty Cổ phần Sữa Việt Nam)",
-  "email": "Email liên hệ chính thức hoặc đoán theo domain (Ví dụ: contact@vinamilk.com.vn)",
-  "phone": "Số điện thoại liên hệ chính thức hoặc hotline",
-  "address": "Địa chỉ văn phòng trụ sở chính chính xác tại Việt Nam",
-  "tax_code": "Mã số thuế chính xác của công ty nếu biết, nếu không biết hãy bỏ trống",
-  "website": "Domain trang web chính thức (Ví dụ: vinamilk.com.vn)"
+  "name": "Tên đầy đủ chính thức của công ty",
+  "email": "Email liên hệ chính thức, hoặc phỏng đoán theo tên miền website gợi ý ở dưới (Ví dụ: info@maithu.com.vn), hoặc null",
+  "phone": "Số điện thoại liên hệ chính thức tìm được từ snippets, hoặc null",
+  "address": "Địa chỉ văn phòng hoặc địa điểm chính xác tại Việt Nam, hoặc null",
+  "tax_code": "Mã số thuế chính xác của công ty nếu có, hoặc null",
+  "website": "Domain trang web chính thức (ví dụ: vinamilk.com.vn), hoặc null"
 }
 
 Chỉ trả về JSON thuần túy, không có giải thích, không markdown.`;
@@ -1255,7 +1441,7 @@ Chỉ trả về JSON thuần túy, không có giải thích, không markdown.`;
             { role: 'user', content: prompt },
           ],
           temperature: 0.1,
-          max_tokens: 400,
+          max_tokens: 500,
         }),
       });
 

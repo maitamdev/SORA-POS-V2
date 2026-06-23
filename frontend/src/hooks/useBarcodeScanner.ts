@@ -9,6 +9,52 @@ const activeChannels = new Map<string, RealtimeChannel>();
 const channelConnectionStates = new Map<string, boolean>();
 const intentionallyClosingChannels = new Set<string>();
 
+/**
+ * Phát tiếng BÍIP khi quét mã vạch thành công.
+ * Dùng HTMLAudioElement với file /beep.wav (được tạo sẵn trong public/)
+ * Đáng tin cậy hơn Web Audio API vì không bị Chrome Autoplay Policy block.
+ */
+let _beepAudio: HTMLAudioElement | null = null;
+
+const getBeep = (): HTMLAudioElement => {
+  if (!_beepAudio) {
+    _beepAudio = new Audio('/beep.wav');
+    _beepAudio.volume = 0.6;
+    _beepAudio.load();
+  }
+  return _beepAudio;
+};
+
+const beepScanner = () => {
+  try {
+    // Thử phát bằng HTMLAudioElement trước
+    const sound = getBeep().cloneNode(true) as HTMLAudioElement;
+    sound.volume = 0.6;
+    sound.play().catch(() => {
+      // Fallback: Web Audio API
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+        resume.then(() => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(1050, ctx.currentTime);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.18);
+          osc.onended = () => ctx.close();
+        });
+      } catch { /* silent */ }
+    });
+  } catch { /* silent */ }
+};
+
+
 export const useBarcodeScanner = () => {
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -28,6 +74,9 @@ export const useBarcodeScanner = () => {
 
     // Callback nhận mã vạch quét
     const onScan = (barcode: string) => {
+      // 🔊 BÍIP! — âm thanh xác nhận quét thành công
+      beepScanner();
+
       setScannedBarcode(barcode);
       // Reset mã vạch sau 1 giây để có thể quét lại cùng một mã
       setTimeout(() => {

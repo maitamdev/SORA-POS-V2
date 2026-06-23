@@ -19,6 +19,7 @@ router.get('/', roleMiddleware('admin', 'manager'), ShiftController.list);
 router.post('/', roleMiddleware('admin', 'manager'), validateMiddleware(openShiftSchema), ShiftController.open);
 router.get('/:id', roleMiddleware('admin', 'manager'), ShiftController.get);
 router.post('/:id/close', roleMiddleware('admin', 'manager'), validateMiddleware(closeShiftSchema), ShiftController.closeByManager);
+router.post('/:id/cancel', roleMiddleware('admin', 'manager'), ShiftController.cancel);
 router.post('/:id/cash-drawer', roleMiddleware('admin', 'manager'), validateMiddleware(cashDrawerTxSchema), ShiftController.logCashDrawerTx);
 
 export default router;

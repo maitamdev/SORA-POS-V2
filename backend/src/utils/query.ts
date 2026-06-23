@@ -10,7 +10,7 @@ export const toPositiveInt = (value: unknown, fallback = 1): number => {
 
 export const parsePagination = (query: Record<string, unknown>) => {
   const page = Math.max(toPositiveInt(query.page, 1), 1);
-  const limit = Math.min(Math.max(toPositiveInt(query.limit, 20), 1), 100);
+  const limit = Math.min(Math.max(toPositiveInt(query.limit, 20), 1), 10000);
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 

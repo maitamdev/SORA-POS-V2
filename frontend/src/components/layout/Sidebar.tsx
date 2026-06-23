@@ -81,7 +81,7 @@ const menuItems = [
     label: 'Nhà cung cấp',
     icon: HiOutlineTruck,
     path: '/suppliers',
-    roles: ['admin', 'manager'],
+    roles: ['admin', 'manager', 'cashier'],
   },
   {
     label: 'Nhân viên',
