@@ -45,16 +45,21 @@ const OrdersPage = () => {
   const [dateTo, setDateTo] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // Phân trang (Pagination)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { limit: 100 };
+      const params: Record<string, unknown> = { limit: 1000 };
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       if (statusFilter !== 'all') params.status = statusFilter;
 
       const response = await orderAPI.list(params);
       setOrders(response.data.data.items);
+      setCurrentPage(1);
     } catch {
       toast.error('Không tải được danh sách hóa đơn');
     } finally {
@@ -125,6 +130,64 @@ const OrdersPage = () => {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
+  };
+
+  // Tính toán phân trang
+  const indexOfLastOrder = currentPage * itemsPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - itemsPerPage;
+  const paginatedOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const totalPages = Math.ceil(orders.length / itemsPerPage) || 1;
+  const itemsStart = orders.length === 0 ? 0 : indexOfFirstOrder + 1;
+  const itemsEnd = Math.min(indexOfLastOrder, orders.length);
+
+  const renderPaginationControls = () => {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(currentPage - 1)}
+          className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white active:scale-95 duration-150 shadow-xs"
+        >
+          &lt;
+        </button>
+        {Array.from({ length: totalPages }).map((_, index) => {
+          const pNum = index + 1;
+          if (Math.abs(pNum - currentPage) <= 1 || pNum === 1 || pNum === totalPages) {
+            return (
+              <button
+                key={pNum}
+                type="button"
+                onClick={() => setCurrentPage(pNum)}
+                className={`h-8 w-8 rounded-lg border flex items-center justify-center transition text-xs font-bold active:scale-95 duration-150 ${
+                  currentPage === pNum
+                    ? 'bg-emerald-600 border-emerald-600 text-white font-extrabold shadow-sm shadow-emerald-500/20'
+                    : 'border-slate-200 bg-white text-slate-650 hover:bg-slate-50'
+                }`}
+              >
+                {pNum}
+              </button>
+            );
+          }
+          if (pNum === 2 || pNum === totalPages - 1) {
+            return (
+              <span key={pNum} className="px-1 text-slate-400 text-xs font-bold">
+                ...
+              </span>
+            );
+          }
+          return null;
+        })}
+        <button
+          type="button"
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+          className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white active:scale-95 duration-150 shadow-xs"
+        >
+          &gt;
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -286,6 +349,38 @@ const OrdersPage = () => {
         )}
       </div>
 
+      {/* 3.5 Pagination Bar (Top) */}
+      {orders.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-3 text-xs text-slate-500 shadow-[0_4px_20px_rgba(0,0,0,0.01)] animate-fadeIn">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="font-semibold text-slate-600">
+              Hiển thị <span className="font-extrabold text-slate-900">{itemsStart} - {itemsEnd}</span> trên <span className="font-extrabold text-slate-900">{orders.length}</span> hóa đơn
+            </div>
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-8 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition duration-150 cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>mục/trang</span>
+            </div>
+          </div>
+          <div>
+            {totalPages > 1 && renderPaginationControls()}
+          </div>
+        </div>
+      )}
+
       {/* 4. Table view */}
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
         <div className="overflow-x-auto">
@@ -316,7 +411,7 @@ const OrdersPage = () => {
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => {
+                paginatedOrders.map((order) => {
                   const status = (order.status || 'completed') as 'completed' | 'cancelled';
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/50 transition duration-150">
@@ -385,6 +480,18 @@ const OrdersPage = () => {
           </table>
         </div>
       </div>
+
+      {/* 4.5 Pagination Bar (Bottom) */}
+      {orders.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 rounded-2xl px-5 py-4 text-xs text-slate-500 shadow-[0_4px_20px_rgba(0,0,0,0.01)] mt-2">
+          <div className="font-semibold text-slate-650">
+            Hiển thị <span className="font-black text-slate-800">{itemsStart} - {itemsEnd}</span> trên <span className="font-black text-slate-800">{orders.length}</span> hóa đơn
+          </div>
+          <div>
+            {totalPages > 1 && renderPaginationControls()}
+          </div>
+        </div>
+      )}
 
       {/* 5. Drawer Chi tiết Hóa đơn (Thermal Receipt style) */}
       {selected && (
