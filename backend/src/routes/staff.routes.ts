@@ -10,6 +10,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', roleMiddleware('admin', 'manager'), StaffController.list);
+router.get('/:id/report', roleMiddleware('admin', 'manager'), StaffController.getReport);
 router.post('/', roleMiddleware('admin'), validateMiddleware(staffCreateSchema), StaffController.create);
 router.put('/:id', roleMiddleware('admin'), validateMiddleware(staffUpdateSchema), StaffController.update);
 router.delete('/:id', roleMiddleware('admin'), StaffController.deactivate);

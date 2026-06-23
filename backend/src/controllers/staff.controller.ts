@@ -19,4 +19,10 @@ export class StaffController {
   static deactivate = asyncHandler(async (req: Request, res: Response) => {
     successResponse(res, await StaffService.deactivate(req.params.id), 'Đã vô hiệu hóa tài khoản nhân viên');
   });
+
+  static getReport = asyncHandler(async (req: Request, res: Response) => {
+    const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const data = await StaffService.getStaffReport(req.params.id, date);
+    successResponse(res, data, 'Lấy báo cáo doanh thu nhân viên thành công');
+  });
 }

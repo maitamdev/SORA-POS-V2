@@ -158,4 +158,79 @@ export class StaffService {
     if (error) throw new AppError(400, error.message);
     return null;
   }
+
+  static async getStaffReport(staffId: string, dateStr: string) {
+    const targetDate = new Date(dateStr);
+    const startOfDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+    // Fetch all completed orders for this user on this day
+    const { data: orders, error } = await supabase
+      .from('orders')
+      .select('id, order_number, final_amount, created_at, status, customers(name), order_details(id, product_name, quantity, unit_price, subtotal), payments(method)')
+      .eq('user_id', staffId)
+      .eq('status', 'completed')
+      .gte('created_at', startOfDate.toISOString())
+      .lte('created_at', endOfDate.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) throw new AppError(500, error.message);
+
+    // Aggregate statistics
+    let totalRevenue = 0;
+    const ordersCount = orders?.length || 0;
+    let productsCount = 0;
+    const productSalesMap = new Map<string, { name: string; quantity: number; revenue: number }>();
+
+    for (const order of orders || []) {
+      totalRevenue += Number(order.final_amount || 0);
+
+      const details = order.order_details || [];
+      for (const d of details) {
+        const qty = Number(d.quantity || 0);
+        const subtotal = Number(d.subtotal || 0);
+        productsCount += qty;
+
+        const current = productSalesMap.get(d.product_name) || {
+          name: d.product_name,
+          quantity: 0,
+          revenue: 0,
+        };
+        current.quantity += qty;
+        current.revenue += subtotal;
+        productSalesMap.set(d.product_name, current);
+      }
+    }
+
+    const productsSold = Array.from(productSalesMap.values()).sort((a, b) => b.quantity - a.quantity);
+
+    // Format orders for frontend
+    const formattedOrders = (orders || []).map((o) => {
+      const p = o.payments?.[0];
+      let methodLabel = 'Tiền mặt';
+      if (p?.method === 'transfer' || p?.method === 'momo' || p?.method === 'zalopay') methodLabel = 'QR Pay';
+      else if (p?.method === 'card') methodLabel = 'Thẻ';
+
+      return {
+        id: o.id,
+        order_number: o.order_number,
+        customer_name: o.customers ? (o.customers as any).name : 'Khách lẻ',
+        payment_method: methodLabel,
+        total_amount: Number(o.final_amount || 0),
+        created_at: o.created_at,
+        status: o.status,
+      };
+    });
+
+    return {
+      summary: {
+        total_revenue: totalRevenue,
+        orders_count: ordersCount,
+        products_count: productsCount,
+      },
+      orders: formattedOrders,
+      products_sold: productsSold,
+    };
+  }
 }
+

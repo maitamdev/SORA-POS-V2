@@ -11,10 +11,38 @@ export interface StaffPayload {
   is_active?: boolean;
 }
 
+export interface StaffReportOrder {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  payment_method: string;
+  total_amount: number;
+  created_at: string;
+  status: string;
+}
+
+export interface StaffReportProduct {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+export interface StaffReportData {
+  summary: {
+    total_revenue: number;
+    orders_count: number;
+    products_count: number;
+  };
+  orders: StaffReportOrder[];
+  products_sold: StaffReportProduct[];
+}
+
 export const staffAPI = {
   list: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<StaffUser>>>(`/staff${buildQuery(params)}`),
   create: (data: StaffPayload) => api.post<ApiResponse<StaffUser>>('/staff', data),
   update: (id: string, data: StaffPayload) => api.put<ApiResponse<StaffUser>>(`/staff/${id}`, data),
   deactivate: (id: string) => api.delete<ApiResponse<null>>(`/staff/${id}`),
+  getReport: (id: string, date: string) =>
+    api.get<ApiResponse<StaffReportData>>(`/staff/${id}/report?date=${date}`),
 };
