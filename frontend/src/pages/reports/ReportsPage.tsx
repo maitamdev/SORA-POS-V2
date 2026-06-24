@@ -33,6 +33,74 @@ const formatDateLabel = (dateStr: string) => {
   return `${parts[2]}/${parts[1]}`;
 };
 
+const renderReportMarkdown = (text: string) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-3 text-[12.5px] leading-relaxed text-slate-600 font-medium">
+      {lines.map((line, idx) => {
+        let cleanLine = line.trim();
+        if (!cleanLine) return <div key={idx} className="h-2" />;
+
+        // Header ###
+        if (cleanLine.startsWith('###')) {
+          const headerText = cleanLine.replace(/^###\s*/, '');
+          return (
+            <h3 key={idx} className="text-sm font-black text-slate-800 border-b border-slate-100 pb-1.5 pt-4 flex items-center gap-1.5">
+              {headerText}
+            </h3>
+          );
+        }
+
+        // Header ##
+        if (cleanLine.startsWith('##')) {
+          const headerText = cleanLine.replace(/^##\s*/, '');
+          return (
+            <h2 key={idx} className="text-base font-black text-slate-900 border-b border-slate-200 pb-2 pt-5">
+              {headerText}
+            </h2>
+          );
+        }
+
+        // Bullet points
+        const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*') || cleanLine.startsWith('•') || cleanLine.startsWith('+');
+        if (isBullet) {
+          cleanLine = cleanLine.replace(/^[-*•+]\s*/, '');
+        }
+
+        // Parse **bold** inside the line
+        const parts = [];
+        let index = 0;
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        let match;
+
+        while ((match = boldRegex.exec(cleanLine)) !== null) {
+          const before = cleanLine.substring(index, match.index);
+          if (before) parts.push(before);
+          parts.push(<strong key={match.index} className="font-extrabold text-slate-900">{match[1]}</strong>);
+          index = boldRegex.lastIndex;
+        }
+
+        const after = cleanLine.substring(index);
+        if (after) parts.push(after);
+
+        const content = parts.length > 0 ? parts : cleanLine;
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-3">
+              <span className="mt-2 text-[5px] text-indigo-500 shrink-0">●</span>
+              <span className="flex-1">{content}</span>
+            </div>
+          );
+        }
+
+        return <p key={idx} className="pl-1">{content}</p>;
+      })}
+    </div>
+  );
+};
+
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload as RevenuePoint;
@@ -78,6 +146,8 @@ const ReportsPage = () => {
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiAnalysisText, setAiAnalysisText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -95,8 +165,23 @@ const ReportsPage = () => {
     }
   };
 
+  const handleAiAnalysis = async () => {
+    setAiLoading(true);
+    setAiAnalysisText('');
+    try {
+      const res = await reportAPI.aiAnalysis(days);
+      setAiAnalysisText(res.data.data.analysis);
+      toast.success('Phân tích tài chính AI hoàn tất!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không thể thực hiện phân tích tài chính AI');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    setAiAnalysisText('');
   }, [days]);
 
   // Aggregate metrics
@@ -255,6 +340,50 @@ const ReportsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* AI REVENUE REPORT ASSISTANT */}
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
+              Trợ lý Phân tích Doanh thu AI (Groq)
+            </h2>
+            <p className="text-[11px] font-semibold text-slate-400 mt-1">
+              Phân tích tự động doanh thu, cơ cấu sản phẩm, sức khỏe tài chính và đề xuất hành động kinh tế cụ thể.
+            </p>
+          </div>
+          <button
+            onClick={handleAiAnalysis}
+            disabled={aiLoading || loading || revenue.length === 0}
+            className="flex items-center justify-center gap-2 h-10 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black shadow-md shadow-indigo-500/10 transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            <span>Phân tích bằng AI</span>
+          </button>
+        </div>
+
+        <div className="mt-5">
+          {aiLoading ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <div className="relative w-10 h-10">
+                <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-indigo-600 animate-spin" />
+                <div className="absolute inset-1.5 rounded-full border-4 border-slate-100 border-b-blue-600 animate-spin [animation-duration:1.5s]" />
+              </div>
+              <span className="text-xs font-bold text-slate-500 animate-pulse">Trợ lý AI đang tổng hợp số liệu và lập báo cáo tài chính...</span>
+            </div>
+          ) : aiAnalysisText ? (
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-5 animate-fadeIn">
+              {renderReportMarkdown(aiAnalysisText)}
+            </div>
+          ) : (
+            <div className="py-10 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/30">
+              <p className="text-xs font-bold text-slate-400">
+                Chưa có báo cáo. Nhấn nút "Phân tích bằng AI" để đánh giá hoạt động kinh doanh {days} ngày qua.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* CHARTS AND LISTS SECTION */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">

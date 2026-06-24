@@ -1,5 +1,6 @@
 import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
+import { env } from '../config/env';
 
 const startOfDay = (date = new Date()) => {
   const value = new Date(date);
@@ -429,5 +430,213 @@ export class ReportService {
     return Array.from(grouped.values())
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, limit);
+  }
+
+  static async aiAnalysis(days = 30) {
+    const today = startOfDay();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const rangeDaysAgo = new Date(today);
+    rangeDaysAgo.setDate(rangeDaysAgo.getDate() - (days - 1));
+
+    // Parallel fetch
+    const [
+      revenueTrend,
+      topProductsRaw,
+      categoryAndPaymentRawData
+    ] = await Promise.all([
+      this.revenue(days, today),
+      this.topProducts(days, 5, today),
+      supabase
+        .from('orders')
+        .select('id')
+        .eq('status', 'completed')
+        .gte('created_at', rangeDaysAgo.toISOString())
+        .lt('created_at', tomorrow.toISOString())
+    ]);
+
+    if (categoryAndPaymentRawData.error) throw new AppError(500, categoryAndPaymentRawData.error.message);
+    const rangeOrders = categoryAndPaymentRawData.data || [];
+    const rangeOrderIds = rangeOrders.map((o) => o.id);
+
+    // Fetch details for category sales
+    const [
+      categoryDetailsResult,
+      paymentsStatsResult
+    ] = await Promise.all([
+      rangeOrderIds.length > 0
+        ? supabase.from('order_details').select('product_id, subtotal').in('order_id', rangeOrderIds)
+        : Promise.resolve({ data: null, error: null }),
+      rangeOrderIds.length > 0
+        ? supabase.from('payments').select('order_id, method, amount').in('order_id', rangeOrderIds)
+        : Promise.resolve({ data: null, error: null })
+    ]);
+
+    if (categoryDetailsResult.error) throw new AppError(500, categoryDetailsResult.error.message);
+    if (paymentsStatsResult.error) throw new AppError(500, paymentsStatsResult.error.message);
+
+    // Categories
+    const categoryDetails = categoryDetailsResult.data || [];
+    const categoryDetailsProductIds = Array.from(new Set(categoryDetails.map((d) => d.product_id)));
+    let productsWithCategories = null;
+    if (categoryDetailsProductIds.length > 0) {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, categories(name)')
+        .in('id', categoryDetailsProductIds);
+      if (error) throw new AppError(500, error.message);
+      productsWithCategories = data;
+    }
+
+    let categorySalesMap = new Map<string, number>();
+    if (categoryDetails.length > 0 && productsWithCategories) {
+      const prodToCat = new Map<string, string>();
+      for (const p of productsWithCategories) {
+        const catName = p.categories ? (p.categories as any).name : 'Khác';
+        prodToCat.set(p.id, catName);
+      }
+      for (const d of categoryDetails) {
+        const catName = prodToCat.get(d.product_id) || 'Khác';
+        categorySalesMap.set(catName, (categorySalesMap.get(catName) || 0) + Number(d.subtotal || 0));
+      }
+    }
+    const category_sales = Array.from(categorySalesMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    // Payments
+    const paymentStats = { cash: 0, transfer: 0, card: 0 };
+    const paymentCounts = { cash: 0, transfer: 0, card: 0 };
+    const payments = paymentsStatsResult.data || [];
+    for (const p of payments) {
+      const method = p.method === 'transfer' || p.method === 'momo' || p.method === 'zalopay' 
+        ? 'transfer' 
+        : p.method === 'card' 
+          ? 'card' 
+          : 'cash';
+      paymentStats[method] += Number(p.amount || 0);
+      paymentCounts[method] += 1;
+    }
+    const totalPaymentCount = paymentCounts.cash + paymentCounts.transfer + paymentCounts.card || 1;
+    const payment_stats = [
+      { name: 'Tiền mặt', percentage: Math.round((paymentCounts.cash / totalPaymentCount) * 1000) / 10, count: paymentCounts.cash, amount: paymentStats.cash },
+      { name: 'QR Pay/Chuyển khoản', percentage: Math.round((paymentCounts.transfer / totalPaymentCount) * 1000) / 10, count: paymentCounts.transfer, amount: paymentStats.transfer },
+      { name: 'Thẻ', percentage: Math.round((paymentCounts.card / totalPaymentCount) * 1000) / 10, count: paymentCounts.card, amount: paymentStats.card },
+    ];
+
+    // Aggregates
+    const totalRevenue = revenueTrend.reduce((sum, item) => sum + item.revenue, 0);
+    const totalOrders = revenueTrend.reduce((sum, item) => sum + item.orders, 0);
+    const totalCogs = revenueTrend.reduce((sum, item) => sum + (item.cogs || 0), 0);
+    const totalProfit = revenueTrend.reduce((sum, item) => sum + (item.profit || 0), 0);
+    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    const averageOrderVal = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    // Formatting currency for prompt
+    const money = (value: number) => `${Math.round(value || 0).toLocaleString('vi-VN')} VND`;
+
+    // Construct detailed prompt
+    const topProductsList = topProductsRaw.map((p, idx) => 
+      `- Top ${idx + 1}: ${p.product_name} - Số lượng: ${p.quantity} - Doanh thu: ${money(p.revenue)}`
+    ).join('\n') || '- Không có sản phẩm nào bán ra';
+
+    const categorySalesList = category_sales.map((c) => 
+      `- ${c.name}: ${money(c.value)}`
+    ).join('\n') || '- Chưa có dữ liệu doanh thu danh mục';
+
+    const paymentStatsList = payment_stats.map((p) => 
+      `- ${p.name}: Chiếm ${p.percentage}% (${p.count} giao dịch - ${money(p.amount)})`
+    ).join('\n');
+
+    const revenueTrendList = revenueTrend.map((r) => 
+      `+ Ngày ${r.date.split('-').reverse().join('/')}: Doanh thu: ${money(r.revenue)} | Lợi nhuận: ${money(r.profit)} | Đơn hàng: ${r.orders}`
+    ).join('\n');
+
+    if (!env.groqApiKey) {
+      throw new AppError(400, 'Groq API Key chưa được cấu hình ở Backend');
+    }
+
+    const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu Kinh doanh POS chuyên nghiệp. 
+Hãy phân tích báo cáo doanh thu và tình hình hoạt động của cửa hàng dựa trên dữ liệu thực tế được cung cấp. Trả lời bằng tiếng Việt.
+Sử dụng định dạng Markdown phong phú để trình bày báo cáo chuyên nghiệp. In đậm những con số quan trọng, xu hướng nổi bật.`;
+
+    const userPrompt = `Hãy phân tích báo cáo hoạt động kinh doanh trong ${days} ngày qua với các số liệu thực tế sau:
+
+1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN:
+- Tổng doanh thu: ${money(totalRevenue)}
+- Tổng giá vốn hàng bán (COGS): ${money(totalCogs)}
+- Tổng lợi nhuận gộp: ${money(totalProfit)}
+- Tỉ suất lợi nhuận gộp trung bình: ${profitMargin.toFixed(1)}%
+- Tổng số đơn hàng: ${totalOrders} đơn
+- Giá trị trung bình mỗi đơn hàng (AOV): ${money(averageOrderVal)}
+
+2. TOP SẢN PHẨM BÁN CHẠY NHẤT:
+${topProductsList}
+
+3. DOANH THU THEO DANH MỤC SẢN PHẨM:
+${categorySalesList}
+
+4. PHƯƠNG THỨC THANH TOÁN:
+${paymentStatsList}
+
+5. CHI TIẾT DOANH THU & LỢI NHUẬN HÀNG NGÀY:
+${revenueTrendList}
+
+HÃY ĐƯA RA BÁO CÁO PHÂN TÍCH SÂU SẮC BẰNG TIẾNG VIỆT, SỬ DỤNG ĐỊNH DẠNG MARKDOWN RÕ RÀNG VỚI CÁC MỤC SAU:
+
+### 📊 1. Đánh giá Tổng quan Sức khỏe Tài chính
+- Nhận định sâu sắc về doanh thu, chi phí vốn và biên lợi nhuận gộp (độ hiệu quả kinh doanh, tỷ suất có đạt kỳ vọng không).
+- Đánh giá quy mô đơn hàng (số lượng đơn và giá trị trung bình đơn hàng).
+
+### 📈 2. Phân tích Xuương & Chu kỳ Kinh doanh
+- Nhận diện các ngày có doanh thu tăng đột biến hoặc giảm sâu. Phân tích nguyên nhân tiềm ẩn hoặc chu kỳ từ chuỗi số liệu hàng ngày.
+
+### 📦 3. Cơ cấu Sản phẩm & Danh mục Chủ lực
+- Nhận xét về nhóm sản phẩm bán chạy nhất và cơ cấu đóng góp doanh thu của các danh mục. Chỉ ra danh mục nào là đóng góp chính hoặc danh mục nào đang yếu cần đẩy mạnh.
+
+### 💳 4. Hành vi Khách hàng & Phương thức Thanh toán
+- Phân tích từ cơ cấu thanh toán (Tiền mặt, QR, Thẻ) để tối ưu hóa quy trình thu ngân hoặc đề xuất chương trình thúc đẩy thanh toán không tiền mặt.
+
+### 💡 5. Đề xuất Hành động Chiến lược (Chi tiết & Khả thi)
+- Đưa ra ít nhất 3 hành động cụ thể và thiết thực để cải thiện tình hình kinh doanh (ví dụ: tối ưu tồn kho, kích cầu sản phẩm, kiểm soát COGS).
+
+YÊU CẦU TRÌNH BÀY:
+- Phân tích sâu sắc, chuyên nghiệp, sử dụng ngôn ngữ kinh tế/kinh doanh thực tế, tránh các lời khuyên chung chung sáo rỗng.
+- In đậm các con số quan trọng để dễ theo dõi.`;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.groqApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.4,
+        max_tokens: 2000,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new AppError(500, `Lỗi khi gọi Groq API: ${errText}`);
+    }
+
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const analysisResult = data.choices?.[0]?.message?.content?.trim();
+    if (!analysisResult) {
+      throw new AppError(500, 'Không nhận được kết quả phân tích từ Groq API');
+    }
+
+    return {
+      analysis: analysisResult,
+      generated_at: new Date().toISOString(),
+      days
+    };
   }
 }

@@ -57,6 +57,10 @@ type Candidate = {
   stock_quantity: number;
   min_stock_level: number;
   unit: string;
+  cost_price?: number;
+  sell_price?: number;
+  categories?: any;
+  suppliers?: any;
 };
 
 type RestockAnalysisItem = Candidate & {
@@ -68,6 +72,8 @@ type RestockAnalysisItem = Candidate & {
   stock_days: number | null;
   reason: string;
   ai_insight: string;
+  sales_speed_7d?: number;
+  sales_trend?: 'up' | 'down' | 'stable';
 };
 
 type OpenFoodFactsProduct = {
@@ -163,27 +169,22 @@ export class AIService {
         messages: [
           {
             role: 'system',
-            content: 'Bạn là trợ lý quản lý tồn kho POS chuyên nghiệp. Trả lời tiếng Việt, ngắn gọn 2-3 câu văn liền mạch. TUYỆT ĐỐI KHÔNG dùng dấu **, dấu gạch đầu dòng (-), markdown hay định dạng đặc biệt. Chỉ viết câu văn thuần túy, tập trung vào hành động cụ thể cần làm.',
+            content: `Bạn là trợ lý quản lý tồn kho và cố vấn cung ứng POS chuyên nghiệp. Hãy viết nhận xét ngắn gọn, thực tế bằng tiếng Việt.
+Sử dụng định dạng Markdown:
+- Dùng **in đậm** cho từ khóa, con số quan trọng (số lượng nhập, chi phí ước tính, ngày hết hàng, nhà cung cấp).
+- Sử dụng các gạch đầu dòng (-) hoặc danh sách ngắn để chia nhỏ thông tin rõ ràng.
+- Đưa ra khuyến nghị thiết thực về hành động cụ thể cần làm.`,
           },
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,
-        max_tokens: 300,
+        max_tokens: 400,
       }),
     });
 
     if (!response.ok) return null;
     const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = data.choices?.[0]?.message?.content?.trim() || null;
-    // Làm sạch output: loại bỏ ** và - đầu dòng nếu AI vẫn tự thêm
-    if (!raw) return null;
-    return raw
-      .replace(/\*\*/g, '')
-      .replace(/^[-•]\s*/gm, '')
-      .replace(/\n{2,}/g, ' ')
-      .replace(/\n/g, '. ')
-      .replace(/\.\s*\./g, '.')
-      .trim();
+    return data.choices?.[0]?.message?.content?.trim() || null;
   }
 
   private static aiProviderName() {
@@ -191,42 +192,77 @@ export class AIService {
     return 'local-rules';
   }
 
-  private static async getAverageDailySalesMap(productIds: string[], days = 30) {
-    const result = new Map<string, number>();
-    productIds.forEach((id) => result.set(id, 0));
+  private static async getProductSalesMetrics(productIds: string[]) {
+    const result = new Map<string, { speed30d: number; speed7d: number; trend: 'up' | 'down' | 'stable' }>();
+    productIds.forEach((id) => result.set(id, { speed30d: 0, speed7d: 0, trend: 'stable' }));
     if (productIds.length === 0) return result;
+
+    const date30DaysAgo = lastNDays(30);
+    const date7DaysAgo = lastNDays(7);
 
     const { data: orders, error: orderError } = await supabase
       .from('orders')
-      .select('id')
+      .select('id, created_at')
       .eq('status', 'completed')
-      .gte('created_at', lastNDays(days));
+      .gte('created_at', date30DaysAgo);
 
     if (orderError) throw new AppError(500, orderError.message);
     const orderIds = (orders || []).map((order) => order.id);
     if (orderIds.length === 0) return result;
 
+    const orderIdToDate = new Map<string, string>();
+    for (const o of orders || []) {
+      orderIdToDate.set(o.id, o.created_at);
+    }
+
     const { data: details, error } = await supabase
       .from('order_details')
-      .select('product_id, quantity')
+      .select('product_id, quantity, order_id')
       .in('product_id', productIds)
       .in('order_id', orderIds);
 
     if (error) throw new AppError(500, error.message);
 
+    const sold30dMap = new Map<string, number>();
+    const sold7dMap = new Map<string, number>();
+
     for (const detail of details || []) {
       const productId = String(detail.product_id);
-      result.set(productId, (result.get(productId) || 0) + Number(detail.quantity || 0));
+      const qty = Number(detail.quantity || 0);
+      const createdAt = orderIdToDate.get(detail.order_id);
+
+      sold30dMap.set(productId, (sold30dMap.get(productId) || 0) + qty);
+      if (createdAt && createdAt >= date7DaysAgo) {
+        sold7dMap.set(productId, (sold7dMap.get(productId) || 0) + qty);
+      }
     }
 
-    for (const [productId, sold] of result.entries()) {
-      result.set(productId, Number((sold / days).toFixed(2)));
+    for (const productId of productIds) {
+      const sold30d = sold30dMap.get(productId) || 0;
+      const sold7d = sold7dMap.get(productId) || 0;
+
+      const speed30d = Number((sold30d / 30).toFixed(2));
+      const speed7d = Number((sold7d / 7).toFixed(2));
+
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (speed7d > speed30d * 1.2 && speed7d > 0.05) {
+        trend = 'up';
+      } else if (speed7d < speed30d * 0.8) {
+        trend = 'down';
+      }
+
+      result.set(productId, { speed30d, speed7d, trend });
     }
 
     return result;
   }
 
-  private static toAnalysisItem(product: Candidate, averageDailySales: number, targetDays: number): RestockAnalysisItem {
+  private static toAnalysisItem(
+    product: Candidate,
+    metrics: { speed30d: number; speed7d: number; trend: 'up' | 'down' | 'stable' },
+    targetDays: number
+  ): RestockAnalysisItem {
+    const averageDailySales = metrics.speed30d;
     const currentStock = Number(product.stock_quantity || 0);
     const minStockLevel = Number(product.min_stock_level || 0);
     const stockDays = averageDailySales > 0 ? Number((currentStock / averageDailySales).toFixed(1)) : null;
@@ -266,6 +302,8 @@ export class AIService {
       alert_status: alertStatus,
       stock_days: stockDays,
       reason,
+      sales_speed_7d: metrics.speed7d,
+      sales_trend: metrics.trend,
       ai_insight: this.buildLocalInsight(
         {
           stock_quantity: currentStock,
@@ -298,7 +336,7 @@ export class AIService {
     const normalizedTargetDays = this.normalizeTargetDays(targetDays);
     let query = supabase
       .from('products')
-      .select('id, sku, name, stock_quantity, min_stock_level, unit')
+      .select('id, sku, name, stock_quantity, min_stock_level, unit, cost_price, sell_price, category_id, supplier_id, categories(name), suppliers(name)')
       .eq('is_active', true);
 
     if (productId) query = query.eq('id', productId);
@@ -307,13 +345,16 @@ export class AIService {
     if (error) throw new AppError(500, error.message);
 
     const candidates = (products || []) as Candidate[];
-    const averageDailySalesMap = await this.getAverageDailySalesMap(
-      candidates.map((product) => product.id),
-      30
+    const salesMetricsMap = await this.getProductSalesMetrics(
+      candidates.map((product) => product.id)
     );
 
     const items = candidates
-      .map((product) => this.toAnalysisItem(product, averageDailySalesMap.get(product.id) || 0, normalizedTargetDays))
+      .map((product) => this.toAnalysisItem(
+        product,
+        salesMetricsMap.get(product.id) || { speed30d: 0, speed7d: 0, trend: 'stable' },
+        normalizedTargetDays
+      ))
       .sort((a, b) => {
         const priorityCompare = priorityWeight[a.priority] - priorityWeight[b.priority];
         if (priorityCompare !== 0) return priorityCompare;
@@ -380,18 +421,45 @@ export class AIService {
         ? Math.floor(item.stock_quantity / item.average_daily_sales)
         : null;
 
+      const categoryObj = item.categories;
+      const categoryName = categoryObj
+        ? (Array.isArray(categoryObj) ? categoryObj[0]?.name : categoryObj.name)
+        : 'Chưa phân loại';
+
+      const supplierObj = item.suppliers;
+      const supplierName = supplierObj
+        ? (Array.isArray(supplierObj) ? supplierObj[0]?.name : supplierObj.name)
+        : 'Chưa liên kết nhà cung cấp';
+
+      const costPrice = Number(item.cost_price || 0);
+      const sellPrice = Number(item.sell_price || 0);
+      const profitMargin = sellPrice > 0 ? Math.round(((sellPrice - costPrice) / sellPrice) * 100) : 0;
+      const estimatedCost = item.recommended_quantity * costPrice;
+
+      const formatVnd = (val: number) => `${Math.round(val).toLocaleString('vi-VN')}đ`;
+
+      const trendText = item.sales_trend === 'up'
+        ? 'TĂNG NHANH GẦN ĐÂY'
+        : item.sales_trend === 'down'
+          ? 'GIẢM GẦN ĐÂY'
+          : 'ỔN ĐỊNH';
+
       const prompt = [
         `Thời điểm phân tích: ${now}`,
         `Sản phẩm: ${item.name} (${item.sku})`,
+        `Danh mục: ${categoryName} | Nhà cung cấp: ${supplierName}`,
+        `Giá nhập: ${formatVnd(costPrice)} | Giá bán: ${formatVnd(sellPrice)} | Biên lợi nhuận: ${profitMargin}%`,
         `Tồn hiện tại: ${item.stock_quantity} ${item.unit}`,
         `Ngưỡng tối thiểu: ${item.min_stock_level}`,
         `Bán trung bình 30 ngày: ${item.average_daily_sales}/ngày`,
+        `Bán trung bình 7 ngày gần đây: ${item.sales_speed_7d || 0}/ngày (Xu hướng: ${trendText})`,
         stockDaysLeft !== null ? `Dự kiến hết hàng sau: ${stockDaysLeft} ngày` : 'Chưa có dữ liệu bán hàng',
-        `Số lượng đề xuất nhập: ${item.recommended_quantity}`,
+        `Số lượng đề xuất nhập: ${item.recommended_quantity} ${item.unit}`,
+        `Tổng chi phí nhập hàng dự kiến: ${formatVnd(estimatedCost)}`,
         `Mục tiêu tồn kho: ${analysis.target_days} ngày`,
         '',
-        'Hãy đưa ra nhận định ngắn gọn (2-3 câu) về tình trạng tồn kho và khuyến nghị cụ thể.',
-        'Viết tự nhiên, chuyên nghiệp, tập trung vào hành động cần làm. Không dùng dấu ** hay markdown.',
+        'Hãy đưa ra nhận định tồn kho và khuyến nghị nhập hàng cụ thể cho mặt hàng này.',
+        'Sử dụng Markdown để viết ngắn gọn, chuyên nghiệp và thuyết phục.',
       ].join('\n');
 
       const aiInsight = (await this.groqInsight(prompt)) || item.ai_insight;

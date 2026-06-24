@@ -31,6 +31,52 @@ const statusLabel = {
 
 const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 
+const renderFormattedText = (text: string) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1.5 text-xs text-slate-600 font-medium">
+      {lines.map((line, idx) => {
+        let cleanLine = line.trim();
+        if (!cleanLine) return <div key={idx} className="h-0.5" />;
+        
+        const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*') || cleanLine.startsWith('•');
+        if (isBullet) {
+          cleanLine = cleanLine.replace(/^[-*•]\s*/, '');
+        }
+
+        const parts = [];
+        let index = 0;
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        let match;
+        
+        while ((match = boldRegex.exec(cleanLine)) !== null) {
+          const before = cleanLine.substring(index, match.index);
+          if (before) parts.push(before);
+          parts.push(<strong key={match.index} className="font-extrabold text-slate-900">{match[1]}</strong>);
+          index = boldRegex.lastIndex;
+        }
+        
+        const after = cleanLine.substring(index);
+        if (after) parts.push(after);
+
+        const content = parts.length > 0 ? parts : cleanLine;
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2">
+              <span className="mt-1.5 text-[6px] text-blue-500 shrink-0">●</span>
+              <span>{content}</span>
+            </div>
+          );
+        }
+
+        return <p key={idx}>{content}</p>;
+      })}
+    </div>
+  );
+};
+
 const AIRecommendationsPage = () => {
   const [items, setItems] = useState<AIRecommendation[]>([]);
   const [analysis, setAnalysis] = useState<RestockAnalysis | null>(null);
@@ -201,7 +247,7 @@ const AIRecommendationsPage = () => {
                   <td className="px-4 py-4 text-right font-bold text-slate-600">{formatNumber(item.min_stock_level)}</td>
                   <td className="px-4 py-4 text-right font-bold text-slate-600">{Number(item.average_daily_sales).toFixed(2)}</td>
                   <td className="px-4 py-4 text-right font-black text-blue-700">{formatNumber(item.recommended_quantity)}</td>
-                  <td className="max-w-md px-4 py-4 font-semibold leading-relaxed text-slate-600">{item.ai_insight}</td>
+                  <td className="max-w-md px-4 py-4 leading-relaxed">{renderFormattedText(item.ai_insight)}</td>
                 </tr>
               ))}
               {visibleAnalysisItems.length === 0 && (
@@ -234,9 +280,9 @@ const AIRecommendationsPage = () => {
                       {statusLabel[item.status]}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm font-semibold leading-relaxed text-slate-600">
-                    {item.ai_insight || item.reason}
-                  </p>
+                  <div className="mt-2 text-sm leading-relaxed">
+                    {item.ai_insight ? renderFormattedText(item.ai_insight) : <p className="font-semibold text-slate-600">{item.reason}</p>}
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold text-slate-500">
                     <span>Tồn: {formatNumber(item.current_stock)}</span>
                     <span>Tối thiểu: {formatNumber(item.min_stock_level)}</span>

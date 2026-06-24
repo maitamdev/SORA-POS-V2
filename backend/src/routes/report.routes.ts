@@ -9,5 +9,6 @@ router.use(authMiddleware);
 router.get('/dashboard', roleMiddleware('admin', 'manager'), ReportController.dashboard);
 router.get('/revenue', roleMiddleware('admin', 'manager'), ReportController.revenue);
 router.get('/top-products', roleMiddleware('admin', 'manager'), ReportController.topProducts);
+router.post('/ai-analysis', roleMiddleware('admin', 'manager'), ReportController.aiAnalysis);
 
 export default router;

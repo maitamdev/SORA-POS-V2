@@ -82,4 +82,6 @@ export const reportAPI = {
   revenue: (days = 30) => api.get<ApiResponse<RevenuePoint[]>>(`/reports/revenue${buildQuery({ days })}`),
   topProducts: (days = 30, limit = 10) =>
     api.get<ApiResponse<TopProduct[]>>(`/reports/top-products${buildQuery({ days, limit })}`),
+  aiAnalysis: (days = 30) =>
+    api.post<ApiResponse<{ analysis: string; generated_at: string; days: number }>>('/reports/ai-analysis', { days }),
 };

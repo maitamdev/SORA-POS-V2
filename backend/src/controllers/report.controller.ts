@@ -26,4 +26,9 @@ export class ReportController {
       'Lấy sản phẩm bán chạy thành công'
     );
   });
+
+  static aiAnalysis = asyncHandler(async (req: Request, res: Response) => {
+    const days = parseDays(req.body.days, 30);
+    successResponse(res, await ReportService.aiAnalysis(days), 'Phân tích báo cáo doanh thu AI thành công');
+  });
 }
