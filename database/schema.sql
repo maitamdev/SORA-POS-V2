@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_details (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   product_name VARCHAR(255) NOT NULL,   -- Lưu tên tại thời điểm mua
   quantity INTEGER NOT NULL,
   unit_price DECIMAL(15, 2) NOT NULL,   -- Giá bán tại thời điểm mua
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS goods_receipts (
 CREATE TABLE IF NOT EXISTS goods_receipt_details (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   goods_receipt_id UUID NOT NULL REFERENCES goods_receipts(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL CHECK (quantity > 0),                  -- Số lượng nhập
   unit_price DECIMAL(15, 2) NOT NULL CHECK (unit_price >= 0),      -- Giá nhập của mặt hàng đó
   subtotal DECIMAL(15, 2) NOT NULL,                                -- Thành tiền = quantity * unit_price
@@ -227,7 +227,7 @@ CREATE TABLE IF NOT EXISTS goods_receipt_details (
 -- ============================================
 CREATE TABLE IF NOT EXISTS stock_transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   type VARCHAR(20) NOT NULL,          -- import, sale, adjustment, return
   quantity INTEGER NOT NULL,          -- Số lượng (dương = nhập, âm = xuất)
   previous_stock INTEGER NOT NULL,    -- Tồn kho trước giao dịch
