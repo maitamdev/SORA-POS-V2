@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { 
   HiOutlineChartBar, 
@@ -8,6 +8,7 @@ import {
   HiOutlineCalendar,
   HiOutlineArrowNarrowUp,
   HiOutlineTrendingUp,
+  HiOutlineTrendingDown,
   HiOutlineArrowNarrowDown
 } from 'react-icons/hi';
 import { useAuthStore } from '../../stores/auth.store';
@@ -22,23 +23,51 @@ const formatDisplayDate = (dateStr: string) => {
   return `${day}/${month}/${year}`;
 };
 
+const renderGrowth = (growth: number) => {
+  if (growth > 0) {
+    return (
+      <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
+        <HiOutlineTrendingUp className="w-3.5 h-3.5" />
+        <span>+{growth}% so với hôm qua</span>
+      </p>
+    );
+  } else if (growth < 0) {
+    return (
+      <p className="text-[10px] font-bold text-rose-600 flex items-center gap-0.5">
+        <HiOutlineTrendingDown className="w-3.5 h-3.5" />
+        <span>{growth}% so với hôm qua</span>
+      </p>
+    );
+  } else {
+    return (
+      <p className="text-[10px] font-bold text-slate-400 flex items-center gap-0.5">
+        <span className="w-2 h-[2px] bg-slate-300 inline-block mr-0.5"></span>
+        <span>0% so với hôm qua</span>
+      </p>
+    );
+  }
+};
+
 const DashboardPage = () => {
   const { user } = useAuthStore();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
   const [hoveredRevenueIdx, setHoveredRevenueIdx] = useState<number | null>(null);
   
-  // Date Input Ref for programmatic showPicker trigger
-  const dateInputRef = useRef<HTMLInputElement>(null);
-
   // Real-time Clock State
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Date Selector State
+  // Date Selector State (Initialized using local date parameters to prevent timezone offset bugs)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const now = new Date();
-    return now.toISOString().slice(0, 10); // YYYY-MM-DD format
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
+
+  // Time Range Selector State (7 days or 30 days)
+  const [selectedRange, setSelectedRange] = useState<number>(7);
 
   // Clock interval
   useEffect(() => {
@@ -48,10 +77,10 @@ const DashboardPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const loadData = async (dateStr?: string) => {
+  const loadData = async (dateStr?: string, days = 7) => {
     setLoading(true);
     try {
-      const response = await reportAPI.dashboard(dateStr);
+      const response = await reportAPI.dashboard(dateStr, days);
       setData(response.data.data);
     } catch {
       toast.error('Không tải được dữ liệu dashboard');
@@ -60,22 +89,10 @@ const DashboardPage = () => {
     }
   };
 
-  // Reload data whenever selectedDate changes
+  // Reload data whenever selectedDate or selectedRange changes
   useEffect(() => {
-    loadData(selectedDate);
-  }, [selectedDate]);
-
-  const handleDateDivClick = () => {
-    if (dateInputRef.current) {
-      try {
-        // Modern programmatic way to open browser native date picker
-        dateInputRef.current.showPicker();
-      } catch (err) {
-        // Fallback for older browsers
-        dateInputRef.current.click();
-      }
-    }
-  };
+    loadData(selectedDate, selectedRange);
+  }, [selectedDate, selectedRange]);
 
   if (!data) {
     return (
@@ -147,19 +164,17 @@ const DashboardPage = () => {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Clickable Date Selector (Triggers Ref showPicker) */}
+          {/* Clickable Date Selector (Overlay input makes clicking parent open native date picker cross-browser) */}
           <div 
-            onClick={handleDateDivClick}
             className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer select-none"
           >
             <HiOutlineCalendar className="w-4 h-4 text-slate-400 pointer-events-none" />
             <span className="pointer-events-none">{formatDisplayDate(selectedDate)}</span>
             <input 
-              ref={dateInputRef}
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute pointer-events-none opacity-0 w-0 h-0"
+              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
             />
           </div>
 
@@ -190,10 +205,7 @@ const DashboardPage = () => {
             <div className="space-y-1.5">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Doanh thu hôm nay</p>
               <p className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{money(summary.today_revenue)}</p>
-              <p className="text-[10px] font-bold text-blue-700 flex items-center gap-0.5">
-                <HiOutlineTrendingUp className="w-3.5 h-3.5" />
-                <span>{summary.today_revenue_growth}% so với hôm qua</span>
-              </p>
+              {renderGrowth(summary.today_revenue_growth)}
             </div>
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -209,10 +221,7 @@ const DashboardPage = () => {
             <div className="space-y-1.5">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Đơn hàng</p>
               <p className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{summary.today_orders} đơn</p>
-              <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-0.5">
-                <HiOutlineTrendingUp className="w-3.5 h-3.5" />
-                <span>{summary.today_orders_growth}% so với hôm qua</span>
-              </p>
+              {renderGrowth(summary.today_orders_growth)}
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
               <HiOutlineShoppingCart className="w-5 h-5" />
@@ -226,10 +235,7 @@ const DashboardPage = () => {
             <div className="space-y-1.5">
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Sản phẩm bán ra</p>
               <p className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">{summary.today_sold_products} món</p>
-              <p className="text-[10px] font-bold text-blue-700 flex items-center gap-0.5">
-                <HiOutlineTrendingUp className="w-3.5 h-3.5" />
-                <span>{summary.today_sold_growth}% so với hôm qua</span>
-              </p>
+              {renderGrowth(summary.today_sold_growth)}
             </div>
             <div className="w-10 h-10 rounded-xl bg-[#e8f2fd] text-[#1b4d8e] flex items-center justify-center group-hover:bg-blue-100 transition-colors">
               <HiOutlineCube className="w-5 h-5" />
@@ -260,10 +266,14 @@ const DashboardPage = () => {
         {/* Doanh thu 7 ngày - Line Area Chart */}
         <div className="lg:col-span-5 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-black uppercase text-slate-700 tracking-wide">Doanh thu 7 ngày</h2>
-            <select className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2.5 py-1.5 outline-none bg-slate-50">
-              <option>7 ngày qua</option>
-              <option>Tháng này</option>
+            <h2 className="text-sm font-black uppercase text-slate-700 tracking-wide">Doanh thu {selectedRange} ngày</h2>
+            <select 
+              value={selectedRange}
+              onChange={(e) => setSelectedRange(Number(e.target.value))}
+              className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2.5 py-1.5 outline-none bg-slate-50 cursor-pointer"
+            >
+              <option value={7}>7 ngày qua</option>
+              <option value={30}>30 ngày qua</option>
             </select>
           </div>
           
@@ -377,9 +387,13 @@ const DashboardPage = () => {
         <div className="lg:col-span-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-black uppercase text-slate-700 tracking-wide">Bán hàng theo danh mục</h2>
-            <select className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2.5 py-1.5 outline-none bg-slate-50">
-              <option>7 ngày qua</option>
-              <option>Tháng này</option>
+            <select 
+              value={selectedRange}
+              onChange={(e) => setSelectedRange(Number(e.target.value))}
+              className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2.5 py-1.5 outline-none bg-slate-50 cursor-pointer"
+            >
+              <option value={7}>7 ngày qua</option>
+              <option value={30}>30 ngày qua</option>
             </select>
           </div>
 
@@ -585,9 +599,13 @@ const DashboardPage = () => {
         <div className="lg:col-span-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-black uppercase text-slate-700 tracking-wide">Top bán chạy</h2>
-            <select className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2 py-1 outline-none bg-slate-50">
-              <option>7 ngày qua</option>
-              <option>Tháng này</option>
+            <select 
+              value={selectedRange}
+              onChange={(e) => setSelectedRange(Number(e.target.value))}
+              className="border border-slate-200 text-[10px] font-bold text-slate-500 rounded-lg px-2 py-1 outline-none bg-slate-50 cursor-pointer"
+            >
+              <option value={7}>7 ngày qua</option>
+              <option value={30}>30 ngày qua</option>
             </select>
           </div>
 

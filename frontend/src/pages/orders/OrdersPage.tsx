@@ -39,6 +39,8 @@ const OrdersPage = () => {
   const [selected, setSelected] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   // Bộ lọc ngày tháng và trạng thái
   const [dateFrom, setDateFrom] = useState('');
@@ -75,7 +77,9 @@ const OrdersPage = () => {
     setDetailLoading(true);
     try {
       const response = await orderAPI.get(id);
-      setSelected(response.data.data);
+      const ord = response.data.data;
+      setSelected(ord);
+      setEmailInput(ord.customers?.email || '');
     } catch {
       toast.error('Không tải được chi tiết hóa đơn');
     } finally {
@@ -619,8 +623,43 @@ const OrdersPage = () => {
                 </div>
 
                 {/* Drawer Footer Actions */}
-                {selected && selected.status !== 'cancelled' && user?.role !== 'cashier' && (
-                  <div className="p-4 border-t border-slate-150/40 bg-white shrink-0">
+                <div className="p-4 border-t border-slate-150/40 bg-white shrink-0 space-y-3">
+                  {/* Gửi Email Hóa Đơn */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gửi hóa đơn qua email</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        placeholder="Nhập email khách hàng..."
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-semibold"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!emailInput.trim()) {
+                            toast.error('Vui lòng nhập email');
+                            return;
+                          }
+                          setIsSending(true);
+                          try {
+                            await orderAPI.sendInvoiceEmail(selected.id, emailInput);
+                            toast.success('Đã gửi email hóa đơn thành công!');
+                          } catch (err: any) {
+                            toast.error(err.response?.data?.message || 'Gửi email thất bại');
+                          } finally {
+                            setIsSending(false);
+                          }
+                        }}
+                        disabled={isSending}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition disabled:opacity-50 flex items-center justify-center min-w-[70px]"
+                      >
+                        {isSending ? '...' : 'Gửi'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {selected && selected.status !== 'cancelled' && user?.role !== 'cashier' && (
                     <button
                       onClick={() => cancel(selected)}
                       className="w-full inline-flex items-center justify-center gap-1.5 h-11 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-sm font-black text-white transition-all shadow-[0_4px_12px_rgba(225,29,72,0.2)]"
@@ -628,8 +667,8 @@ const OrdersPage = () => {
                       <FiTrash2 size={16} />
                       Yêu cầu hủy hóa đơn này
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>

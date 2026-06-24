@@ -28,4 +28,5 @@ export const orderAPI = {
   get: (id: string) => api.get<ApiResponse<Order>>(`/orders/${id}`),
   create: (data: CreateOrderPayload) => api.post<ApiResponse<Order>>('/orders', data),
   cancel: (id: string, note?: string) => api.patch<ApiResponse<Order>>(`/orders/${id}/cancel`, { note, restock: true }),
+  sendInvoiceEmail: (id: string, email: string) => api.post<ApiResponse<null>>(`/orders/${id}/send-email`, { email }),
 };

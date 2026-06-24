@@ -10,6 +10,7 @@ const router = Router();
 router.use(authMiddleware);
 router.get('/', OrderController.list);
 router.post('/', roleMiddleware('admin', 'manager', 'cashier'), validateMiddleware(orderCreateSchema), OrderController.create);
+router.post('/:id/send-email', roleMiddleware('admin', 'manager', 'cashier'), OrderController.sendInvoiceEmail);
 router.get('/:id', OrderController.get);
 router.patch('/:id/cancel', roleMiddleware('admin', 'manager'), validateMiddleware(cancelOrderSchema), OrderController.cancel);
 router.delete('/all', roleMiddleware('admin'), OrderController.deleteAll);

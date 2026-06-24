@@ -11,7 +11,8 @@ const parseDays = (value: unknown, fallback: number) => {
 export class ReportController {
   static dashboard = asyncHandler(async (req: Request, res: Response) => {
     const dateStr = req.query.date as string | undefined;
-    successResponse(res, await ReportService.dashboard(dateStr), 'Lấy dữ liệu dashboard thành công');
+    const days = parseDays(req.query.days, 7);
+    successResponse(res, await ReportService.dashboard(dateStr, days), 'Lấy dữ liệu dashboard thành công');
   });
 
   static revenue = asyncHandler(async (req: Request, res: Response) => {

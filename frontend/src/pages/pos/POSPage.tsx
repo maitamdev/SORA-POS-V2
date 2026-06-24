@@ -181,6 +181,7 @@ const POSPage = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: defaultOperationSettings.productPageSize, total: 0 });
 
   const [checkoutSuccessInfo, setCheckoutSuccessInfo] = useState<{
+    orderId?: string;
     orderNumber: string;
     finalAmount: number;
     total: number;
@@ -198,11 +199,14 @@ const POSPage = () => {
     pointsEarned?: number;
     pointsAfter?: number;
   } | null>(null);
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const scannerBufferRef = useRef('');
   const scannerLastKeyAtRef = useRef(0);
   const scannerTimerRef = useRef<number | null>(null);
   const barcodeAutoSubmitTimerRef = useRef<number | null>(null);
   const barcodeSubmittingRef = useRef(false);
+  const customerPhoneRef = useRef('');
 
   const focusBarcodeInput = () => {
     window.setTimeout(() => document.getElementById('barcode-search-input')?.focus(), 0);
@@ -349,6 +353,7 @@ const POSPage = () => {
 
   const handlePhoneChange = async (value: string) => {
     setCustomerPhone(value);
+    customerPhoneRef.current = value;
     const normalized = value.trim().replace(/[\s.-]/g, '');
 
     // Reset các state tích điểm nếu xóa số điện thoại
@@ -380,6 +385,12 @@ const POSPage = () => {
     if (normalized.length >= 9) {
       try {
         const res = await catalogAPI.customers.list({ search: value, limit: 1 });
+        
+        // Tránh lỗi Race Condition: Nếu người dùng đã gõ ký tự mới, bỏ qua kết quả API cũ
+        if (value !== customerPhoneRef.current) {
+          return;
+        }
+
         const matched = res.data.data.items[0];
         const dbPhone = (matched?.phone || '').trim().replace(/[\s.-]/g, '');
         if (matched && dbPhone === normalized) {
@@ -397,6 +408,9 @@ const POSPage = () => {
         setUsedPoints(0);
         setIsRedeemingPoints(false);
       } catch (err) {
+        if (value !== customerPhoneRef.current) {
+          return;
+        }
         console.error('Lỗi khi tìm kiếm khách hàng bằng SĐT:', err);
         setMatchedCustomer(null);
         setCustomerId('');
@@ -966,10 +980,11 @@ const POSPage = () => {
 
       const response = await orderAPI.create(orderPayload);
 
+      const orderId = response.data.data.id;
       const orderNumber = response.data.data.order_number;
       
       const customerObj = finalCustomerId
-        ? (customers.find(c => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone })
+        ? (customers.find(c => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone, email: '' })
         : null;
 
       const pBefore = matchedCustomer ? matchedCustomer.points : 0;
@@ -977,7 +992,10 @@ const POSPage = () => {
       const pEarned = Math.floor(finalAmount / 10000);
       const pAfter = Math.max(0, pBefore - pUsed + pEarned);
 
+      setCustomerEmail(customerObj?.email || '');
+
       setCheckoutSuccessInfo({
+        orderId,
         orderNumber,
         finalAmount,
         total,
@@ -2404,6 +2422,41 @@ const POSPage = () => {
                 </button>
               </div>
             </div>
+
+            {/* Email form */}
+            {info.orderId && (
+              <div className="px-5 py-3 bg-blue-50/50 border-b border-slate-300 flex items-center gap-3">
+                <p className="text-[11px] font-bold text-slate-700 whitespace-nowrap">Gửi email hóa đơn:</p>
+                <input
+                  type="email"
+                  placeholder="Nhập email nhận hóa đơn..."
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  onClick={async () => {
+                    if (!customerEmail.trim()) {
+                      toast.error('Vui lòng nhập địa chỉ email');
+                      return;
+                    }
+                    setIsSendingEmail(true);
+                    try {
+                      await orderAPI.sendInvoiceEmail(info.orderId!, customerEmail);
+                      toast.success('Đã gửi email hóa đơn thành công!');
+                    } catch (err: any) {
+                      toast.error(err.response?.data?.message || 'Gửi email thất bại');
+                    } finally {
+                      setIsSendingEmail(false);
+                    }
+                  }}
+                  disabled={isSendingEmail}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded shadow-sm transition disabled:opacity-50"
+                >
+                  {isSendingEmail ? 'Đang gửi...' : 'Gửi'}
+                </button>
+              </div>
+            )}
 
             {/* Invoice Preview */}
             <div className="flex-1 overflow-y-auto p-5">

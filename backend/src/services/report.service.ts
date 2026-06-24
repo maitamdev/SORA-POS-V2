@@ -16,7 +16,7 @@ const getLocalDateString = (dateInput: Date | string) => {
 };
 
 export class ReportService {
-  static async dashboard(dateStr?: string) {
+  static async dashboard(dateStr?: string, days = 7) {
     const today = dateStr ? new Date(dateStr + 'T00:00:00') : startOfDay();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -24,8 +24,8 @@ export class ReportService {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const rangeDaysAgo = new Date(today);
+    rangeDaysAgo.setDate(rangeDaysAgo.getDate() - (days - 1));
 
     // 1. Fetch independent data blocks in parallel (Level 1)
     const [
@@ -58,15 +58,15 @@ export class ReportService {
           .lt('created_at', tomorrow.toISOString()),
       ]),
 
-      // Task 3: Fetch 7-day revenue trend
-      this.revenue(7, today),
+      // Task 3: Fetch dynamic range revenue trend
+      this.revenue(days, today),
 
-      // Task 4: Fetch completed orders of last 7 days for Category & Payment
+      // Task 4: Fetch completed orders of last N days for Category & Payment
       supabase
         .from('orders')
         .select('id')
         .eq('status', 'completed')
-        .gte('created_at', sevenDaysAgo.toISOString())
+        .gte('created_at', rangeDaysAgo.toISOString())
         .lt('created_at', tomorrow.toISOString()),
 
       // Task 5: Fetch recent transactions
@@ -85,7 +85,7 @@ export class ReportService {
         .limit(4),
 
       // Task 7: Fetch top products (raw list of IDs)
-      this.topProducts(7, 5, today)
+      this.topProducts(days, 5, today)
     ]);
 
     // Check Level 1 query errors
@@ -97,7 +97,7 @@ export class ReportService {
     if (alertsResult.error) throw new AppError(500, alertsResult.error.message);
 
     const orders = summaryOrdersData.data || [];
-    const sevenDayOrders = categoryAndPaymentRawData.data || [];
+    const rangeOrders = categoryAndPaymentRawData.data || [];
     const recentOrders = recentOrdersResult.data || [];
     const alerts = alertsResult.data || [];
 
@@ -125,7 +125,7 @@ export class ReportService {
     const todayOrderIds = todayCompletedOrders.map((o) => o.id);
     const yesterdayOrderIds = yesterdayCompletedOrders.map((o) => o.id);
     const allCompletedOrderIds = [...todayOrderIds, ...yesterdayOrderIds];
-    const sevenDayOrderIds = sevenDayOrders.map((o) => o.id);
+    const rangeOrderIds = rangeOrders.map((o) => o.id);
     const recentOrderIds = recentOrders.map((o) => o.id);
     const topProductIds = topProductsRaw.map((p) => p.product_id);
 
@@ -143,13 +143,13 @@ export class ReportService {
         : Promise.resolve({ data: null, error: null }),
 
       // Dependent Task 2: Fetch order details for category sales
-      sevenDayOrderIds.length > 0
-        ? supabase.from('order_details').select('product_id, subtotal').in('order_id', sevenDayOrderIds)
+      rangeOrderIds.length > 0
+        ? supabase.from('order_details').select('product_id, subtotal').in('order_id', rangeOrderIds)
         : Promise.resolve({ data: null, error: null }),
 
-      // Dependent Task 3: Fetch payments for last 7 days
-      sevenDayOrderIds.length > 0
-        ? supabase.from('payments').select('order_id, method, amount').in('order_id', sevenDayOrderIds)
+      // Dependent Task 3: Fetch payments for last range days
+      rangeOrderIds.length > 0
+        ? supabase.from('payments').select('order_id, method, amount').in('order_id', rangeOrderIds)
         : Promise.resolve({ data: null, error: null }),
 
       // Dependent Task 4: Fetch payments for recent transactions

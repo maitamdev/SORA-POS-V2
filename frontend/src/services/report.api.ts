@@ -78,7 +78,7 @@ export interface DashboardData {
 }
 
 export const reportAPI = {
-  dashboard: (date?: string) => api.get<ApiResponse<DashboardData>>(`/reports/dashboard${date ? `?date=${date}` : ''}`),
+  dashboard: (date?: string, days = 7) => api.get<ApiResponse<DashboardData>>(`/reports/dashboard${buildQuery({ date, days })}`),
   revenue: (days = 30) => api.get<ApiResponse<RevenuePoint[]>>(`/reports/revenue${buildQuery({ days })}`),
   topProducts: (days = 30, limit = 10) =>
     api.get<ApiResponse<TopProduct[]>>(`/reports/top-products${buildQuery({ days, limit })}`),
