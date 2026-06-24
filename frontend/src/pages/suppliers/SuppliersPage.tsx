@@ -60,26 +60,14 @@ const getSupplierLogo = (name: string, email?: string | null): string => {
   if (cleanName.includes('masan')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/c/ca/Masan_Group_logo.svg';
   }
-  if (cleanName.includes('elmich')) {
-    return 'https://logo.clearbit.com/elmich.vn';
-  }
-  if (cleanName.includes('sunhouse')) {
-    return 'https://logo.clearbit.com/sunhouse.com.vn';
-  }
   if (cleanName.includes('lock')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Lock_%26_Lock_logo.svg';
   }
   if (cleanName.includes('mayora')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/4/4b/Mayora_logo.svg';
   }
-  if (cleanName.includes('minh long')) {
-    return 'https://logo.clearbit.com/minhlong.com';
-  }
   if (cleanName.includes('kinh do') || cleanName.includes('mondelez')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/0/07/Mondelez_International_logo.svg';
-  }
-  if (cleanName.includes('trung nguyen')) {
-    return 'https://logo.clearbit.com/trungnguyenlegend.com';
   }
   if (cleanName.includes('unilever')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/b/b2/Unilever.svg';
@@ -89,15 +77,6 @@ const getSupplierLogo = (name: string, email?: string | null): string => {
   }
   if (cleanName.includes('coca')) {
     return 'https://upload.wikimedia.org/wikipedia/commons/c/cf/Coca-Cola_logo.svg';
-  }
-
-  // Domain extraction from email
-  if (email && email.includes('@')) {
-    const domain = email.split('@')[1].trim();
-    const genericDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'mail.com'];
-    if (!genericDomains.includes(domain)) {
-      return `https://logo.clearbit.com/${domain}`;
-    }
   }
 
   return '';

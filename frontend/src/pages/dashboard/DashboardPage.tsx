@@ -572,6 +572,9 @@ const DashboardPage = () => {
                     <img 
                       src={item.image_url} 
                       alt={item.name} 
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://placehold.co/100x100?text=SP';
+                      }}
                       className="w-9 h-9 object-contain rounded-lg border border-slate-100 bg-slate-50 flex-shrink-0"
                     />
                     <div className="leading-tight min-w-0">
@@ -617,6 +620,9 @@ const DashboardPage = () => {
                   <img 
                     src={item.image_url} 
                     alt={item.name} 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://placehold.co/100x100?text=SP';
+                    }}
                     className="w-9 h-9 object-contain rounded-lg border border-slate-100 bg-slate-50 flex-shrink-0"
                   />
                   <div className="leading-tight min-w-0 flex-1">
