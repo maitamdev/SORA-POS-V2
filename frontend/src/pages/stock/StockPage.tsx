@@ -41,13 +41,48 @@ const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(va
 
 const renderInsight = (text: string) => {
   if (!text) return null;
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-extrabold text-slate-900">{part.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{part}</span>;
-  });
+  const lines = text.split('\n');
+  return (
+    <div className="space-y-1.5 text-xs text-slate-600 font-medium">
+      {lines.map((line, idx) => {
+        let cleanLine = line.trim();
+        if (!cleanLine) return <div key={idx} className="h-0.5" />;
+        
+        const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*') || cleanLine.startsWith('•') || cleanLine.startsWith('+');
+        if (isBullet) {
+          cleanLine = cleanLine.replace(/^[-*•+]\s*/, '');
+        }
+
+        const parts = [];
+        let index = 0;
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        let match;
+        
+        while ((match = boldRegex.exec(cleanLine)) !== null) {
+          const before = cleanLine.substring(index, match.index);
+          if (before) parts.push(before);
+          parts.push(<strong key={match.index} className="font-extrabold text-slate-900">{match[1]}</strong>);
+          index = boldRegex.lastIndex;
+        }
+        
+        const after = cleanLine.substring(index);
+        if (after) parts.push(after);
+
+        const content = parts.length > 0 ? parts : cleanLine;
+
+        if (isBullet) {
+          return (
+            <div key={idx} className="flex items-start gap-2 pl-2">
+              <span className="mt-1.5 text-[5px] text-blue-500 shrink-0">●</span>
+              <span className="flex-1">{content}</span>
+            </div>
+          );
+        }
+
+        return <p key={idx}>{content}</p>;
+      })}
+    </div>
+  );
 };
 
 const getAvatarColor = (name: string) => {
@@ -129,7 +164,7 @@ const StockPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'safe'>('all');
-  const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'near_expiry' | 'watchlist' | 'safe'>('all');
+  const [expiryFilter, setExpiryFilter] = useState<'all' | 'expired' | 'near_expiry' | 'safe'>('all');
 
   // AI Panel
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -289,7 +324,6 @@ const StockPage = () => {
   const expiryStats = useMemo(() => {
     let expired = 0;
     let nearExpiry = 0;
-    let watchlist = 0;
     let safe = 0;
     const currentDateMs = new Date().setHours(0, 0, 0, 0);
 
@@ -301,14 +335,12 @@ const StockPage = () => {
         expired++;
       } else if (remainingDays <= 30) {
         nearExpiry++;
-      } else if (remainingDays <= 90) {
-        watchlist++;
       } else {
         safe++;
       }
     });
 
-    return { expired, nearExpiry, watchlist, safe };
+    return { expired, nearExpiry, safe };
   }, [expiryAlerts]);
 
   // Filtered Expiry Batches
@@ -336,10 +368,8 @@ const StockPage = () => {
         matchesExpiry = remainingDays < 0;
       } else if (expiryFilter === 'near_expiry') {
         matchesExpiry = remainingDays >= 0 && remainingDays <= 30;
-      } else if (expiryFilter === 'watchlist') {
-        matchesExpiry = remainingDays > 30 && remainingDays <= 90;
       } else if (expiryFilter === 'safe') {
-        matchesExpiry = remainingDays > 90;
+        matchesExpiry = remainingDays > 30;
       }
 
       return matchesSearch && matchesCategory && matchesExpiry;
@@ -892,7 +922,7 @@ const StockPage = () => {
         {activeTab === 'expiry' && (
           <div className="space-y-5">
             {/* Expiry Overview Stats Cards */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-3">
               {/* Expired Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'expired' ? 'all' : 'expired')}
@@ -937,28 +967,6 @@ const StockPage = () => {
                 </div>
               </button>
 
-              {/* Watchlist Card */}
-              <button
-                onClick={() => setExpiryFilter(expiryFilter === 'watchlist' ? 'all' : 'watchlist')}
-                className={`group flex items-center gap-4.5 p-4 rounded-xl border transition-all duration-200 text-left ${
-                  expiryFilter === 'watchlist'
-                    ? 'border-amber-500 bg-amber-50/50 shadow-sm ring-2 ring-amber-500/5'
-                    : 'border-slate-200 bg-white shadow-xs hover:shadow-sm hover:border-amber-200 hover:-translate-y-0.5'
-                }`}
-              >
-                <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform duration-200 shadow-inner ${
-                  expiryFilter === 'watchlist'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-amber-50 text-amber-600 border border-amber-100/50'
-                }`}>
-                  <FiClock size={20} className="stroke-[2.5]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Theo dõi (31-90 ngày)</p>
-                  <h4 className="text-xl font-extrabold text-amber-600 mt-0.5 tracking-tight">{expiryStats.watchlist} Lô</h4>
-                </div>
-              </button>
-
               {/* Safe Card */}
               <button
                 onClick={() => setExpiryFilter(expiryFilter === 'safe' ? 'all' : 'safe')}
@@ -976,7 +984,7 @@ const StockPage = () => {
                   <FiShield size={20} className="stroke-[2.5]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">An toàn (&gt; 90 ngày)</p>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">An toàn (&gt; 30 ngày)</p>
                   <h4 className="text-xl font-extrabold text-emerald-600 mt-0.5 tracking-tight">{expiryStats.safe} Lô</h4>
                 </div>
               </button>
@@ -1083,11 +1091,6 @@ const StockPage = () => {
                           statusBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
                           progressColor = 'bg-orange-500';
                           progressPercent = Math.max(5, (remainingDays / 30) * 100);
-                        } else if (remainingDays <= 90) {
-                          statusLabelText = `Còn ${remainingDays} ngày`;
-                          statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-                          progressColor = 'bg-amber-500';
-                          progressPercent = Math.max(5, ((remainingDays - 30) / 60) * 100);
                         } else {
                           statusLabelText = `Còn ${remainingDays} ngày`;
                           statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -1219,11 +1222,6 @@ const StockPage = () => {
                       statusBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
                       progressColor = 'bg-orange-500';
                       progressPercent = Math.max(5, (remainingDays / 30) * 100);
-                    } else if (remainingDays <= 90) {
-                      statusLabelText = `Còn ${remainingDays} ngày`;
-                      statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-                      progressColor = 'bg-amber-500';
-                      progressPercent = Math.max(5, ((remainingDays - 30) / 60) * 100);
                     } else {
                       statusLabelText = `Còn ${remainingDays} ngày`;
                       statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';

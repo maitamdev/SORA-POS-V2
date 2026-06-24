@@ -170,6 +170,7 @@ export class AIService {
           {
             role: 'system',
             content: `Bạn là trợ lý quản lý tồn kho và cố vấn cung ứng POS chuyên nghiệp. Hãy viết nhận xét ngắn gọn, thực tế bằng tiếng Việt.
+TUYỆT ĐỐI KHÔNG sử dụng các biểu tượng cảm xúc (emoji như 📦, ⚠️, 🚨, v.v.) trong toàn bộ nhận xét. Hãy duy trì văn phong kinh tế nghiêm túc.
 Sử dụng định dạng Markdown:
 - Dùng **in đậm** cho từ khóa, con số quan trọng (số lượng nhập, chi phí ước tính, ngày hết hàng, nhà cung cấp).
 - Sử dụng các gạch đầu dòng (-) hoặc danh sách ngắn để chia nhỏ thông tin rõ ràng.
@@ -260,7 +261,8 @@ Sử dụng định dạng Markdown:
   private static toAnalysisItem(
     product: Candidate,
     metrics: { speed30d: number; speed7d: number; trend: 'up' | 'down' | 'stable' },
-    targetDays: number
+    targetDays: number,
+    savedInsight?: string
   ): RestockAnalysisItem {
     const averageDailySales = metrics.speed30d;
     const currentStock = Number(product.stock_quantity || 0);
@@ -291,6 +293,18 @@ Sử dụng định dạng Markdown:
       targetDays
     );
 
+    const localInsight = this.buildLocalInsight(
+      {
+        stock_quantity: currentStock,
+        min_stock_level: minStockLevel,
+        average_daily_sales: averageDailySales,
+        recommended_quantity: recommendedQuantity,
+        unit: product.unit,
+        stock_days: stockDays,
+      },
+      targetDays
+    );
+
     return {
       ...product,
       stock_quantity: currentStock,
@@ -304,17 +318,7 @@ Sử dụng định dạng Markdown:
       reason,
       sales_speed_7d: metrics.speed7d,
       sales_trend: metrics.trend,
-      ai_insight: this.buildLocalInsight(
-        {
-          stock_quantity: currentStock,
-          min_stock_level: minStockLevel,
-          average_daily_sales: averageDailySales,
-          recommended_quantity: recommendedQuantity,
-          unit: product.unit,
-          stock_days: stockDays,
-        },
-        targetDays
-      ),
+      ai_insight: savedInsight || localInsight,
     };
   }
 
@@ -345,6 +349,23 @@ Sử dụng định dạng Markdown:
     if (error) throw new AppError(500, error.message);
 
     const candidates = (products || []) as Candidate[];
+
+    // Fetch latest pending/approved recommendations to map saved insights
+    const { data: savedRecs } = await supabase
+      .from('ai_recommendations')
+      .select('product_id, ai_insight')
+      .in('status', ['pending', 'approved'])
+      .order('created_at', { ascending: false });
+
+    const savedRecsMap = new Map<string, string>();
+    if (savedRecs) {
+      for (const rec of savedRecs) {
+        if (rec.product_id && rec.ai_insight && !savedRecsMap.has(rec.product_id)) {
+          savedRecsMap.set(rec.product_id, rec.ai_insight);
+        }
+      }
+    }
+
     const salesMetricsMap = await this.getProductSalesMetrics(
       candidates.map((product) => product.id)
     );
@@ -353,7 +374,8 @@ Sử dụng định dạng Markdown:
       .map((product) => this.toAnalysisItem(
         product,
         salesMetricsMap.get(product.id) || { speed30d: 0, speed7d: 0, trend: 'stable' },
-        normalizedTargetDays
+        normalizedTargetDays,
+        savedRecsMap.get(product.id)
       ))
       .sort((a, b) => {
         const priorityCompare = priorityWeight[a.priority] - priorityWeight[b.priority];
@@ -369,6 +391,7 @@ Sử dụng định dạng Markdown:
       ai_provider: this.aiProviderName(),
     };
   }
+
 
   private static async saveRecommendation(item: RestockAnalysisItem, userId?: string) {
     const payload = {

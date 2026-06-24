@@ -195,7 +195,7 @@ const ScannerPage: React.FC = () => {
         {/* Camera Helper Text */}
         {isScanning && (
           <p className="mt-3 text-xs text-slate-400 text-center px-4 leading-relaxed">
-            📦 Đưa mã vạch hoặc mã QR sản phẩm vào khung để quét tự động gửi lên POS máy tính
+            Đưa mã vạch hoặc mã QR sản phẩm vào khung để quét tự động gửi lên POS máy tính
           </p>
         )}
 

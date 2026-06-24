@@ -16,7 +16,16 @@ export class OrderController {
 
   static create = asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
-    successResponse(res, await OrderService.create(req.body, req.user.userId), 'Tạo hóa đơn thành công', 201);
+    const order = await OrderService.create(req.body, req.user.userId);
+
+    // Tự động gửi email hóa đơn cho khách hàng nếu có địa chỉ email
+    if (order.customers?.email) {
+      EmailService.sendInvoice(order.customers.email, order).catch((err) => {
+        console.error('[OrderController.create] Lỗi tự động gửi email hóa đơn:', err);
+      });
+    }
+
+    successResponse(res, order, 'Tạo hóa đơn thành công', 201);
   });
 
   static sendInvoiceEmail = asyncHandler(async (req: Request, res: Response) => {

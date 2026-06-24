@@ -559,7 +559,8 @@ export class ReportService {
 
     const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu Kinh doanh POS chuyên nghiệp. 
 Hãy phân tích báo cáo doanh thu và tình hình hoạt động của cửa hàng dựa trên dữ liệu thực tế được cung cấp. Trả lời bằng tiếng Việt.
-Sử dụng định dạng Markdown phong phú để trình bày báo cáo chuyên nghiệp. In đậm những con số quan trọng, xu hướng nổi bật.`;
+Sử dụng định dạng Markdown phong phú để trình bày báo cáo chuyên nghiệp. In đậm những con số quan trọng, xu hướng nổi bật.
+TUYỆT ĐỐI KHÔNG sử dụng các biểu tượng cảm xúc (emoji / icon hình vẽ như 📊, 📈, 📦, 💡, 💰, v.v.) trong toàn bộ câu trả lời. Hãy giữ văn phong chuyên nghiệp của một chuyên gia tài chính.`;
 
     const userPrompt = `Hãy phân tích báo cáo hoạt động kinh doanh trong ${days} ngày qua với các số liệu thực tế sau:
 
@@ -583,22 +584,22 @@ ${paymentStatsList}
 5. CHI TIẾT DOANH THU & LỢI NHUẬN HÀNG NGÀY:
 ${revenueTrendList}
 
-HÃY ĐƯA RA BÁO CÁO PHÂN TÍCH SÂU SẮC BẰNG TIẾNG VIỆT, SỬ DỤNG ĐỊNH DẠNG MARKDOWN RÕ RÀNG VỚI CÁC MỤC SAU:
+HÃY ĐƯA RA BÁO CÁO PHÂN TÍCH SÂU SẮC BẰNG TIẾNG VIỆT, SỬ DỤNG ĐỊNH DẠNG MARKDOWN RÕ RÀNG VỚI CÁC MỤC SAU (TUYỆT ĐỐI KHÔNG DÙNG EMOJI TRONG TIÊU ĐỀ HOẶC NỘI DUNG):
 
-### 📊 1. Đánh giá Tổng quan Sức khỏe Tài chính
+### 1. Đánh giá Tổng quan Sức khỏe Tài chính
 - Nhận định sâu sắc về doanh thu, chi phí vốn và biên lợi nhuận gộp (độ hiệu quả kinh doanh, tỷ suất có đạt kỳ vọng không).
 - Đánh giá quy mô đơn hàng (số lượng đơn và giá trị trung bình đơn hàng).
 
-### 📈 2. Phân tích Xuương & Chu kỳ Kinh doanh
+### 2. Phân tích Xu hướng & Chu kỳ Kinh doanh
 - Nhận diện các ngày có doanh thu tăng đột biến hoặc giảm sâu. Phân tích nguyên nhân tiềm ẩn hoặc chu kỳ từ chuỗi số liệu hàng ngày.
 
-### 📦 3. Cơ cấu Sản phẩm & Danh mục Chủ lực
+### 3. Cơ cấu Sản phẩm & Danh mục Chủ lực
 - Nhận xét về nhóm sản phẩm bán chạy nhất và cơ cấu đóng góp doanh thu của các danh mục. Chỉ ra danh mục nào là đóng góp chính hoặc danh mục nào đang yếu cần đẩy mạnh.
 
-### 💳 4. Hành vi Khách hàng & Phương thức Thanh toán
+### 4. Hành vi Khách hàng & Phương thức Thanh toán
 - Phân tích từ cơ cấu thanh toán (Tiền mặt, QR, Thẻ) để tối ưu hóa quy trình thu ngân hoặc đề xuất chương trình thúc đẩy thanh toán không tiền mặt.
 
-### 💡 5. Đề xuất Hành động Chiến lược (Chi tiết & Khả thi)
+### 5. Đề xuất Hành động Chiến lược (Chi tiết & Khả thi)
 - Đưa ra ít nhất 3 hành động cụ thể và thiết thực để cải thiện tình hình kinh doanh (ví dụ: tối ưu tồn kho, kích cầu sản phẩm, kiểm soát COGS).
 
 YÊU CẦU TRÌNH BÀY:

@@ -717,9 +717,9 @@ BEGIN
   
   CREATE TEMP TABLE goods_receipt_items ON COMMIT DROP AS
   SELECT
-    (item->>'product_id')::uuid AS product_id,
-    (item->>'quantity')::integer AS quantity,
-    (item->>'unit_price')::numeric(15, 2) AS unit_price
+    product_id,
+    quantity,
+    unit_price
   FROM jsonb_to_recordset(COALESCE(p_payload->'items', '[]'::jsonb)) AS item(product_id uuid, quantity integer, unit_price numeric);
 
   SELECT COUNT(*) INTO v_item_count FROM goods_receipt_items;

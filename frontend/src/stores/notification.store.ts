@@ -22,12 +22,12 @@ export interface Notification {
 const MAX_NOTIFICATIONS = 50;
 
 const TYPE_ICONS: Record<NotificationType, string> = {
-  order_new: '🟢',
-  order_cancelled: '🟡',
-  stock_low: '🟠',
-  stock_out: '🔴',
-  shift_checkin: '🔵',
-  info: 'ℹ️',
+  order_new: '[Đơn Mới]',
+  order_cancelled: '[Hủy Đơn]',
+  stock_low: '[Sắp Hết]',
+  stock_out: '[Hết Hàng]',
+  shift_checkin: '[Vào Ca]',
+  info: '[Thông Tin]',
 };
 
 /* ------------------------------------------------------------------ */
@@ -69,7 +69,7 @@ export const useNotificationStore = create<NotificationState>()(
         });
 
         // Hiện toast popup ngay lập tức
-        const icon = TYPE_ICONS[type] || 'ℹ️';
+        const icon = TYPE_ICONS[type] || '[Thông Tin]';
         toast(
           `${icon} ${title}\n${message}`,
           {

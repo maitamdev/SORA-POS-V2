@@ -72,11 +72,11 @@ BEGIN
   
   CREATE TEMP TABLE goods_receipt_items ON COMMIT DROP AS
   SELECT
-    (item->>'product_id')::uuid AS product_id,
-    (item->>'quantity')::integer AS quantity,
-    (item->>'unit_price')::numeric(15, 2) AS unit_price,
-    COALESCE(NULLIF(item->>'expiry_date', '')::date, CURRENT_DATE + INTERVAL '1 year') AS expiry_date,
-    COALESCE(NULLIF(trim(item->>'batch_number'), ''), 'BAT-' || to_char(now(), 'YYYYMMDD') || '-' || substring(uuid_generate_v4()::text, 1, 8)) AS batch_number
+    product_id,
+    quantity,
+    unit_price,
+    COALESCE(NULLIF(expiry_date, '')::date, CURRENT_DATE + INTERVAL '1 year') AS expiry_date,
+    COALESCE(NULLIF(trim(batch_number), ''), 'BAT-' || to_char(now(), 'YYYYMMDD') || '-' || substring(gen_random_uuid()::text, 1, 8)) AS batch_number
   FROM jsonb_to_recordset(COALESCE(p_payload->'items', '[]'::jsonb)) AS item(product_id uuid, quantity integer, unit_price numeric, expiry_date text, batch_number text);
 
   SELECT COUNT(*) INTO v_item_count FROM goods_receipt_items;

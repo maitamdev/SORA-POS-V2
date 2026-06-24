@@ -4,19 +4,25 @@ import {
   HiOutlineCheck,
   HiOutlineTrash,
   HiOutlineX,
+  HiOutlineShoppingBag,
+  HiOutlineBan,
+  HiOutlineExclamationCircle,
+  HiOutlineXCircle,
+  HiOutlineUser,
+  HiOutlineInformationCircle,
 } from 'react-icons/hi';
 import { useNotificationStore, NotificationType } from '../../stores/notification.store';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-const TYPE_CONFIG: Record<NotificationType, { icon: string; color: string; bg: string }> = {
-  order_new: { icon: '🟢', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  order_cancelled: { icon: '🟡', color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  stock_low: { icon: '🟠', color: 'text-orange-400', bg: 'bg-orange-500/10' },
-  stock_out: { icon: '🔴', color: 'text-red-400', bg: 'bg-red-500/10' },
-  shift_checkin: { icon: '🔵', color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  info: { icon: 'ℹ️', color: 'text-slate-400', bg: 'bg-slate-500/10' },
+const TYPE_CONFIG: Record<NotificationType, { icon: React.ComponentType<{ className?: string }>; color: string; bg: string }> = {
+  order_new: { icon: HiOutlineShoppingBag, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+  order_cancelled: { icon: HiOutlineBan, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+  stock_low: { icon: HiOutlineExclamationCircle, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+  stock_out: { icon: HiOutlineXCircle, color: 'text-red-400', bg: 'bg-red-500/10' },
+  shift_checkin: { icon: HiOutlineUser, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+  info: { icon: HiOutlineInformationCircle, color: 'text-slate-400', bg: 'bg-slate-500/10' },
 };
 
 function timeAgo(timestamp: string): string {
@@ -41,7 +47,7 @@ const NotificationCenter = () => {
 
   // Đóng panel khi click ra ngoài
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: any) => {
       if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
@@ -55,7 +61,7 @@ const NotificationCenter = () => {
 
   // Đóng khi nhấn Escape
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
+    const handleEsc = (e: any) => {
       if (e.key === 'Escape') setIsOpen(false);
     };
     if (isOpen) window.addEventListener('keydown', handleEsc);
@@ -148,9 +154,9 @@ const NotificationCenter = () => {
                   >
                     {/* Icon */}
                     <div
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-sm ${config.bg}`}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg flex-shrink-0 text-sm ${config.color} ${config.bg}`}
                     >
-                      {config.icon}
+                      <config.icon className="w-4 h-4" />
                     </div>
 
                     {/* Content */}
@@ -173,7 +179,7 @@ const NotificationCenter = () => {
 
                     {/* Delete button (visible on hover) */}
                     <button
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         removeNotification(notification.id);
                       }}

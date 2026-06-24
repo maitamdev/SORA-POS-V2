@@ -411,7 +411,7 @@ const DashboardPage = () => {
                     <div className="w-full max-w-[28px] bg-slate-100 rounded-t-lg h-32 flex items-end">
                       <div 
                         style={{ height: `${percent}%` }}
-                        className="w-full bg-[#1b4d8e] group-hover:bg-[#3b8fd4] transition-all duration-200 rounded-t-lg shadow-sm"
+                        className="w-full bg-gradient-to-t from-[#1b4d8e] to-[#3b8fd4] group-hover:from-[#3b8fd4] group-hover:to-[#60a5fa] transition-all duration-300 rounded-t-lg shadow-sm"
                       />
                     </div>
                     <span className="text-[9px] text-slate-400 font-extrabold mt-2 text-center w-full truncate block" title={item.name}>

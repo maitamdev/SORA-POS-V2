@@ -224,8 +224,8 @@ export class StockService {
       const watchlistDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       query = query.gt('expiry_date', warningDate).lte('expiry_date', watchlistDate);
     } else if (queryParams.status === 'safe') {
-      const watchlistDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      query = query.gt('expiry_date', watchlistDate);
+      const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      query = query.gt('expiry_date', warningDate);
     }
 
     query = query.order('expiry_date', { ascending: true });
