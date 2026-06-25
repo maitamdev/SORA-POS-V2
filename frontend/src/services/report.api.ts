@@ -77,11 +77,24 @@ export interface DashboardData {
   top_products: TopProductExtended[];
 }
 
+export interface AiChartData {
+  title: string;
+  type: 'pie' | 'bar' | 'line';
+  data: { name: string; value: number }[];
+}
+
+export interface AiAnalysisResult {
+  summary: string;
+  insights: string[];
+  recommendations: string[];
+  charts: AiChartData[];
+}
+
 export const reportAPI = {
   dashboard: (date?: string, days = 7) => api.get<ApiResponse<DashboardData>>(`/reports/dashboard${buildQuery({ date, days })}`),
   revenue: (days = 30) => api.get<ApiResponse<RevenuePoint[]>>(`/reports/revenue${buildQuery({ days })}`),
   topProducts: (days = 30, limit = 10) =>
     api.get<ApiResponse<TopProduct[]>>(`/reports/top-products${buildQuery({ days, limit })}`),
   aiAnalysis: (days = 30) =>
-    api.post<ApiResponse<{ analysis: string; generated_at: string; days: number }>>('/reports/ai-analysis', { days }),
+    api.post<ApiResponse<{ analysis: AiAnalysisResult; generated_at: string; days: number }>>('/reports/ai-analysis', { days }),
 };

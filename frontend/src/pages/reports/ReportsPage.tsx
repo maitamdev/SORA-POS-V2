@@ -9,7 +9,7 @@ import {
   HiOutlineClock as HiClock,
   HiOutlineDownload
 } from 'react-icons/hi';
-import { reportAPI, RevenuePoint, TopProduct } from '../../services/report.api';
+import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult } from '../../services/report.api';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -18,7 +18,14 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend 
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  LineChart,
+  Line
 } from 'recharts';
 import * as XLSX from 'xlsx';
 
@@ -33,73 +40,7 @@ const formatDateLabel = (dateStr: string) => {
   return `${parts[2]}/${parts[1]}`;
 };
 
-const renderReportMarkdown = (text: string) => {
-  if (!text) return null;
-  const lines = text.split('\n');
-  return (
-    <div className="space-y-3 text-[12.5px] leading-relaxed text-slate-600 font-medium">
-      {lines.map((line, idx) => {
-        let cleanLine = line.trim();
-        if (!cleanLine) return <div key={idx} className="h-2" />;
-
-        // Header ###
-        if (cleanLine.startsWith('###')) {
-          const headerText = cleanLine.replace(/^###\s*/, '');
-          return (
-            <h3 key={idx} className="text-sm font-black text-slate-800 border-b border-slate-100 pb-1.5 pt-4 flex items-center gap-1.5">
-              {headerText}
-            </h3>
-          );
-        }
-
-        // Header ##
-        if (cleanLine.startsWith('##')) {
-          const headerText = cleanLine.replace(/^##\s*/, '');
-          return (
-            <h2 key={idx} className="text-base font-black text-slate-900 border-b border-slate-200 pb-2 pt-5">
-              {headerText}
-            </h2>
-          );
-        }
-
-        // Bullet points
-        const isBullet = cleanLine.startsWith('-') || cleanLine.startsWith('*') || cleanLine.startsWith('•') || cleanLine.startsWith('+');
-        if (isBullet) {
-          cleanLine = cleanLine.replace(/^[-*•+]\s*/, '');
-        }
-
-        // Parse **bold** inside the line
-        const parts = [];
-        let index = 0;
-        const boldRegex = /\*\*(.*?)\*\*/g;
-        let match;
-
-        while ((match = boldRegex.exec(cleanLine)) !== null) {
-          const before = cleanLine.substring(index, match.index);
-          if (before) parts.push(before);
-          parts.push(<strong key={match.index} className="font-extrabold text-slate-900">{match[1]}</strong>);
-          index = boldRegex.lastIndex;
-        }
-
-        const after = cleanLine.substring(index);
-        if (after) parts.push(after);
-
-        const content = parts.length > 0 ? parts : cleanLine;
-
-        if (isBullet) {
-          return (
-            <div key={idx} className="flex items-start gap-2 pl-3">
-              <span className="mt-2 text-[5px] text-indigo-500 shrink-0">●</span>
-              <span className="flex-1">{content}</span>
-            </div>
-          );
-        }
-
-        return <p key={idx} className="pl-1">{content}</p>;
-      })}
-    </div>
-  );
-};
+const COLORS = ['#1e1b4b', '#312e81', '#3730a3', '#4338ca', '#4f46e5', '#6366f1', '#818cf8', '#a5b4fc'];
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -146,7 +87,7 @@ const ReportsPage = () => {
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
-  const [aiAnalysisText, setAiAnalysisText] = useState('');
+  const [aiAnalysisData, setAiAnalysisData] = useState<AiAnalysisResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
   const loadData = async () => {
@@ -167,10 +108,13 @@ const ReportsPage = () => {
 
   const handleAiAnalysis = async () => {
     setAiLoading(true);
-    setAiAnalysisText('');
+    setAiAnalysisData(null);
     try {
       const res = await reportAPI.aiAnalysis(days);
-      setAiAnalysisText(res.data.data.analysis);
+      const data = typeof res.data.data.analysis === 'string' 
+        ? JSON.parse(res.data.data.analysis) 
+        : res.data.data.analysis;
+      setAiAnalysisData(data);
       toast.success('Phân tích tài chính AI hoàn tất!');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Không thể thực hiện phân tích tài chính AI');
@@ -181,7 +125,7 @@ const ReportsPage = () => {
 
   useEffect(() => {
     loadData();
-    setAiAnalysisText('');
+    setAiAnalysisData(null);
   }, [days]);
 
   // Aggregate metrics
@@ -371,9 +315,100 @@ const ReportsPage = () => {
               </div>
               <span className="text-xs font-bold text-slate-500 animate-pulse">Trợ lý AI đang tổng hợp số liệu và lập báo cáo tài chính...</span>
             </div>
-          ) : aiAnalysisText ? (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-5 animate-fadeIn">
-              {renderReportMarkdown(aiAnalysisText)}
+          ) : aiAnalysisData ? (
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 md:p-8 shadow-sm animate-fadeIn space-y-8">
+              {/* Header section with icon */}
+              <div className="flex items-start gap-4 pb-6 border-b border-slate-100">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-white shrink-0 shadow-md">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 tracking-tight">Tổng Quan Sức Khỏe Tài Chính</h3>
+                  <p className="text-[13.5px] text-slate-500 font-medium leading-relaxed mt-1.5">{aiAnalysisData.summary}</p>
+                </div>
+              </div>
+
+              {/* Charts Grid */}
+              {aiAnalysisData.charts && aiAnalysisData.charts.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {aiAnalysisData.charts.map((chart, idx) => (
+                    <div key={idx} className={`flex flex-col ${aiAnalysisData.charts.length === 3 && idx === 2 ? 'md:col-span-2' : ''}`}>
+                      <h4 className="text-[12.5px] font-bold text-slate-800 mb-4 uppercase tracking-wider">{chart.title}</h4>
+                      <div className="h-[280px] w-full rounded-xl bg-slate-50/50 border border-slate-100/50 p-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {chart.type === 'pie' ? (
+                            <PieChart>
+                              <Pie data={chart.data} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                {chart.data.map((_, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(val: any) => money(Number(val))} />
+                              <Legend />
+                            </PieChart>
+                          ) : chart.type === 'line' ? (
+                            <LineChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${val / 1000}k`} />
+                              <Tooltip formatter={(val: any) => money(Number(val))} />
+                              <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={3} dot={{ r: 4, fill: COLORS[0] }} activeDot={{ r: 6 }} />
+                            </LineChart>
+                          ) : (
+                            <BarChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${val / 1000}k`} />
+                              <Tooltip formatter={(val: any) => money(Number(val))} cursor={{ fill: '#f8fafc' }} />
+                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                {chart.data.map((_, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Insights & Recommendations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-100">
+                <div className="space-y-4">
+                  <h3 className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div>
+                    Phân tích chuyên sâu
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    {aiAnalysisData.insights?.map((insight, i) => (
+                      <div key={i} className="flex gap-3 text-[13.5px] font-medium text-slate-600 items-start">
+                        <span className="text-slate-300 mt-0.5 select-none font-bold">0{i+1}</span>
+                        <span className="flex-1 leading-relaxed">{insight}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div>
+                    Chiến lược hành động
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    {aiAnalysisData.recommendations?.map((rec, i) => (
+                      <div key={i} className="flex gap-3 text-[13.5px] font-medium text-slate-700 items-start p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                        <svg className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="flex-1 leading-relaxed">{rec}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="py-10 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/30">

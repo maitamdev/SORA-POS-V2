@@ -537,7 +537,7 @@ export class ReportService {
     const money = (value: number) => `${Math.round(value || 0).toLocaleString('vi-VN')} VND`;
 
     // Construct detailed prompt
-    const topProductsList = topProductsRaw.map((p, idx) => 
+    const topProductsList = topProductsRaw.slice(0, 5).map((p, idx) => 
       `- Top ${idx + 1}: ${p.product_name} - Số lượng: ${p.quantity} - Doanh thu: ${money(p.revenue)}`
     ).join('\n') || '- Không có sản phẩm nào bán ra';
 
@@ -549,7 +549,9 @@ export class ReportService {
       `- ${p.name}: Chiếm ${p.percentage}% (${p.count} giao dịch - ${money(p.amount)})`
     ).join('\n');
 
-    const revenueTrendList = revenueTrend.map((r) => 
+    // Only take the last 14 days to reduce prompt tokens
+    const recentRevenueTrend = revenueTrend.length > 14 ? revenueTrend.slice(-14) : revenueTrend;
+    const revenueTrendList = recentRevenueTrend.map((r) => 
       `+ Ngày ${r.date.split('-').reverse().join('/')}: Doanh thu: ${money(r.revenue)} | Lợi nhuận: ${money(r.profit)} | Đơn hàng: ${r.orders}`
     ).join('\n');
 
@@ -558,9 +560,48 @@ export class ReportService {
     }
 
     const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu Kinh doanh POS chuyên nghiệp. 
-Hãy phân tích báo cáo doanh thu và tình hình hoạt động của cửa hàng dựa trên dữ liệu thực tế được cung cấp. Trả lời bằng tiếng Việt.
-Sử dụng định dạng Markdown phong phú để trình bày báo cáo chuyên nghiệp. In đậm những con số quan trọng, xu hướng nổi bật.
-TUYỆT ĐỐI KHÔNG sử dụng các biểu tượng cảm xúc (emoji / icon hình vẽ như 📊, 📈, 📦, 💡, 💰, v.v.) trong toàn bộ câu trả lời. Hãy giữ văn phong chuyên nghiệp của một chuyên gia tài chính.`;
+Hãy phân tích báo cáo doanh thu và tình hình hoạt động của cửa hàng dựa trên dữ liệu thực tế được cung cấp.
+BẮT BUỘC trả về kết quả dưới định dạng JSON hợp lệ (không chứa bất kỳ chuỗi văn bản nào ngoài JSON).
+Tuyệt đối KHÔNG dùng ký tự markdown \`\`\`json. Chỉ trả về một JSON object duy nhất.
+Cấu trúc JSON yêu cầu:
+{
+  "summary": "Đánh giá tổng quan sức khỏe tài chính (khoảng 2-3 câu).",
+  "insights": [
+    "Phân tích sâu sắc 1",
+    "Phân tích sâu sắc 2",
+    "Phân tích sâu sắc 3"
+  ],
+  "recommendations": [
+    "Hành động cụ thể 1",
+    "Hành động cụ thể 2",
+    "Hành động cụ thể 3"
+  ],
+  "charts": [
+    {
+      "title": "Tên biểu đồ (ví dụ: Cơ cấu doanh thu theo danh mục)",
+      "type": "pie",
+      "data": [
+        { "name": "Tên mục 1", "value": 123456 },
+        { "name": "Tên mục 2", "value": 789101 }
+      ]
+    },
+    {
+      "title": "Tên biểu đồ 2 (ví dụ: Xu hướng doanh thu tuần qua)",
+      "type": "bar",
+      "data": [
+        { "name": "Ngày X", "value": 123456 }
+      ]
+    }
+    {
+      "title": "Tên biểu đồ 3 (ví dụ: Xu hướng lợi nhuận / số lượng đơn hàng)",
+      "type": "line",
+      "data": [
+        { "name": "Ngày X", "value": 123 }
+      ]
+    }
+  ]
+}
+QUAN TRỌNG: Bạn BẮT BUỘC phải tạo ra CHÍNH XÁC 3 biểu đồ (1 biểu đồ tròn 'pie', 1 biểu đồ cột 'bar', và 1 biểu đồ đường 'line') để giao diện hiển thị đầy đủ thông tin. Không được ít hơn hoặc nhiều hơn 3 biểu đồ.`;
 
     const userPrompt = `Hãy phân tích báo cáo hoạt động kinh doanh trong ${days} ngày qua với các số liệu thực tế sau:
 
@@ -584,27 +625,7 @@ ${paymentStatsList}
 5. CHI TIẾT DOANH THU & LỢI NHUẬN HÀNG NGÀY:
 ${revenueTrendList}
 
-HÃY ĐƯA RA BÁO CÁO PHÂN TÍCH SÂU SẮC BẰNG TIẾNG VIỆT, SỬ DỤNG ĐỊNH DẠNG MARKDOWN RÕ RÀNG VỚI CÁC MỤC SAU (TUYỆT ĐỐI KHÔNG DÙNG EMOJI TRONG TIÊU ĐỀ HOẶC NỘI DUNG):
-
-### 1. Đánh giá Tổng quan Sức khỏe Tài chính
-- Nhận định sâu sắc về doanh thu, chi phí vốn và biên lợi nhuận gộp (độ hiệu quả kinh doanh, tỷ suất có đạt kỳ vọng không).
-- Đánh giá quy mô đơn hàng (số lượng đơn và giá trị trung bình đơn hàng).
-
-### 2. Phân tích Xu hướng & Chu kỳ Kinh doanh
-- Nhận diện các ngày có doanh thu tăng đột biến hoặc giảm sâu. Phân tích nguyên nhân tiềm ẩn hoặc chu kỳ từ chuỗi số liệu hàng ngày.
-
-### 3. Cơ cấu Sản phẩm & Danh mục Chủ lực
-- Nhận xét về nhóm sản phẩm bán chạy nhất và cơ cấu đóng góp doanh thu của các danh mục. Chỉ ra danh mục nào là đóng góp chính hoặc danh mục nào đang yếu cần đẩy mạnh.
-
-### 4. Hành vi Khách hàng & Phương thức Thanh toán
-- Phân tích từ cơ cấu thanh toán (Tiền mặt, QR, Thẻ) để tối ưu hóa quy trình thu ngân hoặc đề xuất chương trình thúc đẩy thanh toán không tiền mặt.
-
-### 5. Đề xuất Hành động Chiến lược (Chi tiết & Khả thi)
-- Đưa ra ít nhất 3 hành động cụ thể và thiết thực để cải thiện tình hình kinh doanh (ví dụ: tối ưu tồn kho, kích cầu sản phẩm, kiểm soát COGS).
-
-YÊU CẦU TRÌNH BÀY:
-- Phân tích sâu sắc, chuyên nghiệp, sử dụng ngôn ngữ kinh tế/kinh doanh thực tế, tránh các lời khuyên chung chung sáo rỗng.
-- In đậm các con số quan trọng để dễ theo dõi.`;
+Dựa vào dữ liệu trên, hãy trả về kết quả định dạng JSON.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -614,12 +635,13 @@ YÊU CẦU TRÌNH BÀY:
       },
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.4,
-        max_tokens: 2000,
+        temperature: 0.3,
+        max_tokens: 1000,
       }),
     });
 
@@ -634,8 +656,16 @@ YÊU CẦU TRÌNH BÀY:
       throw new AppError(500, 'Không nhận được kết quả phân tích từ Groq API');
     }
 
+    let parsedAnalysis;
+    try {
+      parsedAnalysis = JSON.parse(analysisResult);
+    } catch (error) {
+      console.error('Lỗi parse JSON từ AI:', analysisResult);
+      throw new AppError(500, 'AI trả về dữ liệu không đúng định dạng JSON');
+    }
+
     return {
-      analysis: analysisResult,
+      analysis: parsedAnalysis,
       generated_at: new Date().toISOString(),
       days
     };
