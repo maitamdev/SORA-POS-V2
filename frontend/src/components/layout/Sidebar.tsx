@@ -154,11 +154,11 @@ const Sidebar = () => {
           <img
             src="/assets/logo.png"
             alt="Sora POS Logo"
-            className="w-10 h-10 object-contain"
+            className="w-9 h-9 object-contain"
           />
           <div>
-            <h1 className="text-white font-black text-sm tracking-tight leading-none">Sora POS</h1>
-            <p className="text-slate-500 text-[10px] font-semibold mt-0.5 uppercase tracking-wider">Quản lý bán hàng</p>
+            <h1 className="text-white font-bold text-sm tracking-tight leading-none">Sora POS</h1>
+            <p className="text-slate-500 text-[10px] font-medium mt-0.5 uppercase tracking-wider">Quản lý bán hàng</p>
           </div>
         </div>
         {/* Notification Bell */}
@@ -173,8 +173,8 @@ const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-6">
-        <ul className="space-y-1">
+      <nav className="flex-1 overflow-y-auto py-4">
+        <ul className="space-y-0.5">
           {filteredMenu.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -188,8 +188,8 @@ const Sidebar = () => {
                   to={item.path}
                   className={`sidebar-link ${isActive ? 'active' : ''}`}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
+                  <Icon className="w-[18px] h-[18px] flex-shrink-0" />
+                  <span className="text-[11px] font-medium tracking-wide uppercase">{item.label}</span>
                 </Link>
               </li>
             );
@@ -198,10 +198,10 @@ const Sidebar = () => {
       </nav>
 
       {/* User Info + Logout */}
-      <div className="border-t border-slate-800/40 p-4 bg-sidebar-hover/80">
+      <div className="border-t border-slate-800/40 p-4">
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-red-400 hover:bg-red-950/20 rounded-xl transition-all duration-200"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-all duration-200"
         >
           <HiOutlineLogout className="w-3.5 h-3.5" />
           <span>Đăng xuất</span>
@@ -215,7 +215,7 @@ const Sidebar = () => {
       {/* Mobile hamburger button - shown only on small screens */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-sidebar-bg text-white rounded-xl flex items-center justify-center shadow-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
+        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-sidebar-bg text-white rounded-lg flex items-center justify-center shadow-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
         aria-label="Mở menu"
       >
         <HiOutlineMenu className="w-5 h-5" />

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { 
   HiOutlineTrendingUp as HiTrendUp, 
@@ -9,7 +9,10 @@ import {
   HiOutlineClock as HiClock,
   HiOutlineDownload
 } from 'react-icons/hi';
+import { FiTrendingUp, FiTrendingDown, FiMinus, FiPackage } from 'react-icons/fi';
 import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult } from '../../services/report.api';
+import { aiAPI } from '../../services/ai.api';
+import { RestockAnalysis } from '../../types/domain.type';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -40,7 +43,7 @@ const formatDateLabel = (dateStr: string) => {
   return `${parts[2]}/${parts[1]}`;
 };
 
-const COLORS = ['#1e1b4b', '#312e81', '#3730a3', '#4338ca', '#4f46e5', '#6366f1', '#818cf8', '#a5b4fc'];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -82,6 +85,24 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+const TrendBadge = ({ trend }: { trend?: string }) => {
+  if (trend === 'up') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200"><FiTrendingUp className="w-3 h-3" /> Tăng</span>;
+  if (trend === 'down') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-600 text-[10px] font-bold border border-red-200"><FiTrendingDown className="w-3 h-3" /> Giảm</span>;
+  return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200"><FiMinus className="w-3 h-3" /> Ổn định</span>;
+};
+
+const StockDaysBar = ({ stockDays, targetDays }: { stockDays: number | null; targetDays: number }) => {
+  if (stockDays === null) return <span className="text-[10px] text-slate-400 font-medium">N/A</span>;
+  const percent = Math.min((stockDays / targetDays) * 100, 100);
+  const barColor = stockDays <= 3 ? 'bg-red-500' : stockDays <= targetDays * 0.5 ? 'bg-amber-500' : 'bg-emerald-500';
+  return (
+    <div className="flex items-center gap-2 min-w-[90px]">
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full rounded-full ${barColor}`} style={{ width: `${percent}%` }} /></div>
+      <span className={`text-[10px] font-bold tabular-nums ${stockDays <= 3 ? 'text-red-600' : stockDays <= targetDays * 0.5 ? 'text-amber-600' : 'text-slate-600'}`}>{stockDays}d</span>
+    </div>
+  );
+};
+
 const ReportsPage = () => {
   const [days, setDays] = useState(30);
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
@@ -89,8 +110,10 @@ const ReportsPage = () => {
   const [loading, setLoading] = useState(false);
   const [aiAnalysisData, setAiAnalysisData] = useState<AiAnalysisResult | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [stockAnalysis, setStockAnalysis] = useState<RestockAnalysis | null>(null);
+  const [stockLoading, setStockLoading] = useState(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [revenueRes, topRes] = await Promise.all([
@@ -104,9 +127,9 @@ const ReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
 
-  const handleAiAnalysis = async () => {
+  const handleAiAnalysis = useCallback(async () => {
     setAiLoading(true);
     setAiAnalysisData(null);
     try {
@@ -115,18 +138,37 @@ const ReportsPage = () => {
         ? JSON.parse(res.data.data.analysis) 
         : res.data.data.analysis;
       setAiAnalysisData(data);
-      toast.success('Phân tích tài chính AI hoàn tất!');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Không thể thực hiện phân tích tài chính AI');
     } finally {
       setAiLoading(false);
     }
-  };
+  }, [days]);
 
+  const loadStockAnalysis = useCallback(async () => {
+    setStockLoading(true);
+    try {
+      const res = await aiAPI.restockAnalysis({ target_days: 14 });
+      setStockAnalysis(res.data.data);
+    } catch {
+      // Stock analysis is optional, silently fail
+    } finally {
+      setStockLoading(false);
+    }
+  }, []);
+
+  // Auto-load everything on page open
   useEffect(() => {
     loadData();
-    setAiAnalysisData(null);
-  }, [days]);
+    loadStockAnalysis();
+  }, [loadData, loadStockAnalysis]);
+
+  // Auto-trigger AI analysis after revenue data loads
+  useEffect(() => {
+    if (revenue.length > 0 && !aiAnalysisData && !aiLoading) {
+      handleAiAnalysis();
+    }
+  }, [revenue]);
 
   // Aggregate metrics
   const totalRevenue = useMemo(() => revenue.reduce((sum, item) => sum + item.revenue, 0), [revenue]);
@@ -285,24 +327,24 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      {/* AI REVENUE REPORT ASSISTANT */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+      {/* AI REVENUE REPORT ASSISTANT — AUTO-LOADED */}
+      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
-              Trợ lý Phân tích Doanh thu AI (Groq)
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+              Trợ lý Phân tích Doanh thu AI
             </h2>
-            <p className="text-[11px] font-semibold text-slate-400 mt-1">
-              Phân tích tự động doanh thu, cơ cấu sản phẩm, sức khỏe tài chính và đề xuất hành động kinh tế cụ thể.
+            <p className="text-[11px] font-medium text-slate-400 mt-1">
+              Tự động phân tích doanh thu, cơ cấu sản phẩm, sức khỏe tài chính và đề xuất hành động kinh tế cụ thể.
             </p>
           </div>
           <button
             onClick={handleAiAnalysis}
             disabled={aiLoading || loading || revenue.length === 0}
-            className="flex items-center justify-center gap-2 h-10 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black shadow-md shadow-indigo-500/10 transition-all active:scale-[0.98] disabled:opacity-50"
+            className="flex items-center justify-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
           >
-            <span>Phân tích bằng AI</span>
+            {aiLoading ? 'Đang phân tích...' : 'Phân tích lại'}
           </button>
         </div>
 
@@ -317,90 +359,172 @@ const ReportsPage = () => {
             </div>
           ) : aiAnalysisData ? (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-6 md:p-8 shadow-sm animate-fadeIn space-y-8">
-              {/* Header section with icon */}
-              <div className="flex items-start gap-4 pb-6 border-b border-slate-100">
-                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-slate-900 text-white shrink-0 shadow-md">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 tracking-tight">Tổng Quan Sức Khỏe Tài Chính</h3>
-                  <p className="text-[13.5px] text-slate-500 font-medium leading-relaxed mt-1.5">{aiAnalysisData.summary}</p>
+              {/* Health Score + Summary Header */}
+              <div className="flex flex-col md:flex-row items-start gap-6 pb-6 border-b border-slate-100">
+                {/* Health Score Gauge */}
+                {typeof aiAnalysisData.health_score === 'number' && (
+                  <div className="flex flex-col items-center gap-2 shrink-0">
+                    <div className="relative w-24 h-24">
+                      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                        <circle 
+                          cx="60" cy="60" r="50" fill="none" 
+                          stroke={aiAnalysisData.health_score >= 70 ? '#10b981' : aiAnalysisData.health_score >= 40 ? '#f59e0b' : '#ef4444'}
+                          strokeWidth="10" 
+                          strokeLinecap="round"
+                          strokeDasharray={`${(aiAnalysisData.health_score / 100) * 314} 314`}
+                          className="transition-all duration-1000"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-bold text-slate-800">{aiAnalysisData.health_score}</span>
+                        <span className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">điểm</span>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                      aiAnalysisData.health_score >= 70 ? 'text-emerald-700 bg-emerald-50' :
+                      aiAnalysisData.health_score >= 40 ? 'text-amber-700 bg-amber-50' :
+                      'text-red-700 bg-red-50'
+                    }`}>
+                      {aiAnalysisData.health_score >= 70 ? 'Tốt' : aiAnalysisData.health_score >= 40 ? 'Cần cải thiện' : 'Cảnh báo'}
+                    </span>
+                  </div>
+                )}
+                {/* Summary Text */}
+                <div className="flex-1">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 text-white shrink-0 shadow-md">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">Tổng Quan Sức Khỏe Tài Chính</h3>
+                  </div>
+                  <p className="text-[13px] text-slate-600 font-medium leading-relaxed">{aiAnalysisData.summary}</p>
                 </div>
               </div>
 
-              {/* Charts Grid */}
+              {/* Charts Grid — 5 charts, smart layout */}
               {aiAnalysisData.charts && aiAnalysisData.charts.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {aiAnalysisData.charts.map((chart, idx) => (
-                    <div key={idx} className={`flex flex-col ${aiAnalysisData.charts.length === 3 && idx === 2 ? 'md:col-span-2' : ''}`}>
-                      <h4 className="text-[12.5px] font-bold text-slate-800 mb-4 uppercase tracking-wider">{chart.title}</h4>
-                      <div className="h-[280px] w-full rounded-xl bg-slate-50/50 border border-slate-100/50 p-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          {chart.type === 'pie' ? (
-                            <PieChart>
-                              <Pie data={chart.data} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                {chart.data.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(val: any) => money(Number(val))} />
-                              <Legend />
-                            </PieChart>
-                          ) : chart.type === 'line' ? (
-                            <LineChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${val / 1000}k`} />
-                              <Tooltip formatter={(val: any) => money(Number(val))} />
-                              <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={3} dot={{ r: 4, fill: COLORS[0] }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                          ) : (
-                            <BarChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${val / 1000}k`} />
-                              <Tooltip formatter={(val: any) => money(Number(val))} cursor={{ fill: '#f8fafc' }} />
-                              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                {chart.data.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          )}
-                        </ResponsiveContainer>
+                <div className="space-y-6">
+                  {/* First row: 2 charts */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {aiAnalysisData.charts.slice(0, 2).map((chart, idx) => (
+                      <div key={idx} className="flex flex-col rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                        <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider">{chart.title}</h4>
+                        <div className="h-[260px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            {chart.type === 'pie' ? (
+                              <PieChart>
+                                <Pie data={chart.data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                                  {chart.data.map((_, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                                </Pie>
+                                <Tooltip formatter={(val: any) => money(Number(val))} />
+                              </PieChart>
+                            ) : chart.type === 'line' ? (
+                              <LineChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+                                <Tooltip formatter={(val: any) => money(Number(val))} />
+                                <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                              </LineChart>
+                            ) : (
+                              <BarChart data={chart.data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+                                <Tooltip formatter={(val: any) => money(Number(val))} cursor={{ fill: 'rgba(59, 130, 246, 0.04)' }} />
+                                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                  {chart.data.map((_, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            )}
+                          </ResponsiveContainer>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                  {/* Second row: 3 charts */}
+                  {aiAnalysisData.charts.length > 2 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {aiAnalysisData.charts.slice(2, 5).map((chart, idx) => (
+                        <div key={idx + 2} className="flex flex-col rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                          <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider">{chart.title}</h4>
+                          <div className="h-[240px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              {chart.type === 'pie' ? (
+                                <PieChart>
+                                  <Pie data={chart.data} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                                    {chart.data.map((_, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip formatter={(val: any) => money(Number(val))} />
+                                </PieChart>
+                              ) : chart.type === 'line' ? (
+                                <LineChart data={chart.data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} />
+                                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+                                  <Tooltip formatter={(val: any) => money(Number(val))} />
+                                  <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} />
+                                </LineChart>
+                              ) : (
+                                <BarChart data={chart.data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} />
+                                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+                                  <Tooltip formatter={(val: any) => money(Number(val))} cursor={{ fill: 'rgba(59, 130, 246, 0.04)' }} />
+                                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                    {chart.data.map((_, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              )}
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
 
               {/* Insights & Recommendations */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-100">
                 <div className="space-y-4">
-                  <h3 className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div>
+                  <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-blue-600 rounded-full"></div>
                     Phân tích chuyên sâu
                   </h3>
                   <div className="flex flex-col gap-3">
                     {aiAnalysisData.insights?.map((insight, i) => (
-                      <div key={i} className="flex gap-3 text-[13.5px] font-medium text-slate-600 items-start">
-                        <span className="text-slate-300 mt-0.5 select-none font-bold">0{i+1}</span>
-                        <span className="flex-1 leading-relaxed">{insight}</span>
+                      <div key={i} className="flex gap-3 items-start p-3 rounded-lg bg-blue-50/50 border border-blue-100/60">
+                        <span className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white ${
+                          ['bg-blue-600','bg-emerald-600','bg-amber-500','bg-purple-600','bg-cyan-600'][i % 5]
+                        }`}>{i + 1}</span>
+                        <span className="flex-1 text-[13px] font-medium text-slate-700 leading-relaxed">{insight}</span>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-[12.5px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div>
+                  <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></div>
                     Chiến lược hành động
                   </h3>
                   <div className="flex flex-col gap-3">
                     {aiAnalysisData.recommendations?.map((rec, i) => (
-                      <div key={i} className="flex gap-3 text-[13.5px] font-medium text-slate-700 items-start p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                        <svg className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <div key={i} className="flex gap-3 text-[13px] font-medium text-slate-700 items-start p-3.5 bg-emerald-50/50 rounded-xl border border-emerald-100/60 hover:bg-emerald-50 transition-colors">
+                        <svg className={`w-5 h-5 shrink-0 mt-0.5 ${
+                          ['text-blue-500','text-emerald-500','text-amber-500','text-purple-500','text-cyan-500'][i % 5]
+                        }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className="flex-1 leading-relaxed">{rec}</span>
@@ -411,9 +535,9 @@ const ReportsPage = () => {
               </div>
             </div>
           ) : (
-            <div className="py-10 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/30">
-              <p className="text-xs font-bold text-slate-400">
-                Chưa có báo cáo. Nhấn nút "Phân tích bằng AI" để đánh giá hoạt động kinh doanh {days} ngày qua.
+            <div className="py-10 text-center rounded-lg border border-dashed border-slate-200 bg-slate-50/30">
+              <p className="text-xs font-medium text-slate-400">
+                Đang chờ dữ liệu doanh thu...
               </p>
             </div>
           )}
@@ -573,6 +697,104 @@ const ReportsPage = () => {
             )}
           </div>
         </div>
+      </section>
+
+      {/* AI STOCK ANALYSIS — AUTO-LOADED */}
+      <section className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
+        <div className="flex items-center gap-2.5 border-b border-slate-100 p-4 bg-slate-50/50">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white">
+            <FiPackage className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-800 text-sm">Phân tích tồn kho & chuỗi cung ứng AI</h2>
+            <p className="text-[10px] font-medium text-slate-500">
+              Tự động phân tích xu hướng nhu cầu, dự báo hết hàng và đề xuất nhập hàng thông minh.
+            </p>
+          </div>
+        </div>
+        {stockLoading ? (
+          <div className="py-10 flex flex-col items-center justify-center gap-3">
+            <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
+            <span className="text-xs font-medium text-slate-400">Đang phân tích tồn kho...</span>
+          </div>
+        ) : stockAnalysis ? (
+          <div>
+            {/* Stock Summary KPIs */}
+            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
+                <p className="mt-1 text-xl font-bold text-red-700">{stockAnalysis.summary.out_of_stock}</p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">Tồn thấp</p>
+                <p className="mt-1 text-xl font-bold text-amber-700">{stockAnalysis.summary.low_stock}</p>
+              </div>
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-orange-600 tracking-wider">Sắp thiếu</p>
+                <p className="mt-1 text-xl font-bold text-orange-700">{stockAnalysis.summary.needs_restock}</p>
+              </div>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">An toàn</p>
+                <p className="mt-1 text-xl font-bold text-emerald-700">{stockAnalysis.summary.healthy}</p>
+              </div>
+            </div>
+            {/* Stock Alert Table */}
+            {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').length > 0 ? (
+              <div className="overflow-x-auto border-t border-slate-100">
+                <table className="min-w-full divide-y divide-slate-50 text-sm">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Sản phẩm</th>
+                      <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Trạng thái</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Xu hướng</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn (ngày)</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Bán/ngày</th>
+                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Đề xuất nhập</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800 text-xs">{item.name}</p>
+                          <p className="text-[10px] font-medium text-slate-400">{item.sku}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                            item.alert_status === 'out_of_stock' ? 'bg-red-600 text-white' :
+                            item.alert_status === 'low_stock' ? 'bg-amber-500 text-white' :
+                            'bg-orange-500 text-white'
+                          }`}>
+                            {item.alert_status === 'out_of_stock' ? 'Hết hàng' : item.alert_status === 'low_stock' ? 'Tồn thấp' : 'Sắp thiếu'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-center"><TrendBadge trend={item.sales_trend} /></td>
+                        <td className="px-3 py-3 text-right font-bold text-slate-800 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.stock_quantity)}</td>
+                        <td className="px-3 py-3"><StockDaysBar stockDays={item.stock_days} targetDays={stockAnalysis.target_days} /></td>
+                        <td className="px-3 py-3 text-right text-xs tabular-nums">
+                          <span className="font-bold text-slate-700">{Number(item.average_daily_sales).toFixed(1)}</span>
+                          {item.sales_speed_7d !== undefined && (
+                            <span className="block text-[9px] text-slate-400">(7d: {Number(item.sales_speed_7d).toFixed(1)})</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right font-bold text-blue-700 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.recommended_quantity)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs font-medium text-emerald-600 bg-emerald-50/30">
+                Tất cả sản phẩm đều có tồn kho an toàn.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-6 text-center text-xs font-medium text-slate-400">
+            Không có dữ liệu tồn kho.
+          </div>
+        )}
       </section>
     </div>
   );

@@ -7,20 +7,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        blue: {
-          50: '#ecfdf5',
-          100: '#d1fae5',
-          200: '#a7f3d0',
-          300: '#6ee7b7',
-          400: '#34d399',
-          500: '#10b981',
-          600: '#059669',
-          700: '#047857',
-          800: '#065f46',
-          900: '#064e3b',
-          950: '#022c22',
-        },
+        // Brand primary — Deep Navy Blue (enterprise POS feel)
         primary: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
+        // Accent — Emerald (for success states, active sidebar, positive metrics)
+        accent: {
           50: '#ecfdf5',
           100: '#d1fae5',
           200: '#a7f3d0',
@@ -49,37 +51,37 @@ export default {
         sidebar: {
           bg: '#08080a',      // Obsidian Black
           hover: '#131316',   // Deep Charcoal
-          active: '#059669',  // Emerald Green
+          active: '#1e40af',  // Brand Blue (was green)
         },
-        // Material Design 3 Dark Theme - Sora POS Enterprise (Green Theme)
+        // Material Design 3 Dark Theme - Sora POS Enterprise
         sora: {
-          bg: '#0b1c18',      // Very dark green-obsidian
-          'surface': '#0b1c18',
-          'surface-dim': '#0b1c18',
-          'surface-container': '#132c25',
-          'surface-container-low': '#0e241e',
-          'surface-container-high': '#1a3c32',
-          'surface-container-highest': '#234f43',
-          'surface-container-lowest': '#05120f',
-          'surface-bright': '#2b5e50',
-          'surface-variant': '#1e443a',
-          'on-bg': '#e1f5f0',
-          'on-surface': '#e1f5f0',
-          'on-surface-variant': '#c2d6d0',
-          'primary': '#a7f3d0',
-          'primary-container': '#10b981',
-          'on-primary': '#022c22',
-          'on-primary-container': '#064e3b',
-          'outline': '#8fa59f',
-          'outline-variant': '#435c55',
+          bg: '#0b1326',
+          'surface': '#0b1326',
+          'surface-dim': '#0b1326',
+          'surface-container': '#111b33',
+          'surface-container-low': '#0e1629',
+          'surface-container-high': '#182440',
+          'surface-container-highest': '#1f2d4d',
+          'surface-container-lowest': '#060d1a',
+          'surface-bright': '#2a3f66',
+          'surface-variant': '#1a2844',
+          'on-bg': '#e2e8f0',
+          'on-surface': '#e2e8f0',
+          'on-surface-variant': '#c2cfe0',
+          'primary': '#93c5fd',
+          'primary-container': '#2563eb',
+          'on-primary': '#172554',
+          'on-primary-container': '#1e3a8a',
+          'outline': '#8fa5bf',
+          'outline-variant': '#435a73',
           'error': '#ffb4ab',
           'error-container': '#93000a',
           'on-error': '#690005',
           'on-error-container': '#ffdad6',
-          'secondary': '#c2d5cf',
-          'tertiary': '#c2d4ce',
-          'inverse-surface': '#e1f5f0',
-          'inverse-primary': '#059669',
+          'secondary': '#c2d5e0',
+          'tertiary': '#c2d4e0',
+          'inverse-surface': '#e2e8f0',
+          'inverse-primary': '#2563eb',
         },
       },
       fontFamily: {
@@ -101,6 +103,7 @@ export default {
         'slideUp': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
         'glow-pulse': 'glowPulse 3s ease-in-out infinite',
         'scan-line': 'scanLine 4s linear infinite',
+        'scaleIn': 'scaleIn 0.15s ease-out',
       },
       keyframes: {
         shake: {
@@ -121,12 +124,16 @@ export default {
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         glowPulse: {
-          '0%, 100%': { boxShadow: '0 0 15px rgba(96, 165, 250, 0.15)' },
-          '50%': { boxShadow: '0 0 30px rgba(96, 165, 250, 0.3)' },
+          '0%, 100%': { boxShadow: '0 0 15px rgba(59, 130, 246, 0.15)' },
+          '50%': { boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)' },
         },
         scanLine: {
           '0%': { transform: 'translateY(-100%)' },
           '100%': { transform: 'translateY(100%)' },
+        },
+        scaleIn: {
+          from: { opacity: '0', transform: 'scale(0.9)' },
+          to: { opacity: '1', transform: 'scale(1)' },
         },
       },
     },

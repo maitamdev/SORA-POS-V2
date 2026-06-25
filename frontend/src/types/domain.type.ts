@@ -142,6 +142,8 @@ export interface RestockAnalysisItem {
   stock_quantity: number;
   min_stock_level: number;
   unit: string;
+  cost_price?: number;
+  sell_price?: number;
   average_daily_sales: number;
   target_stock: number;
   recommended_quantity: number;
@@ -150,6 +152,8 @@ export interface RestockAnalysisItem {
   stock_days: number | null;
   reason: string;
   ai_insight: string;
+  sales_speed_7d?: number;
+  sales_trend?: 'up' | 'down' | 'stable';
 }
 
 export interface RestockAnalysis {

@@ -1,5 +1,4 @@
-/* Fonts loaded via index.html: Inter (sans) & Plus Jakarta Sans (title) */
-
+/* Fonts loaded via index.html: Lexend (primary) & Inter (fallback) */
 
 @tailwind base;
 @tailwind components;
@@ -27,14 +26,14 @@ img {
 }
 .overflow-x-auto::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 0px;
+  border-radius: 3px;
 }
 .overflow-x-auto::-webkit-scrollbar-track {
   background: transparent;
 }
 
 /* ============================================ */
-/* Global Styles - Sora POS                     */
+/* Global Styles - Sora POS Enterprise           */
 /* ============================================ */
 
 * {
@@ -58,10 +57,10 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Lexend', 'Inter', sans-serif;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar — Enterprise sleek */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -69,20 +68,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #414751;
-  border-radius: 0px;
+  background: #94a3b8;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #8b919d;
+  background: #64748b;
 }
 
 /* ============================================ */
-/* Sidebar                                       */
+/* Sidebar — Clean Enterprise                    */
 /* ============================================ */
 
 .sidebar-link {
-  @apply flex items-center gap-3 mx-3 px-4 py-2.5 text-slate-400 rounded-xl transition-all duration-200;
+  @apply flex items-center gap-3 mx-3 px-4 py-2.5 text-slate-400 rounded-lg transition-all duration-200;
 }
 
 .sidebar-link:hover {
@@ -90,7 +89,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar-link.active {
-  @apply bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/10;
+  @apply bg-blue-600 text-white font-semibold shadow-md shadow-blue-600/20;
 }
 
 /* ============================================ */
@@ -121,6 +120,7 @@ h1, h2, h3, h4, h5, h6 {
 .login-form-surface {
   background-color: #0b1326;
   border: 1px solid #414751;
+  border-radius: 12px;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -133,7 +133,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   background-color: #222a3d;
   border: 1px solid #414751;
-  border-radius: 0px;
+  border-radius: 8px;
   color: #dae2fd;
   font-size: 14px;
   line-height: 20px;
@@ -159,14 +159,14 @@ h1, h2, h3, h4, h5, h6 {
 /* Primary CTA button */
 .login-btn-primary {
   width: 100%;
-  background-color: #60a5fa;
-  color: #003a6b;
-  font-size: 12px;
+  background-color: #3b82f6;
+  color: #ffffff;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   line-height: 16px;
   padding: 12px 16px;
-  border-radius: 0px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.1s ease;
@@ -177,7 +177,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .login-btn-primary:hover {
-  background-color: #a4c9ff;
+  background-color: #2563eb;
 }
 
 .login-btn-primary:active {
@@ -194,10 +194,10 @@ h1, h2, h3, h4, h5, h6 {
 .login-checkbox {
   width: 16px;
   height: 16px;
-  border-radius: 0px;
+  border-radius: 4px;
   border: 1px solid #414751;
   background-color: #222a3d;
-  accent-color: #60a5fa;
+  accent-color: #3b82f6;
   cursor: pointer;
 }
 
@@ -215,7 +215,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 500px;
   height: 500px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(96, 165, 250, 0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 70%);
   top: -150px;
   right: -100px;
   pointer-events: none;
@@ -227,7 +227,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 400px;
   height: 400px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(96, 165, 250, 0.04) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
   bottom: -100px;
   left: -80px;
   pointer-events: none;
@@ -254,8 +254,6 @@ h1, h2, h3, h4, h5, h6 {
   background-position: center;
 }
 
-
-
 /* ============================================ */
 /* Network Status Bar Animation                  */
 /* ============================================ */
@@ -274,4 +272,21 @@ h1, h2, h3, h4, h5, h6 {
   animation: slideDown 0.3s ease-out forwards;
 }
 
-/* Force Tailwind rebuild: Sunset Amber & Obsidian Theme */
+/* ============================================ */
+/* Enterprise Card & Table Polish                */
+/* ============================================ */
+
+/* Subtle card hover lift */
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card-hover:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+/* Table row hover */
+.table-row-hover:hover {
+  background-color: #f8fafc;
+}

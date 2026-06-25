@@ -60,7 +60,7 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [search]);
 
   const startEdit = (item: T) => {
     setEditing(item);
@@ -119,16 +119,16 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Tìm kiếm..."
-            className="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold outline-none focus:border-blue-500"
+            className="w-full sm:w-64 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium outline-none focus:border-blue-500"
           />
-          <button onClick={fetchItems} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white whitespace-nowrap">
+          <button onClick={fetchItems} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white whitespace-nowrap">
             Tải lại
           </button>
         </div>
       </header>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-        <form key={editing?.id || 'new'} onSubmit={submit} className="h-fit rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <form key={editing?.id || 'new'} onSubmit={submit} className="h-fit rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">
               {editing ? 'Cập nhật' : 'Tạo mới'}
@@ -149,7 +149,7 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
                     defaultValue={String(form[field.key as keyof T] ?? '')}
                     required={field.required}
                     rows={3}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                   />
                 ) : field.type === 'select' ? (
                   <select
@@ -157,7 +157,7 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
                     value={String(form[field.key as keyof T] ?? '')}
                     onChange={(event) => setForm((state) => ({ ...state, [field.key]: event.target.value }))}
                     required={field.required}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                   >
                     <option value="">Không chọn</option>
                     {field.options?.map((option) => (
@@ -172,7 +172,7 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
                     type={field.type || 'text'}
                     defaultValue={String(form[field.key as keyof T] ?? '')}
                     required={field.required}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
                   />
                 )}
               </label>
@@ -180,13 +180,13 @@ function CrudPage<T extends { id: string; is_active?: boolean }>({
           </div>
           <button
             disabled={saving}
-            className="mt-5 w-full rounded-xl bg-blue-600 py-2.5 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60"
+            className="mt-5 w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
             {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Tạo mới'}
           </button>
         </form>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">

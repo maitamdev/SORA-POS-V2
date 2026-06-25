@@ -559,73 +559,112 @@ export class ReportService {
       throw new AppError(400, 'Groq API Key chưa được cấu hình ở Backend');
     }
 
-    const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu Kinh doanh POS chuyên nghiệp. 
-Hãy phân tích báo cáo doanh thu và tình hình hoạt động của cửa hàng dựa trên dữ liệu thực tế được cung cấp.
-BẮT BUỘC trả về kết quả dưới định dạng JSON hợp lệ (không chứa bất kỳ chuỗi văn bản nào ngoài JSON).
-Tuyệt đối KHÔNG dùng ký tự markdown \`\`\`json. Chỉ trả về một JSON object duy nhất.
-Cấu trúc JSON yêu cầu:
+    const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu cấp cao chuyên về hệ thống POS bán lẻ.
+Nhiệm vụ: Phân tích dữ liệu kinh doanh thực tế, đưa ra đánh giá chiến lược và khuyến nghị có thể hành động được.
+
+BẮT BUỘC trả về JSON hợp lệ (không markdown, không \`\`\`json). Chỉ trả về MỘT JSON object duy nhất.
+
+Cấu trúc JSON bắt buộc:
 {
-  "summary": "Đánh giá tổng quan sức khỏe tài chính (khoảng 2-3 câu).",
+  "health_score": 72,
+  "summary": "Đánh giá tổng quan sức khỏe tài chính 3-5 câu, bao gồm: tổng doanh thu, lợi nhuận, xu hướng tăng/giảm, và điểm mạnh/yếu nổi bật nhất. Phải nêu con số cụ thể.",
   "insights": [
-    "Phân tích sâu sắc 1",
-    "Phân tích sâu sắc 2",
-    "Phân tích sâu sắc 3"
+    "Phân tích 1: Về hiệu suất doanh thu và xu hướng (so sánh giữa các ngày cao/thấp, phát hiện pattern)",
+    "Phân tích 2: Về cơ cấu sản phẩm bán chạy và tỉ trọng đóng góp doanh thu",
+    "Phân tích 3: Về biên lợi nhuận và hiệu quả kinh doanh (margin analysis)",
+    "Phân tích 4: Về hành vi thanh toán khách hàng và xu hướng digital payment",
+    "Phân tích 5: Về điểm yếu, rủi ro hoặc cơ hội bị bỏ lỡ"
   ],
   "recommendations": [
-    "Hành động cụ thể 1",
-    "Hành động cụ thể 2",
-    "Hành động cụ thể 3"
+    "Hành động 1: Chiến lược tăng doanh thu cụ thể (sản phẩm nào, cách nào, mục tiêu bao nhiêu %)",
+    "Hành động 2: Tối ưu chi phí / cải thiện biên lợi nhuận",
+    "Hành động 3: Chiến lược khuyến mãi hoặc cross-sell/upsell",
+    "Hành động 4: Cải thiện trải nghiệm thanh toán / vận hành",
+    "Hành động 5: Chiến lược dài hạn cho tháng tiếp theo"
   ],
   "charts": [
     {
-      "title": "Tên biểu đồ (ví dụ: Cơ cấu doanh thu theo danh mục)",
+      "title": "Cơ cấu doanh thu theo danh mục sản phẩm",
       "type": "pie",
       "data": [
-        { "name": "Tên mục 1", "value": 123456 },
-        { "name": "Tên mục 2", "value": 789101 }
+        { "name": "Tên danh mục 1", "value": 5000000 },
+        { "name": "Tên danh mục 2", "value": 3000000 }
       ]
     },
     {
-      "title": "Tên biểu đồ 2 (ví dụ: Xu hướng doanh thu tuần qua)",
+      "title": "Xu hướng doanh thu theo ngày",
       "type": "bar",
       "data": [
-        { "name": "Ngày X", "value": 123456 }
+        { "name": "Ngày 01/06", "value": 1500000 }
       ]
-    }
+    },
     {
-      "title": "Tên biểu đồ 3 (ví dụ: Xu hướng lợi nhuận / số lượng đơn hàng)",
+      "title": "Xu hướng lợi nhuận gộp theo ngày",
       "type": "line",
       "data": [
-        { "name": "Ngày X", "value": 123 }
+        { "name": "Ngày 01/06", "value": 450000 }
+      ]
+    },
+    {
+      "title": "Top 5 sản phẩm bán chạy (doanh thu)",
+      "type": "bar",
+      "data": [
+        { "name": "Sản phẩm A", "value": 3000000 }
+      ]
+    },
+    {
+      "title": "Phân bổ phương thức thanh toán",
+      "type": "pie",
+      "data": [
+        { "name": "Tiền mặt", "value": 45 },
+        { "name": "QR Pay", "value": 40 },
+        { "name": "Thẻ", "value": 15 }
       ]
     }
   ]
 }
-QUAN TRỌNG: Bạn BẮT BUỘC phải tạo ra CHÍNH XÁC 3 biểu đồ (1 biểu đồ tròn 'pie', 1 biểu đồ cột 'bar', và 1 biểu đồ đường 'line') để giao diện hiển thị đầy đủ thông tin. Không được ít hơn hoặc nhiều hơn 3 biểu đồ.`;
 
-    const userPrompt = `Hãy phân tích báo cáo hoạt động kinh doanh trong ${days} ngày qua với các số liệu thực tế sau:
+QUY TẮC QUAN TRỌNG:
+1. BẮT BUỘC tạo CHÍNH XÁC 5 biểu đồ theo đúng thứ tự và loại ở trên.
+2. "health_score" là số nguyên từ 0-100 đánh giá sức khỏe tổng thể của cửa hàng.
+3. Mỗi insight PHẢI chứa con số cụ thể từ dữ liệu (ví dụ: "chiếm 45% tổng doanh thu", "tăng 23% so với...").
+4. Mỗi recommendation PHẢI nêu hành động cụ thể + kỳ vọng kết quả (ví dụ: "Tăng combo upsell → kỳ vọng tăng AOV thêm 15%").
+5. Dữ liệu biểu đồ PHẢI sử dụng số liệu thực tế được cung cấp, KHÔNG bịa số.
+6. Insights phải đủ 5 mục, recommendations phải đủ 5 mục, charts phải đủ 5 biểu đồ.`;
 
-1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN:
-- Tổng doanh thu: ${money(totalRevenue)}
-- Tổng giá vốn hàng bán (COGS): ${money(totalCogs)}
-- Tổng lợi nhuận gộp: ${money(totalProfit)}
-- Tỉ suất lợi nhuận gộp trung bình: ${profitMargin.toFixed(1)}%
-- Tổng số đơn hàng: ${totalOrders} đơn
-- Giá trị trung bình mỗi đơn hàng (AOV): ${money(averageOrderVal)}
+    const userPrompt = `PHÂN TÍCH BÁO CÁO KINH DOANH TOÀN DIỆN — ${days} NGÀY QUA
 
-2. TOP SẢN PHẨM BÁN CHẠY NHẤT:
+═══════════════════════════════════
+1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN
+═══════════════════════════════════
+• Tổng doanh thu (Revenue): ${money(totalRevenue)}
+• Tổng giá vốn hàng bán (COGS): ${money(totalCogs)}
+• Tổng lợi nhuận gộp (Gross Profit): ${money(totalProfit)}
+• Tỉ suất lợi nhuận gộp (Gross Margin): ${profitMargin.toFixed(1)}%
+• Tổng số đơn hàng: ${totalOrders} đơn
+• Giá trị trung bình mỗi đơn (AOV): ${money(averageOrderVal)}
+
+═══════════════════════════════════
+2. TOP 5 SẢN PHẨM BÁN CHẠY NHẤT
+═══════════════════════════════════
 ${topProductsList}
 
-3. DOANH THU THEO DANH MỤC SẢN PHẨM:
+═══════════════════════════════════
+3. DOANH THU THEO DANH MỤC SẢN PHẨM
+═══════════════════════════════════
 ${categorySalesList}
 
-4. PHƯƠNG THỨC THANH TOÁN:
+═══════════════════════════════════
+4. CƠ CẤU PHƯƠNG THỨC THANH TOÁN
+═══════════════════════════════════
 ${paymentStatsList}
 
-5. CHI TIẾT DOANH THU & LỢI NHUẬN HÀNG NGÀY:
+═══════════════════════════════════
+5. DỮ LIỆU DOANH THU & LỢI NHUẬN HÀNG NGÀY
+═══════════════════════════════════
 ${revenueTrendList}
 
-Dựa vào dữ liệu trên, hãy trả về kết quả định dạng JSON.`;
+Hãy phân tích TOÀN DIỆN và trả về JSON theo đúng cấu trúc đã yêu cầu. Đảm bảo health_score phản ánh đúng tình hình, insights có chiều sâu với con số cụ thể, recommendations có thể thực hiện được ngay, và tất cả 5 biểu đồ đều dùng dữ liệu thực tế.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -634,14 +673,14 @@ Dựa vào dữ liệu trên, hãy trả về kết quả định dạng JSON.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.3,
-        max_tokens: 1000,
+        temperature: 0.25,
+        max_tokens: 3000,
       }),
     });
 

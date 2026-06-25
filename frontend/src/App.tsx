@@ -29,7 +29,7 @@ const ScannerPage = lazy(() => import('./pages/ScannerPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
-    <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 animate-spin" />
+    <div className="w-10 h-10 border-[3px] border-slate-200 border-t-blue-600 rounded-full animate-spin" />
   </div>
 );
 
@@ -67,9 +67,9 @@ function App() {
             style: {
               background: '#0f172a',
               color: '#f8fafc',
-              borderRadius: '0px',
+              borderRadius: '8px',
               border: '1px solid #1e293b',
-              fontSize: '14px',
+              fontSize: '13px',
             },
           }}
         />

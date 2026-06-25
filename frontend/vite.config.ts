@@ -46,6 +46,24 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Split vendor chunks for better caching & faster initial load
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react-router')) return 'react-vendor';
+            if (id.includes('recharts') || id.includes('d3-')) return 'chart-vendor';
+            if (id.includes('react-icons') || id.includes('react-hot-toast')) return 'ui-vendor';
+            if (id.includes('axios') || id.includes('zustand') || id.includes('dexie') || id.includes('@supabase')) return 'data-vendor';
+            if (id.includes('xlsx') || id.includes('zod') || id.includes('qrcode') || id.includes('html2canvas')) return 'utility-vendor';
+          }
+        },
+      },
+    },
+    // Increase warning threshold for production chunks
+    chunkSizeWarningLimit: 600,
+  },
   server: {
     port: 5173,
     proxy: {

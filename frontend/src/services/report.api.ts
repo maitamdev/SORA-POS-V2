@@ -84,6 +84,7 @@ export interface AiChartData {
 }
 
 export interface AiAnalysisResult {
+  health_score?: number;
   summary: string;
   insights: string[];
   recommendations: string[];

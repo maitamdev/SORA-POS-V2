@@ -165,21 +165,48 @@ export class AIService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile',
         messages: [
           {
             role: 'system',
-            content: `Bạn là trợ lý quản lý tồn kho và cố vấn cung ứng POS chuyên nghiệp. Hãy viết nhận xét ngắn gọn, thực tế bằng tiếng Việt.
-TUYỆT ĐỐI KHÔNG sử dụng các biểu tượng cảm xúc (emoji như 📦, ⚠️, 🚨, v.v.) trong toàn bộ nhận xét. Hãy duy trì văn phong kinh tế nghiêm túc.
-Sử dụng định dạng Markdown:
-- Dùng **in đậm** cho từ khóa, con số quan trọng (số lượng nhập, chi phí ước tính, ngày hết hàng, nhà cung cấp).
-- Sử dụng các gạch đầu dòng (-) hoặc danh sách ngắn để chia nhỏ thông tin rõ ràng.
-- Đưa ra khuyến nghị thiết thực về hành động cụ thể cần làm.`,
+            content: `Bạn là Chuyên gia Quản trị Chuỗi Cung Ứng (Supply Chain Manager) cấp cao chuyên về hệ thống POS bán lẻ.
+TUYỆT ĐỐI KHÔNG sử dụng emoji. Duy trì văn phong kinh tế, chuyên nghiệp, nghiêm túc.
+
+Với mỗi sản phẩm, hãy phân tích theo 6 KHUNG sau (chỉ phân tích khung nào có dữ liệu liên quan):
+
+**1. Tình trạng tồn kho:**
+- Đánh giá mức tồn so với ngưỡng tối thiểu và tốc độ bán
+- Ước tính số ngày còn lại trước khi hết hàng
+
+**2. Xu hướng nhu cầu:**
+- So sánh tốc độ bán 7 ngày gần đây vs 30 ngày
+- Phát hiện xu hướng TĂNG/GIẢM/ỔN ĐỊNH và lý giải nguyên nhân
+
+**3. Phân tích mùa vụ & thời điểm:**
+- Sản phẩm này có đặc tính mùa vụ không (mùa hè/đông, lễ tết, cuối tuần)?
+- Thời điểm hiện tại có phải peak season?
+
+**4. Chiến lược giá & biên lợi nhuận:**
+- Đánh giá biên lợi nhuận hiện tại
+- Sản phẩm này đáng để đầu tư nhập nhiều hay nên giảm?
+
+**5. Rủi ro chuỗi cung ứng:**
+- Lead time nhà cung cấp dự kiến
+- Chi phí tồn kho vs chi phí hết hàng (mất đơn)
+
+**6. Khuyến nghị hành động cụ thể:**
+- Nhập bao nhiêu, khi nào, mức ưu tiên
+- ROI dự kiến nếu nhập theo đề xuất
+
+Sử dụng Markdown:
+- **in đậm** cho số liệu quan trọng
+- Gạch đầu dòng (-) cho danh sách
+- Viết ngắn gọn 150-250 từ, đi thẳng vào vấn đề`,
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.3,
-        max_tokens: 400,
+        temperature: 0.2,
+        max_tokens: 800,
       }),
     });
 
@@ -467,23 +494,59 @@ Sử dụng định dạng Markdown:
           ? 'GIẢM GẦN ĐÂY'
           : 'ỔN ĐỊNH';
 
+      const speed7d = item.sales_speed_7d || 0;
+      const speed30d = item.average_daily_sales;
+      const speedChangePercent = speed30d > 0 
+        ? Math.round(((speed7d - speed30d) / speed30d) * 100) 
+        : 0;
+      const estimatedRevenue = item.recommended_quantity * sellPrice;
+      const estimatedProfit = item.recommended_quantity * (sellPrice - costPrice);
+      const sellThroughDays = speed30d > 0 
+        ? Math.ceil(item.recommended_quantity / speed30d) 
+        : null;
+
       const prompt = [
-        `Thời điểm phân tích: ${now}`,
-        `Sản phẩm: ${item.name} (${item.sku})`,
-        `Danh mục: ${categoryName} | Nhà cung cấp: ${supplierName}`,
-        `Giá nhập: ${formatVnd(costPrice)} | Giá bán: ${formatVnd(sellPrice)} | Biên lợi nhuận: ${profitMargin}%`,
-        `Tồn hiện tại: ${item.stock_quantity} ${item.unit}`,
-        `Ngưỡng tối thiểu: ${item.min_stock_level}`,
-        `Bán trung bình 30 ngày: ${item.average_daily_sales}/ngày`,
-        `Bán trung bình 7 ngày gần đây: ${item.sales_speed_7d || 0}/ngày (Xu hướng: ${trendText})`,
-        stockDaysLeft !== null ? `Dự kiến hết hàng sau: ${stockDaysLeft} ngày` : 'Chưa có dữ liệu bán hàng',
-        `Số lượng đề xuất nhập: ${item.recommended_quantity} ${item.unit}`,
-        `Tổng chi phí nhập hàng dự kiến: ${formatVnd(estimatedCost)}`,
-        `Mục tiêu tồn kho: ${analysis.target_days} ngày`,
-        '',
-        'Hãy đưa ra nhận định tồn kho và khuyến nghị nhập hàng cụ thể cho mặt hàng này.',
-        'Sử dụng Markdown để viết ngắn gọn, chuyên nghiệp và thuyết phục.',
-      ].join('\n');
+        `═══ BÁO CÁO PHÂN TÍCH SẢN PHẨM ═══`,
+        `Thời điểm: ${now}`,
+        ``,
+        `▸ SẢN PHẨM: ${item.name} (SKU: ${item.sku})`,
+        `▸ Danh mục: ${categoryName}`,
+        `▸ Nhà cung cấp: ${supplierName}`,
+        ``,
+        `─── TÀI CHÍNH ───`,
+        `• Giá nhập: ${formatVnd(costPrice)}`,
+        `• Giá bán: ${formatVnd(sellPrice)}`,
+        `• Biên lợi nhuận: ${profitMargin}%`,
+        ``,
+        `─── TỒN KHO ───`,
+        `• Tồn hiện tại: ${item.stock_quantity} ${item.unit}`,
+        `• Ngưỡng tối thiểu: ${item.min_stock_level} ${item.unit}`,
+        stockDaysLeft !== null 
+          ? `• Dự kiến hết hàng sau: ${stockDaysLeft} ngày` 
+          : `• Chưa có dữ liệu bán hàng đủ để dự báo`,
+        ``,
+        `─── XU HƯỚNG BÁN HÀNG ───`,
+        `• Tốc độ bán TB 30 ngày: ${speed30d}/ngày`,
+        `• Tốc độ bán TB 7 ngày gần đây: ${speed7d}/ngày`,
+        `• Thay đổi tốc độ: ${speedChangePercent > 0 ? '+' : ''}${speedChangePercent}% (${trendText})`,
+        ``,
+        `─── ĐỀ XUẤT NHẬP HÀNG ───`,
+        `• Số lượng đề xuất nhập: ${item.recommended_quantity} ${item.unit}`,
+        `• Chi phí nhập dự kiến: ${formatVnd(estimatedCost)}`,
+        `• Doanh thu dự kiến nếu bán hết: ${formatVnd(estimatedRevenue)}`,
+        `• Lợi nhuận gộp dự kiến: ${formatVnd(estimatedProfit)}`,
+        sellThroughDays ? `• Thời gian bán hết (ước tính): ${sellThroughDays} ngày` : '',
+        `• Mục tiêu tồn kho: ${analysis.target_days} ngày`,
+        ``,
+        `═══ YÊU CẦU PHÂN TÍCH ═══`,
+        `Dựa trên dữ liệu trên, hãy phân tích theo 6 khung:`,
+        `1. Tình trạng tồn kho (nguy hiểm/ổn/dư thừa?)`,
+        `2. Xu hướng nhu cầu khách hàng (tăng/giảm/ổn định? Tại sao?)`,
+        `3. Yếu tố mùa vụ & thời điểm (peak season? Lễ tết sắp tới?)`,
+        `4. Chiến lược giá & biên lợi nhuận (đáng đầu tư nhập nhiều?)`,
+        `5. Rủi ro chuỗi cung ứng (lead time, chi phí cơ hội)`,
+        `6. Khuyến nghị hành động cụ thể (nhập bao nhiêu, khi nào, ROI)`,
+      ].filter(Boolean).join('\n');
 
       const aiInsight = (await this.groqInsight(prompt)) || item.ai_insight;
       created.push(await this.saveRecommendation({ ...item, ai_insight: aiInsight }, userId));
