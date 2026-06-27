@@ -38,6 +38,56 @@ const statusLabel: Record<string, string> = {
 };
 
 const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const getLocalDateMs = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  if (year && month && day) {
+    return new Date(year, month - 1, day).setHours(0, 0, 0, 0);
+  }
+  return new Date(dateString).setHours(0, 0, 0, 0);
+};
+
+const getRemainingExpiryDays = (dateString: string) => {
+  const todayMs = new Date().setHours(0, 0, 0, 0);
+  return Math.round((getLocalDateMs(dateString) - todayMs) / MS_PER_DAY);
+};
+
+const getExpiryStatusView = (remainingDays: number) => {
+  if (remainingDays < 0) {
+    return {
+      label: `Hết hạn ${Math.abs(remainingDays)} ngày`,
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+      progressColor: 'bg-rose-500',
+      progressPercent: 100,
+    };
+  }
+
+  if (remainingDays === 0) {
+    return {
+      label: 'Hết hạn hôm nay',
+      badgeClass: 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse',
+      progressColor: 'bg-orange-500',
+      progressPercent: 5,
+    };
+  }
+
+  if (remainingDays <= 30) {
+    return {
+      label: `Còn ${remainingDays} ngày`,
+      badgeClass: 'bg-orange-50 text-orange-700 border-orange-200',
+      progressColor: 'bg-orange-500',
+      progressPercent: Math.max(5, (remainingDays / 30) * 100),
+    };
+  }
+
+  return {
+    label: `Còn ${remainingDays} ngày`,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    progressColor: 'bg-emerald-500',
+    progressPercent: 100,
+  };
+};
 
 const renderInsight = (text: string) => {
   if (!text) return null;
@@ -197,7 +247,7 @@ const StockPage = () => {
       const [inventoryRes, alertsRes, expiryRes] = await Promise.all([
         stockAPI.inventory({ limit: 500 }),
         stockAPI.alerts({ limit: 200 }),
-        stockAPI.expiryAlerts({ limit: 200 }),
+        stockAPI.expiryAlerts({ limit: 10000 }),
       ]);
       setInventory(inventoryRes.data.data.items);
       setAlerts(alertsRes.data.data.items);
@@ -380,11 +430,8 @@ const StockPage = () => {
     let expired = 0;
     let nearExpiry = 0;
     let safe = 0;
-    const currentDateMs = new Date().setHours(0, 0, 0, 0);
-
     expiryAlerts.forEach((batch) => {
-      const diffTime = new Date(batch.expiry_date).getTime() - currentDateMs;
-      const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const remainingDays = getRemainingExpiryDays(batch.expiry_date);
 
       if (remainingDays < 0) {
         expired++;
@@ -400,7 +447,6 @@ const StockPage = () => {
 
   // Filtered Expiry Batches
   const filteredExpiryAlerts = useMemo(() => {
-    const currentDateMs = new Date().setHours(0, 0, 0, 0);
     return expiryAlerts.filter((batch) => {
       // Search term filter matches product name, sku, barcode or batch number
       const matchesSearch =
@@ -415,8 +461,7 @@ const StockPage = () => {
         selectedCategory === 'all' || batch.products?.category_id === selectedCategory;
 
       // Expiry filter
-      const diffTime = new Date(batch.expiry_date).getTime() - currentDateMs;
-      const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const remainingDays = getRemainingExpiryDays(batch.expiry_date);
 
       let matchesExpiry = true;
       if (expiryFilter === 'expired') {
@@ -1193,35 +1238,8 @@ const StockPage = () => {
                       </tr>
                     ) : (
                       filteredExpiryAlerts.map((batch) => {
-                        const diffTime = new Date(batch.expiry_date).getTime() - new Date().setHours(0, 0, 0, 0);
-                        const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        let statusLabelText = '';
-                        let statusBadgeClass = '';
-                        let progressColor = 'bg-emerald-500';
-                        let progressPercent = 100;
-
-                        if (remainingDays < 0) {
-                          statusLabelText = `Hết hạn ${Math.abs(remainingDays)} ngày`;
-                          statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                          progressColor = 'bg-rose-500';
-                          progressPercent = 100;
-                        } else if (remainingDays === 0) {
-                          statusLabelText = 'Hết hạn hôm nay';
-                          statusBadgeClass = 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse';
-                          progressColor = 'bg-orange-500';
-                          progressPercent = 5;
-                        } else if (remainingDays <= 30) {
-                          statusLabelText = `Còn ${remainingDays} ngày`;
-                          statusBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
-                          progressColor = 'bg-orange-500';
-                          progressPercent = Math.max(5, (remainingDays / 30) * 100);
-                        } else {
-                          statusLabelText = `Còn ${remainingDays} ngày`;
-                          statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                          progressColor = 'bg-emerald-500';
-                          progressPercent = 100;
-                        }
+                        const remainingDays = getRemainingExpiryDays(batch.expiry_date);
+                        const statusView = getExpiryStatusView(remainingDays);
 
                         return (
                           <tr key={batch.id} className="hover:bg-slate-50/30 transition duration-150">
@@ -1273,8 +1291,8 @@ const StockPage = () => {
 
                             {/* Remaining Days status badge */}
                             <td className="px-5 py-3.5 text-center">
-                              <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-extrabold shadow-2xs whitespace-nowrap ${statusBadgeClass}`}>
-                                {statusLabelText}
+                              <span className={`inline-flex rounded border px-2 py-0.5 text-xs font-extrabold shadow-2xs whitespace-nowrap ${statusView.badgeClass}`}>
+                                {statusView.label}
                               </span>
                             </td>
 
@@ -1282,8 +1300,8 @@ const StockPage = () => {
                             <td className="px-5 py-3.5">
                               <div className="w-full bg-slate-100 rounded h-1.5 overflow-hidden shadow-inner">
                                 <div
-                                  className={`h-full transition-all duration-500 rounded ${progressColor}`}
-                                  style={{ width: `${progressPercent}%` }}
+                                  className={`h-full transition-all duration-500 rounded ${statusView.progressColor}`}
+                                  style={{ width: `${statusView.progressPercent}%` }}
                                 />
                               </div>
                             </td>
@@ -1324,35 +1342,8 @@ const StockPage = () => {
                   </div>
                 ) : (
                   filteredExpiryAlerts.map((batch) => {
-                    const diffTime = new Date(batch.expiry_date).getTime() - new Date().setHours(0, 0, 0, 0);
-                    const remainingDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    let statusLabelText = '';
-                    let statusBadgeClass = '';
-                    let progressColor = 'bg-emerald-500';
-                    let progressPercent = 100;
-
-                    if (remainingDays < 0) {
-                      statusLabelText = `Hết hạn ${Math.abs(remainingDays)} ngày`;
-                      statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                      progressColor = 'bg-rose-500';
-                      progressPercent = 100;
-                    } else if (remainingDays === 0) {
-                      statusLabelText = 'Hết hạn hôm nay';
-                      statusBadgeClass = 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse';
-                      progressColor = 'bg-orange-500';
-                      progressPercent = 5;
-                    } else if (remainingDays <= 30) {
-                      statusLabelText = `Còn ${remainingDays} ngày`;
-                      statusBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
-                      progressColor = 'bg-orange-500';
-                      progressPercent = Math.max(5, (remainingDays / 30) * 100);
-                    } else {
-                      statusLabelText = `Còn ${remainingDays} ngày`;
-                      statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                      progressColor = 'bg-emerald-500';
-                      progressPercent = 100;
-                    }
+                    const remainingDays = getRemainingExpiryDays(batch.expiry_date);
+                    const statusView = getExpiryStatusView(remainingDays);
 
                     return (
                       <div key={batch.id} className="bg-white p-4 border border-slate-200 rounded-xl shadow-xs space-y-3">
@@ -1407,14 +1398,14 @@ const StockPage = () => {
                         {/* Status, Progress & Stock */}
                         <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2.5">
                           <div className="flex-1 min-w-0">
-                            <span className={`inline-flex rounded border px-2 py-0.5 text-[11px] font-bold shadow-2xs whitespace-nowrap ${statusBadgeClass}`}>
-                              {statusLabelText}
+                            <span className={`inline-flex rounded border px-2 py-0.5 text-[11px] font-bold shadow-2xs whitespace-nowrap ${statusView.badgeClass}`}>
+                              {statusView.label}
                             </span>
                             {/* Progress bar under status */}
                             <div className="w-full bg-slate-100 rounded h-1 mt-2">
                               <div
-                                className={`h-full transition-all duration-500 rounded ${progressColor}`}
-                                style={{ width: `${progressPercent}%` }}
+                                className={`h-full transition-all duration-500 rounded ${statusView.progressColor}`}
+                                style={{ width: `${statusView.progressPercent}%` }}
                               />
                             </div>
                           </div>

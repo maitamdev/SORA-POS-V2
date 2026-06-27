@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { 
   HiOutlineChartBar, 
@@ -109,23 +110,39 @@ const DashboardPage = () => {
 
     let linePath = '';
     let areaPath = '';
+    const gridLines = [20, 52, 85, 117];
 
     if (revenuePoints.length > 0) {
-      const start = getCoords(0, revenuePoints[0].revenue);
+      const points = revenuePoints.map((item, idx) => getCoords(idx, item.revenue));
+      const start = points[0];
       linePath = `M ${start.x} ${start.y}`;
       areaPath = `M ${start.x} ${height - py} L ${start.x} ${start.y}`;
 
-      for (let i = 1; i < revenuePoints.length; i++) {
-        const coords = getCoords(i, revenuePoints[i].revenue);
-        linePath += ` L ${coords.x} ${coords.y}`;
-        areaPath += ` L ${coords.x} ${coords.y}`;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i - 1] || points[i];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2] || p2;
+
+        const cp1 = {
+          x: p1.x + (p2.x - p0.x) / 6,
+          y: p1.y + (p2.y - p0.y) / 6,
+        };
+        const cp2 = {
+          x: p2.x - (p3.x - p1.x) / 6,
+          y: p2.y - (p3.y - p1.y) / 6,
+        };
+
+        const curve = ` C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p2.x} ${p2.y}`;
+        linePath += curve;
+        areaPath += curve;
       }
 
-      const endCoords = getCoords(revenuePoints.length - 1, revenuePoints[revenuePoints.length - 1].revenue);
+      const endCoords = points[points.length - 1];
       areaPath += ` L ${endCoords.x} ${height - py} Z`;
     }
 
-    return { revenuePoints, height, width, px, py, maxRevenue, getCoords, linePath, areaPath };
+    return { revenuePoints, height, width, px, py, maxRevenue, getCoords, linePath, areaPath, gridLines };
   }, [data?.revenue]);
 
   /* ---- Donut chart calculations (memoized) ---- */
@@ -173,12 +190,12 @@ const DashboardPage = () => {
   }
 
   const summary = data.summary;
-  const { revenuePoints, height: chartHeight, width: chartWidth, px: paddingX, py: paddingY, getCoords, linePath, areaPath } = chartConfig;
+  const { revenuePoints, height: chartHeight, width: chartWidth, px: paddingX, py: paddingY, getCoords, linePath, areaPath, gridLines } = chartConfig;
 
   return (
-    <div className="space-y-5 animate-fadeIn font-sans">
+    <div className="space-y-4 animate-fadeIn font-sans">
       {/* HEADER SECTION */}
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-slate-200 bg-white px-4 py-3 shadow-sm">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Dashboard Tổng Quan</h1>
           <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Hệ thống POS tích hợp quản lý kho & cảnh báo tồn kho thấp</p>
@@ -200,9 +217,9 @@ const DashboardPage = () => {
       </header>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {/* Card 1: Doanh thu hôm nay */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 card-hover relative overflow-hidden group">
+        <div className="border border-slate-200 border-t-blue-600 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Doanh thu hôm nay</p>
@@ -218,7 +235,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Card 2: Đơn hàng */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 card-hover relative overflow-hidden group">
+        <div className="border border-slate-200 border-t-emerald-500 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Đơn hàng</p>
@@ -232,7 +249,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Card 3: Sản phẩm bán ra */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 card-hover relative overflow-hidden group">
+        <div className="border border-slate-200 border-t-indigo-500 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sản phẩm bán ra</p>
@@ -246,7 +263,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Card 4: Cảnh báo tồn kho thấp */}
-        <div className="rounded-xl border border-rose-200 bg-white p-5 card-hover relative overflow-hidden group ring-1 ring-rose-100">
+        <div className="border border-rose-200 border-t-rose-600 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
           <div className="flex justify-between items-start">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cảnh báo tồn kho thấp</p>
@@ -264,9 +281,9 @@ const DashboardPage = () => {
       </div>
 
       {/* CHARTS GRAPHIC SECTION */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         {/* Doanh thu 7 ngày - Line Area Chart */}
-        <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-5 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Doanh thu {selectedRange} ngày</h2>
             <select 
@@ -279,29 +296,42 @@ const DashboardPage = () => {
             </select>
           </div>
           
-          <div className="relative w-full h-44 flex items-center justify-center">
+          <div className="relative w-full h-44 flex items-center justify-center bg-slate-50/40 border border-slate-100">
             {revenuePoints.length > 0 && revenuePoints.some(r => r.revenue > 0) ? (
               <div className="relative w-full h-full">
                 <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
                   <defs>
                     <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.34" />
+                      <stop offset="52%" stopColor="#38bdf8" stopOpacity="0.1" />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
                     </linearGradient>
+                    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#2563eb" />
+                      <stop offset="48%" stopColor="#0284c7" />
+                      <stop offset="100%" stopColor="#0f172a" />
+                    </linearGradient>
+                    <filter id="revenueGlow" x="-20%" y="-40%" width="140%" height="180%">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                      <feMerge>
+                        <feMergeNode in="coloredBlur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
                   </defs>
 
                   {/* Horizontal grid lines */}
-                  <line x1={paddingX} y1={20} x2={chartWidth - paddingX} y2={20} stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1={paddingX} y1={52} x2={chartWidth - paddingX} y2={52} stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1={paddingX} y1={85} x2={chartWidth - paddingX} y2={85} stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1={paddingX} y1={117} x2={chartWidth - paddingX} y2={117} stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1={paddingX} y1={chartHeight - paddingY} x2={chartWidth - paddingX} y2={chartHeight - paddingY} stroke="#cbd5e1" strokeWidth="1" />
+                  {gridLines.map((y) => (
+                    <line key={y} x1={paddingX} y1={y} x2={chartWidth - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 8" />
+                  ))}
+                  <line x1={paddingX} y1={chartHeight - paddingY} x2={chartWidth - paddingX} y2={chartHeight - paddingY} stroke="#94a3b8" strokeWidth="1" />
 
                   {/* Shaded Area */}
                   <path d={areaPath} fill="url(#areaGrad)" />
 
                   {/* Main Line */}
-                  <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={linePath} fill="none" stroke="#60a5fa" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.16" filter="url(#revenueGlow)" />
+                  <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
 
                   {/* Dashed line on Hover */}
                   {hoveredRevenueIdx !== null && (
@@ -310,9 +340,9 @@ const DashboardPage = () => {
                       y1={15}
                       x2={getCoords(hoveredRevenueIdx, revenuePoints[hoveredRevenueIdx].revenue).x}
                       y2={chartHeight - paddingY}
-                      stroke="#3b82f6"
+                      stroke="#0f172a"
                       strokeWidth="1"
-                      strokeDasharray="4 4"
+                      strokeDasharray="3 5"
                     />
                   )}
 
@@ -325,19 +355,19 @@ const DashboardPage = () => {
                         <circle 
                           cx={x} 
                           cy={y} 
-                          r={isHovered ? 5 : 3.5} 
-                          fill={isHovered ? '#1e40af' : '#3b82f6'} 
+                          r={isHovered ? 6 : 4} 
+                          fill={isHovered ? '#0f172a' : '#2563eb'} 
                           stroke="white" 
-                          strokeWidth={isHovered ? 2 : 1.5}
-                          className="transition-all duration-150 cursor-pointer"
+                          strokeWidth={isHovered ? 3 : 2}
+                          className="transition-all duration-150 cursor-pointer drop-shadow-sm"
                         />
                         <text 
                           x={x} 
                           y={chartHeight - 5} 
                           textAnchor="middle" 
-                          className="text-[9px] fill-slate-400 font-medium"
+                          className="text-[9px] fill-slate-500 font-bold"
                         >
-                          {item.date}
+                          {item.date?.slice(5) || item.date}
                         </text>
                       </g>
                     );
@@ -384,13 +414,13 @@ const DashboardPage = () => {
         </div>
 
         {/* Bán hàng theo danh mục - Bar Chart */}
-        <div className="lg:col-span-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-4 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Bán hàng theo danh mục</h2>
             <span className="text-[11px] font-medium text-slate-400">{selectedRange} ngày qua</span>
           </div>
 
-          <div className="h-44 flex items-end justify-between gap-2 px-1">
+          <div className="h-44 flex items-end justify-between gap-2 px-1 bg-slate-50/40 border border-slate-100 py-3">
             {categorySales.length > 0 ? (
               categorySales.slice(0, 5).map((item) => {
                 const percent = (item.value / maxCatSales) * 100;
@@ -420,7 +450,7 @@ const DashboardPage = () => {
         </div>
 
         {/* Phương thức thanh toán - Donut Chart */}
-        <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-3 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
           <div className="mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Phương thức thanh toán</h2>
           </div>
@@ -481,12 +511,12 @@ const DashboardPage = () => {
       </div>
 
       {/* TABLES ROW */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         {/* Giao dịch gần đây */}
-        <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
+        <div className="lg:col-span-5 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Giao dịch gần đây</h2>
-            <button className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</button>
+            <Link to="/orders" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</Link>
           </div>
 
           <div className="overflow-x-auto flex-1 -mx-px">
@@ -502,7 +532,7 @@ const DashboardPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                  {data.recent_orders.map((order) => (
+                  {data.recent_orders.slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-2.5 font-semibold text-slate-800">{order.order_number}</td>
                       <td className="py-2.5 font-medium text-slate-500">{order.customer_name}</td>
@@ -535,15 +565,15 @@ const DashboardPage = () => {
         </div>
 
         {/* Sản phẩm sắp hết hàng */}
-        <div className="lg:col-span-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
+        <div className="lg:col-span-4 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Sản phẩm sắp hết hàng</h2>
-            <button className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</button>
+            <Link to="/stock?tab=alerts" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</Link>
           </div>
 
           <div className="space-y-3 flex-1 overflow-y-auto">
             {data.low_stock_products.length > 0 ? (
-              data.low_stock_products.map((item) => (
+              data.low_stock_products.slice(0, 4).map((item) => (
                 <div key={item.id} className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img 
@@ -576,15 +606,15 @@ const DashboardPage = () => {
         </div>
 
         {/* Top sản phẩm bán chạy */}
-        <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
+        <div className="lg:col-span-3 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Top bán chạy</h2>
-            <span className="text-[11px] font-medium text-slate-400">{selectedRange} ngày qua</span>
+            <Link to="/reports" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem báo cáo</Link>
           </div>
 
           <div className="space-y-3 flex-1 overflow-y-auto">
             {data.top_products.length > 0 ? (
-              data.top_products.map((item, idx) => (
+              data.top_products.slice(0, 5).map((item, idx) => (
                 <div key={item.id} className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
                   <span className="text-xs font-bold text-slate-400 w-4 flex-shrink-0 text-center">{idx + 1}</span>
                   <img 

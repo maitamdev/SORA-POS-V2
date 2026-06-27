@@ -1185,7 +1185,7 @@ const ProductsPage = () => {
                   {canManageProducts && <th className={`${densityPaddingTh} px-4 text-center w-28`}>Thao tác</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+              <tbody className="divide-y divide-slate-200 text-xs font-semibold text-slate-700">
                 {displayedProducts.length === 0 ? (
                   <tr>
                     <td colSpan={visibleColCount} className="py-12 text-center text-slate-400 font-extrabold uppercase">
@@ -1407,7 +1407,7 @@ const ProductsPage = () => {
                 return (
                   <article
                     key={p.id}
-                    className="group relative rounded-xl border border-slate-200 bg-white p-3 shadow-sm ring-1 ring-white transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/60"
+                    className="group relative rounded-xl border border-slate-300 bg-white p-3 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/60"
                   >
                     {canManageProducts && (
                       <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-0.5 shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
@@ -1428,7 +1428,7 @@ const ProductsPage = () => {
                       </div>
                     )}
 
-                    <div className="h-24 sm:h-28 rounded-lg bg-white border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                    <div className="h-24 sm:h-28 rounded-lg bg-white border border-slate-300 flex items-center justify-center p-2 overflow-hidden">
                       <img
                         src={getProductImage(p)}
                         alt={p.name}
