@@ -20,6 +20,11 @@ const applySearch = (
 };
 
 export class CatalogService {
+  /**
+   * Đồng bộ cảnh báo tồn kho cho sản phẩm.
+   * FIX: Xử lý TẤT CẢ active alerts (không chỉ latest) để ngăn duplicate.
+   * Nếu stock đủ → resolve hết. Nếu thiếu → update alert đầu tiên, resolve các alert thừa.
+   */
   static async syncStockAlert(productId: string) {
     const { data: product, error } = await supabase
       .from('products')
@@ -33,24 +38,27 @@ export class CatalogService {
     const minStock = Number(product.min_stock_level);
     const status = currentStock <= 0 ? 'out_of_stock' : currentStock <= minStock ? 'low_stock' : null;
 
-    const { data: activeAlert } = await supabase
+    // Lấy TẤT CẢ active alerts (không chỉ 1) để xử lý duplicate
+    const { data: activeAlerts } = await supabase
       .from('stock_alerts')
       .select('id')
       .eq('product_id', productId)
       .in('status', ['low_stock', 'out_of_stock'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
-    if (!status && activeAlert) {
-      await supabase
-        .from('stock_alerts')
-        .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-        .eq('id', activeAlert.id);
+    const allActiveAlerts = activeAlerts || [];
+
+    // Stock đã đủ → resolve TẤT CẢ active alerts
+    if (!status) {
+      if (allActiveAlerts.length > 0) {
+        const ids = allActiveAlerts.map(a => a.id);
+        await supabase
+          .from('stock_alerts')
+          .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+          .in('id', ids);
+      }
       return;
     }
-
-    if (!status) return;
 
     const payload = {
       product_id: productId,
@@ -59,9 +67,20 @@ export class CatalogService {
       status,
     };
 
-    if (activeAlert) {
-      await supabase.from('stock_alerts').update(payload).eq('id', activeAlert.id);
+    if (allActiveAlerts.length > 0) {
+      // Update alert đầu tiên (mới nhất)
+      await supabase.from('stock_alerts').update(payload).eq('id', allActiveAlerts[0].id);
+
+      // Resolve các alert thừa (duplicate) nếu có
+      if (allActiveAlerts.length > 1) {
+        const duplicateIds = allActiveAlerts.slice(1).map(a => a.id);
+        await supabase
+          .from('stock_alerts')
+          .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+          .in('id', duplicateIds);
+      }
     } else {
+      // Không có alert nào → tạo mới
       await supabase.from('stock_alerts').insert(payload);
     }
   }

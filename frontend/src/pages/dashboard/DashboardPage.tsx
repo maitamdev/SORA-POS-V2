@@ -53,27 +53,6 @@ const renderGrowth = (growth: number) => {
   }
 };
 
-/* ------------------------------------------------------------------ */
-/*  RealtimeClock — isolated component to prevent full dashboard      */
-/*  re-render every second                                             */
-/* ------------------------------------------------------------------ */
-const RealtimeClock = () => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const formattedTime = currentTime.toLocaleTimeString('vi-VN', { hour12: false });
-
-  return (
-    <div className="flex items-center gap-2 bg-slate-900 text-white rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-sm select-none">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-      <span className="font-mono tracking-wider">{formattedTime}</span>
-    </div>
-  );
-};
 
 /* ------------------------------------------------------------------ */
 /*  DashboardPage                                                      */
@@ -199,37 +178,23 @@ const DashboardPage = () => {
   return (
     <div className="space-y-5 animate-fadeIn font-sans">
       {/* HEADER SECTION */}
-      <header className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200 pb-4">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Dashboard Tổng Quan</h1>
           <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Hệ thống POS tích hợp quản lý kho & cảnh báo tồn kho thấp</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Clickable Date Selector */}
-          <div className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer select-none">
+          <div className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer select-none transition shadow-xs">
             <HiOutlineCalendar className="w-4 h-4 text-slate-400 pointer-events-none" />
-            <span className="pointer-events-none">{formatDisplayDate(selectedDate)}</span>
+            <span className="pointer-events-none">Ngày: {formatDisplayDate(selectedDate)}</span>
             <input 
               type="date" 
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
             />
-          </div>
-
-          {/* Real-time clock (isolated component — no full re-render) */}
-          <RealtimeClock />
-
-          {/* Profile Circle */}
-          <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm">
-              {getUserInitials(user)}
-            </div>
-            <div className="leading-none text-left">
-              <p className="text-xs font-bold text-slate-800">{user?.full_name || 'Người dùng'}</p>
-              <p className="text-[9px] font-medium text-slate-400 mt-0.5">{getRoleLabel(user?.role)}</p>
-            </div>
           </div>
         </div>
       </header>

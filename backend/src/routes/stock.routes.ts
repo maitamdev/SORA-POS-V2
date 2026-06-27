@@ -8,6 +8,8 @@ import { resolveAlertSchema, stockAdjustSchema, stockImportSchema } from '../val
 const router = Router();
 
 router.use(authMiddleware);
+router.get('/summary', roleMiddleware('admin', 'manager'), StockController.summary);
+router.get('/lookup', StockController.lookupProduct);
 router.get('/inventory', StockController.inventory);
 router.get('/alerts', StockController.alerts);
 router.get('/expiry-alerts', roleMiddleware('admin', 'manager', 'cashier'), StockController.expiryAlerts);

@@ -101,6 +101,7 @@ export class OrderService {
     }
 
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+    appCache.deletePrefix('report:dashboard');
     return this.getById(String(orderId));
   }
 
@@ -117,6 +118,7 @@ export class OrderService {
     }
 
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+    appCache.deletePrefix('report:dashboard');
     return this.getById(String(orderId));
   }
 

@@ -1,13 +1,14 @@
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
 import { startAutoSync } from '../../services/offlineSync';
 import { startRealtimeSubscriptions, stopRealtimeSubscriptions } from '../../services/realtimeService';
+import { useAuthStore } from '../../stores/auth.store';
+import { HiOutlineCalendar } from 'react-icons/hi';
 
 /**
  * PageTransitionLoader — Loading hiển thị khi lazy page đang load
- * Nhẹ hơn PageLoader ở App.tsx vì chỉ hiện trong content area
  */
 const PageTransitionLoader = () => (
   <div className="flex h-[60vh] items-center justify-center">
@@ -19,9 +20,78 @@ const PageTransitionLoader = () => (
 );
 
 /**
+ * TopHeader — Thanh trạng thái hiển thị ngày, giờ, tài khoản toàn cục
+ */
+const TopHeader = () => {
+  const { user } = useAuthStore();
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedTime = currentTime.toLocaleTimeString('vi-VN', { hour12: false });
+
+  const getDisplayDate = () => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const getUserInitials = (user: any) => {
+    if (!user?.full_name) return 'U';
+    const parts = user.full_name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return user.full_name.substring(0, 2).toUpperCase();
+  };
+
+  const getRoleLabel = (role?: string) => {
+    if (role === 'admin') return 'Quản trị viên';
+    if (role === 'manager') return 'Quản lý';
+    return 'Nhân viên';
+  };
+
+  return (
+    <header className="bg-white border-b border-slate-200/80 h-14 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+      {/* Left: Empty spacer (hamburger sits on top of this on mobile) */}
+      <div className="w-10 h-10 lg:hidden shrink-0" />
+
+      {/* Right: Date, Time & Profile Info */}
+      <div className="flex items-center gap-2 sm:gap-3.5 ml-auto">
+        {/* Date Display */}
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/60 rounded-xl px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-xs select-none">
+          <HiOutlineCalendar className="w-4 h-4 text-slate-400" />
+          <span>{getDisplayDate()}</span>
+        </div>
+
+        {/* Real-time Clock */}
+        <div className="flex items-center gap-2 bg-slate-950 text-white rounded-xl px-3 py-1.5 text-[11px] font-black shadow-sm select-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-mono tracking-wider">{formattedTime}</span>
+        </div>
+
+        {/* Profile Info */}
+        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/60">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+            {getUserInitials(user)}
+          </div>
+          <div className="leading-none text-left hidden sm:block">
+            <p className="text-[11px] font-black text-slate-800">{user?.full_name || 'Người dùng'}</p>
+            <p className="text-[9px] font-bold text-slate-400 mt-0.5">{getRoleLabel(user?.role)}</p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+/**
  * MainLayout - Layout chính sau khi đăng nhập
- * Sidebar (fixed, 256px) bên trái + Nội dung bên phải
- * Responsive: trên mobile sidebar ẩn, main content full width
  */
 const MainLayout = () => {
   const location = useLocation();
@@ -38,7 +108,7 @@ const MainLayout = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
       {/* Network Status Banner (offline/online) */}
       <NetworkStatusBar />
 
@@ -46,8 +116,9 @@ const MainLayout = () => {
       <Sidebar />
 
       {/* Main Content - offset by sidebar width on desktop, full width on mobile */}
-      <main className="lg:ml-64 min-h-screen transition-all duration-300">
-        <div className={isPosPage ? "" : "p-3 sm:p-4 md:p-6 pt-14 lg:pt-6"}>
+      <main className="flex-1 lg:ml-64 min-h-screen transition-all duration-300 flex flex-col">
+        {!isPosPage && <TopHeader />}
+        <div className={isPosPage ? "" : "flex-1 p-3 sm:p-4 md:p-6"}>
           <Suspense fallback={<PageTransitionLoader />}>
             <Outlet />
           </Suspense>

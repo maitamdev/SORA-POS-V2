@@ -154,6 +154,33 @@ function subscribeToShifts() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Subscription: STOCK ALERTS (auto-refresh)                          */
+/* ------------------------------------------------------------------ */
+function subscribeToStockAlerts() {
+  const channel = supabaseClient
+    .channel('stock-alerts-sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'stock_alerts' },
+      (payload) => {
+        // Dispatch custom event cho StockPage tự refresh khi alert thay đổi
+        window.dispatchEvent(
+          new CustomEvent('stock_alert_changed', {
+            detail: {
+              eventType: payload.eventType,
+              new: payload.new,
+              old: payload.old,
+            },
+          })
+        );
+      }
+    )
+    .subscribe();
+
+  channels.push(channel);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -175,8 +202,9 @@ export function startRealtimeSubscriptions(): void {
   subscribeToOrders();
   subscribeToProducts();
   subscribeToShifts();
+  subscribeToStockAlerts();
 
-  console.log('[Realtime] Đã đăng ký lắng nghe: orders, products, shifts');
+  console.log('[Realtime] Đã đăng ký lắng nghe: orders, products, shifts, stock_alerts');
 }
 
 /**

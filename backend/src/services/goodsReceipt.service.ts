@@ -62,6 +62,7 @@ export class GoodsReceiptService {
         console.warn('[GoodsReceiptService.create] RPC create_goods_receipt not found in database schema cache. Running JS Fallback...');
         const result = await this.createFallbackJS(payload, userId);
         appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+        appCache.deletePrefix('report:dashboard');
         return result;
       }
       console.error('[GoodsReceiptService.create] RPC error:', error);
@@ -70,6 +71,7 @@ export class GoodsReceiptService {
 
     // Xóa cache sản phẩm để cập nhật tồn kho mới hiển thị ở FE
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+    appCache.deletePrefix('report:dashboard');
 
     return this.getById(String(receiptId));
   }

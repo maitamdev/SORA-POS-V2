@@ -14,6 +14,8 @@ import {
   HiOutlineCog,
   HiOutlineFolder,
   HiOutlineExclamationCircle,
+  HiOutlineViewGrid,
+  HiOutlineViewList,
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { aiAPI } from '../../services/ai.api';
@@ -113,6 +115,7 @@ const ProductsPage = () => {
 
   // Table Settings
   const [showTableSettings, setShowTableSettings] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [tableDensity, setTableDensity] = useState<'compact' | 'normal' | 'comfortable'>('normal');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     image: true,
@@ -1003,6 +1006,33 @@ const ProductsPage = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50 p-0.5">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`h-8 w-9 flex items-center justify-center rounded-lg transition ${
+                    viewMode === 'table'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-700 hover:bg-white'
+                  }`}
+                  title="Hiển thị dạng bảng"
+                  aria-label="Hiển thị dạng bảng"
+                >
+                  <HiOutlineViewList className="w-4.5 h-4.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`h-8 w-9 flex items-center justify-center rounded-lg transition ${
+                    viewMode === 'grid'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-700 hover:bg-white'
+                  }`}
+                  title="Hiển thị dạng lưới"
+                  aria-label="Hiển thị dạng lưới"
+                >
+                  <HiOutlineViewGrid className="w-4.5 h-4.5" />
+                </button>
+              </div>
+
               <button
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className={`px-4 py-1.5 border text-xs font-bold rounded-xl flex items-center gap-1.5 transition ${
@@ -1131,7 +1161,8 @@ const ProductsPage = () => {
           )}
         </div>
 
-        {/* 3. PRODUCT LIST TABLE */}
+        {/* 3. PRODUCT LIST */}
+        {viewMode === 'table' ? (
         <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto -mx-px">
             <table className="w-full min-w-[900px] text-left border-collapse">
@@ -1345,6 +1376,176 @@ const ProductsPage = () => {
             </span>
           </div>
         </div>
+        ) : (
+        <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Chế độ lưới POS</p>
+              <h3 className="text-sm font-black text-slate-800 mt-0.5">Xem nhanh sản phẩm theo ô vuông</h3>
+            </div>
+            <span className="text-[11px] font-bold text-slate-500">
+              {displayedProducts.length} sản phẩm đang hiển thị
+            </span>
+          </div>
+
+          {displayedProducts.length === 0 ? (
+            <div className="py-16 px-6 text-center text-slate-400 font-extrabold uppercase text-xs">
+              Không có sản phẩm nào khớp bộ lọc
+            </div>
+          ) : (
+            <div className="bg-slate-50/70 p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-3 gap-4">
+              {displayedProducts.map((p) => {
+                const isOutOfStock = p.stock_quantity <= 0;
+                const isLowStock = p.stock_quantity <= p.min_stock_level;
+                const statusClass = isOutOfStock
+                  ? 'bg-red-50 text-red-600 border-red-200'
+                  : isLowStock
+                  ? 'bg-amber-50 text-amber-600 border-amber-200'
+                  : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                const statusText = isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'Còn hàng';
+
+                return (
+                  <article
+                    key={p.id}
+                    className="group relative rounded-xl border border-slate-200 bg-white p-3 shadow-sm ring-1 ring-white transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/60"
+                  >
+                    {canManageProducts && (
+                      <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-0.5 shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                        <button
+                          onClick={() => handleEditClick(p)}
+                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition"
+                          title="Sửa thông tin"
+                        >
+                          <HiOutlinePencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(p)}
+                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition"
+                          title="Xóa sản phẩm"
+                        >
+                          <HiOutlineTrash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="h-24 sm:h-28 rounded-lg bg-white border border-slate-200 flex items-center justify-center p-2 overflow-hidden">
+                      <img
+                        src={getProductImage(p)}
+                        alt={p.name}
+                        className="max-h-full max-w-full object-contain transition duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <div className="min-w-0 border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-black text-slate-850 leading-snug line-clamp-2 min-h-[32px]" title={p.name}>
+                          {p.name}
+                        </h3>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate mt-1">
+                          {p.sku}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border whitespace-nowrap ${statusClass}`}>
+                          {statusText}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 truncate">
+                          {p.categories?.name || 'Chưa phân loại'}
+                        </span>
+                      </div>
+
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[9px] font-black text-slate-400 uppercase">Tồn kho</p>
+                          <p className="text-sm font-black text-slate-850">{p.stock_quantity}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">Cảnh báo</p>
+                          <p className="text-sm font-black text-slate-850">{p.min_stock_level}</p>
+                        </div>
+                        <div className="text-right min-w-0">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">ĐVT</p>
+                          <p className="text-sm font-black text-slate-850 truncate">{p.unit || '-'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-end justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/40 px-2.5 py-2">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Giá bán</p>
+                          <p className="text-sm font-black text-blue-600">{money(p.sell_price)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black text-slate-400 uppercase">Giá nhập</p>
+                          <p className="text-xs font-black text-slate-500">{money(p.cost_price)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <span>Hiển thị</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="border border-slate-200 rounded px-1.5 py-0.5 bg-white font-bold text-slate-600"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>sản phẩm/trang</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-7 h-7 border border-slate-200 rounded bg-white flex items-center justify-center text-slate-500 disabled:opacity-40"
+              >
+                ‹
+              </button>
+              {Array.from({ length: Math.ceil(totalItems / limit) }).map((_, index) => {
+                const pNum = index + 1;
+                return (
+                  <button
+                    key={pNum}
+                    onClick={() => setPage(pNum)}
+                    className={`w-7 h-7 rounded text-xs font-black transition ${
+                      page === pNum
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {pNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setPage(p => Math.min(Math.ceil(totalItems / limit), p + 1))}
+                disabled={page >= Math.ceil(totalItems / limit)}
+                className="w-7 h-7 border border-slate-200 rounded bg-white flex items-center justify-center text-slate-500 disabled:opacity-40"
+              >
+                ›
+              </button>
+            </div>
+
+            <span className="font-bold">
+              Hiển thị {products.length === 0 ? 0 : (page - 1) * limit + 1} - {Math.min(page * limit, totalItems)} trên {totalItems} sản phẩm
+            </span>
+          </div>
+        </div>
+        )}
       </div>
 
       {/* RIGHT SIDEBAR WIDGETS */}

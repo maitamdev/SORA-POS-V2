@@ -1,10 +1,10 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   FiCheck, FiRefreshCw, FiX, FiZap, FiChevronDown, FiChevronUp,
   FiAlertCircle, FiBox, FiShield, FiPlus, FiList, FiClock, FiSearch, 
-  FiSliders, FiArrowUpRight, FiArrowDownLeft, FiSettings, FiActivity, FiTag, FiTruck, FiCalendar
+  FiSliders, FiArrowUpRight, FiArrowDownLeft, FiSettings, FiActivity, FiTag, FiTruck, FiCalendar, FiDownload
 } from 'react-icons/fi';
 import { stockAPI } from '../../services/stock.api';
 import { aiAPI } from '../../services/ai.api';
@@ -146,6 +146,10 @@ const StockPage = () => {
   const [alerts, setAlerts] = useState<StockAlert[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [expiryAlerts, setExpiryAlerts] = useState<ProductBatch[]>([]);
+
+  // Transactions pagination
+  const [txPage, setTxPage] = useState(1);
+  const [txPagination, setTxPagination] = useState({ page: 1, limit: 10, total: 0 });
   const [mode, setMode] = useState<'import' | 'adjust'>('import');
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -176,23 +180,29 @@ const StockPage = () => {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
 
+  const loadTransactions = useCallback(async (pageToLoad: number) => {
+    if (!canManageStock) return;
+    try {
+      const transactionsRes = await stockAPI.transactions({ page: pageToLoad, limit: 10 });
+      setTransactions(transactionsRes.data.data.items);
+      setTxPagination(transactionsRes.data.data.pagination);
+    } catch (error) {
+      console.error('Không tải được nhật ký giao dịch:', error);
+    }
+  }, [canManageStock]);
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [inventoryRes, alertsRes, expiryRes] = await Promise.all([
-        stockAPI.inventory({ limit: 100 }),
-        stockAPI.alerts({ limit: 50 }),
-        stockAPI.expiryAlerts({ limit: 100 }),
+        stockAPI.inventory({ limit: 500 }),
+        stockAPI.alerts({ limit: 200 }),
+        stockAPI.expiryAlerts({ limit: 200 }),
       ]);
       setInventory(inventoryRes.data.data.items);
       setAlerts(alertsRes.data.data.items);
       setExpiryAlerts(expiryRes.data.data.items);
-      if (canManageStock) {
-        const transactionsRes = await stockAPI.transactions({ limit: 100 });
-        setTransactions(transactionsRes.data.data.items);
-      } else {
-        setTransactions([]);
-      }
+      await loadTransactions(txPage);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Không tải được dữ liệu kho');
@@ -202,6 +212,25 @@ const StockPage = () => {
   };
 
   useEffect(() => { loadData(); }, [canManageStock]);
+
+  // Load transactions separately when page changes
+  useEffect(() => {
+    if (activeTab === 'transactions') {
+      loadTransactions(txPage);
+    }
+  }, [txPage, activeTab, loadTransactions]);
+
+  // Realtime auto-refresh: khi stock_alerts table thay đổi (INSERT/UPDATE từ Supabase)
+  useEffect(() => {
+    const handleAlertChanged = () => {
+      // Chỉ reload nếu đang ở tab alerts hoặc inventory
+      if (activeTab === 'alerts' || activeTab === 'inventory') {
+        loadData();
+      }
+    };
+    window.addEventListener('stock_alert_changed', handleAlertChanged);
+    return () => window.removeEventListener('stock_alert_changed', handleAlertChanged);
+  }, [activeTab]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -220,6 +249,7 @@ const StockPage = () => {
       toast.success(mode === 'import' ? 'Đã nhập kho thành công' : 'Đã điều chỉnh tồn kho thành công');
       formEl.reset();
       setShowActionModal(false);
+      setTxPage(1);
       await loadData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -298,6 +328,31 @@ const StockPage = () => {
       return matchesSearch && matchesCategory && matchesStock;
     });
   }, [inventory, searchTerm, selectedCategory, stockFilter]);
+
+  // Excel export handler — lazy import xlsx chỉ khi cần
+  const handleExportExcel = useCallback(async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const exportData = filteredInventory.map((item, idx) => ({
+        'STT': idx + 1,
+        'Mã SKU': item.sku,
+        'Tên sản phẩm': item.name,
+        'Barcode': item.barcode || '',
+        'Danh mục': (item as any).categories?.name || '',
+        'Tồn kho': item.stock_quantity,
+        'Mức tối thiểu': item.min_stock_level,
+        'Trạng thái': item.stock_quantity <= 0 ? 'Hết hàng' : item.stock_quantity <= item.min_stock_level ? 'Tồn thấp' : 'An toàn',
+        'Đơn vị': item.unit || '',
+      }));
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Tồn kho');
+      XLSX.writeFile(wb, `ton-kho_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success(`Đã xuất ${exportData.length} sản phẩm ra file Excel`);
+    } catch {
+      toast.error('Không thể xuất file Excel');
+    }
+  }, [filteredInventory]);
 
   // Unique categories list for filtering
   const categoriesList = useMemo(() => {
@@ -431,6 +486,16 @@ const StockPage = () => {
               )}
             </>
           )}
+          {activeTab === 'inventory' && (
+            <button
+              onClick={handleExportExcel}
+              className="rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 px-3 py-2.5 text-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md text-xs font-extrabold"
+              title="Xuất file Excel tồn kho"
+            >
+              <FiDownload size={14} />
+              <span className="hidden sm:inline">Xuất Excel</span>
+            </button>
+          )}
           <button
             onClick={() => {
               if (activeTab === 'receipts') {
@@ -498,9 +563,9 @@ const StockPage = () => {
         </div>
       </div>
 
-      {/* 3. Tab & Filter Section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-2">
-        {/* Navigation Tabs (iOS Capsule style) */}
+      {/* 3. Tab Navigation Section */}
+      <div className="border-b border-slate-200 pb-1 overflow-x-auto scrollbar-none flex items-center justify-between gap-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Navigation Tabs (iOS Capsule style with horizontal scroll for responsiveness) */}
         <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200/40 shrink-0">
           <button
             onClick={() => setActiveTab('inventory')}
@@ -591,45 +656,6 @@ const StockPage = () => {
             </>
           )}
         </div>
-
-        {/* Quick Stock Filter Chips (only for inventory tab) */}
-        {activeTab === 'inventory' && (
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-[11px] font-bold text-slate-400 mr-1 hidden md:inline uppercase tracking-wider">Trạng thái lọc:</span>
-            <button
-              onClick={() => setStockFilter('all')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition ${
-                stockFilter === 'all'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              Tất cả ({inventory.length})
-            </button>
-            <button
-              onClick={() => setStockFilter('low')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 ${
-                stockFilter === 'low'
-                  ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              Tồn thấp ({inventory.filter(i => i.stock_quantity <= i.min_stock_level).length})
-            </button>
-            <button
-              onClick={() => setStockFilter('safe')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 ${
-                stockFilter === 'safe'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              An toàn ({inventory.filter(i => i.stock_quantity > i.min_stock_level).length})
-            </button>
-          </div>
-        )}
       </div>
 
       {/* 4. Main Content Area */}
@@ -637,9 +663,10 @@ const StockPage = () => {
         {/* Tab 1: Inventory List */}
         {activeTab === 'inventory' && (
           <div className="space-y-4">
-            {/* Search & Category Filter Bar */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 border border-slate-200/80 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-              <div className="relative flex-1">
+            {/* Search, Status & Category Toolbar */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-4 border border-slate-200/80 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+              {/* Left: Search Input */}
+              <div className="relative flex-1 max-w-md">
                 <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input
                   type="text"
@@ -649,6 +676,44 @@ const StockPage = () => {
                   className="w-full h-10 rounded-xl border border-slate-200 pl-10 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-slate-50/50 focus:bg-white transition-all shadow-inner"
                 />
               </div>
+
+              {/* Middle: Quick Stock Filter Chips (in Capsule design style) */}
+              <div className="flex flex-wrap gap-1 items-center bg-slate-150/80 p-1 rounded-xl border border-slate-200/30">
+                <button
+                  onClick={() => setStockFilter('all')}
+                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 ${
+                    stockFilter === 'all'
+                      ? 'bg-white text-slate-800 shadow-xs border border-slate-200/10'
+                      : 'text-slate-500 hover:text-slate-850'
+                  }`}
+                >
+                  Tất cả ({inventory.length})
+                </button>
+                <button
+                  onClick={() => setStockFilter('low')}
+                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                    stockFilter === 'low'
+                      ? 'bg-white text-rose-600 shadow-xs border border-slate-200/10'
+                      : 'text-slate-500 hover:text-rose-600'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  Tồn thấp ({inventory.filter(i => i.stock_quantity <= i.min_stock_level).length})
+                </button>
+                <button
+                  onClick={() => setStockFilter('safe')}
+                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                    stockFilter === 'safe'
+                      ? 'bg-white text-emerald-600 shadow-xs border border-slate-200/10'
+                      : 'text-slate-500 hover:text-emerald-600'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  An toàn ({inventory.filter(i => i.stock_quantity > i.min_stock_level).length})
+                </button>
+              </div>
+
+              {/* Right: Category Filter dropdown */}
               <div className="flex gap-2 shrink-0">
                 <div className="relative">
                   <FiSliders className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -820,12 +885,25 @@ const StockPage = () => {
                         </div>
                       </div>
                       {canManageStock && (
-                        <button
-                          onClick={() => resolveAlert(alert.id)}
-                          className="w-full py-2 bg-white border border-rose-200 hover:border-rose-300 text-xs font-bold text-rose-700 rounded-xl hover:bg-rose-50/80 transition shadow-xs active:bg-rose-100"
-                        >
-                          Xác nhận xử lý cảnh báo
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              // Quick import — chuyển sang tab inventory với modal mở sẵn
+                              setMode('import');
+                              setShowActionModal(true);
+                            }}
+                            className="flex-1 py-2 bg-blue-50 border border-blue-200 hover:border-blue-300 text-xs font-bold text-blue-700 rounded-xl hover:bg-blue-100/80 transition shadow-xs active:bg-blue-100 flex items-center justify-center gap-1.5"
+                          >
+                            <FiPlus size={12} />
+                            Nhập kho
+                          </button>
+                          <button
+                            onClick={() => resolveAlert(alert.id)}
+                            className="flex-1 py-2 bg-white border border-rose-200 hover:border-rose-300 text-xs font-bold text-rose-700 rounded-xl hover:bg-rose-50/80 transition shadow-xs active:bg-rose-100"
+                          >
+                            Đã xử lý
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -852,63 +930,110 @@ const StockPage = () => {
                 <p className="text-slate-800 text-sm font-black">Chưa có giao dịch kho</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-150">
-                <table className="w-full text-left text-sm min-w-[800px]">
-                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3.5">Sản phẩm</th>
-                      <th className="px-4 py-3.5 text-center">Loại GD</th>
-                      <th className="px-4 py-3.5 text-right">Lượng thay đổi</th>
-                      <th className="px-4 py-3.5 text-right">Tồn cũ</th>
-                      <th className="px-4 py-3.5 text-right">Tồn mới</th>
-                      <th className="px-4 py-3.5">Thời gian</th>
-                      <th className="px-4 py-3.5">Người thực hiện</th>
-                      <th className="px-4 py-3.5">Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                    {transactions.map((tx) => {
-                      const isAddition = tx.quantity > 0;
-                      return (
-                        <tr key={tx.id} className="hover:bg-slate-50/30 transition">
-                          <td className="px-4 py-3.5">
-                            <p className="font-extrabold text-slate-800 text-sm leading-snug">{tx.products?.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">SKU: {tx.products?.sku}</p>
-                          </td>
-                          <td className="px-4 py-3.5 text-center">
-                            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase items-center gap-1 ${
-                              tx.type === 'import' ? 'bg-blue-50 text-blue-700 border-blue-200/50' :
-                              tx.type === 'sale' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' :
-                              tx.type === 'adjustment' ? 'bg-amber-50 text-amber-700 border-amber-200/50' :
-                              'bg-slate-50 text-slate-700 border-slate-200'
-                            }`}>
-                              {tx.type === 'import' && <FiArrowUpRight size={10} className="stroke-[2.5]" />}
-                              {tx.type === 'sale' && <FiArrowDownLeft size={10} className="stroke-[2.5]" />}
-                              {tx.type === 'import' ? 'Nhập kho' :
-                               tx.type === 'sale' ? 'Bán hàng' :
-                               tx.type === 'adjustment' ? 'Điều chỉnh' : tx.type}
-                            </span>
-                          </td>
-                          <td className={`px-4 py-3.5 text-right font-black text-sm ${isAddition ? 'text-blue-600' : 'text-rose-600'}`}>
-                            {isAddition ? '+' : ''}{formatNumber(tx.quantity)}
-                          </td>
-                          <td className="px-4 py-3.5 text-right text-slate-400 font-bold">{formatNumber(tx.previous_stock)}</td>
-                          <td className="px-4 py-3.5 text-right text-slate-900 font-black">{formatNumber(tx.new_stock)}</td>
-                          <td className="px-4 py-3.5 text-slate-400 font-medium text-xs">
-                            {new Date(tx.created_at).toLocaleString('vi-VN', {
-                              hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
-                            })}
-                          </td>
-                          <td className="px-4 py-3.5 font-bold text-slate-700 text-xs">{tx.users?.full_name}</td>
-                          <td className="px-4 py-3.5 font-medium text-slate-500 text-xs max-w-xs truncate" title={tx.note || ''}>
-                            {tx.note || '-'}
-                          </td>
-                        </tr>
-                      );
+              <>
+                <div className="overflow-x-auto rounded-xl border border-slate-150">
+                  <table className="w-full text-left text-sm min-w-[800px]">
+                    <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3.5">Sản phẩm</th>
+                        <th className="px-4 py-3.5 text-center">Loại GD</th>
+                        <th className="px-4 py-3.5 text-right">Lượng thay đổi</th>
+                        <th className="px-4 py-3.5 text-right">Tồn cũ</th>
+                        <th className="px-4 py-3.5 text-right">Tồn mới</th>
+                        <th className="px-4 py-3.5">Thời gian</th>
+                        <th className="px-4 py-3.5">Người thực hiện</th>
+                        <th className="px-4 py-3.5">Ghi chú</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                      {transactions.map((tx) => {
+                        const isAddition = tx.quantity > 0;
+                        return (
+                          <tr key={tx.id} className="hover:bg-slate-50/30 transition">
+                            <td className="px-4 py-3.5">
+                              <p className="font-extrabold text-slate-800 text-sm leading-snug">{tx.products?.name}</p>
+                              <p className="text-[10px] font-bold text-slate-400 mt-0.5">SKU: {tx.products?.sku}</p>
+                            </td>
+                            <td className="px-4 py-3.5 text-center">
+                              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase items-center gap-1 ${
+                                tx.type === 'import' ? 'bg-blue-50 text-blue-700 border-blue-200/50' :
+                                tx.type === 'sale' ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50' :
+                                tx.type === 'adjustment' ? 'bg-amber-50 text-amber-700 border-amber-200/50' :
+                                'bg-slate-50 text-slate-700 border-slate-200'
+                              }`}>
+                                {tx.type === 'import' && <FiArrowUpRight size={10} className="stroke-[2.5]" />}
+                                {tx.type === 'sale' && <FiArrowDownLeft size={10} className="stroke-[2.5]" />}
+                                {tx.type === 'import' ? 'Nhập kho' :
+                                 tx.type === 'sale' ? 'Bán hàng' :
+                                 tx.type === 'adjustment' ? 'Điều chỉnh' : tx.type}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-3.5 text-right font-black text-sm ${isAddition ? 'text-blue-600' : 'text-rose-600'}`}>
+                              {isAddition ? '+' : ''}{formatNumber(tx.quantity)}
+                            </td>
+                            <td className="px-4 py-3.5 text-right text-slate-400 font-bold">{formatNumber(tx.previous_stock)}</td>
+                            <td className="px-4 py-3.5 text-right text-slate-900 font-black">{formatNumber(tx.new_stock)}</td>
+                            <td className="px-4 py-3.5 text-slate-400 font-medium text-xs">
+                              {new Date(tx.created_at).toLocaleString('vi-VN', {
+                                hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'
+                              })}
+                            </td>
+                            <td className="px-4 py-3.5 font-bold text-slate-700 text-xs">{tx.users?.full_name}</td>
+                            <td className="px-4 py-3.5 font-medium text-slate-500 text-xs max-w-xs truncate" title={tx.note || ''}>
+                              {tx.note || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination Footer */}
+                <div className="flex items-center justify-between border-t border-slate-200/60 pt-4 mt-2">
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Hiển thị {txPagination.total === 0 ? 0 : (txPagination.page - 1) * txPagination.limit + 1} - {Math.min(txPagination.page * txPagination.limit, txPagination.total)} trên {txPagination.total} giao dịch
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setTxPage(p => Math.max(1, p - 1))}
+                      disabled={txPage === 1}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition"
+                    >
+                      ‹
+                    </button>
+                    {Array.from({ length: Math.ceil(txPagination.total / txPagination.limit) }).map((_, index) => {
+                      const pNum = index + 1;
+                      if (Math.abs(pNum - txPage) <= 2 || pNum === 1 || pNum === Math.ceil(txPagination.total / txPagination.limit)) {
+                        return (
+                          <button
+                            key={pNum}
+                            onClick={() => setTxPage(pNum)}
+                            className={`w-8 h-8 rounded-lg text-xs font-black transition ${
+                              txPage === pNum
+                                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/10'
+                                : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {pNum}
+                          </button>
+                        );
+                      }
+                      if (pNum === 2 || pNum === Math.ceil(txPagination.total / txPagination.limit) - 1) {
+                        return <span key={pNum} className="text-xs text-slate-400 font-bold px-1">...</span>;
+                      }
+                      return null;
                     })}
-                  </tbody>
-                </table>
-              </div>
+                    <button
+                      onClick={() => setTxPage(p => Math.min(Math.ceil(txPagination.total / txPagination.limit), p + 1))}
+                      disabled={txPage >= Math.ceil(txPagination.total / txPagination.limit)}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition"
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}

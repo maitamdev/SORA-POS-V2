@@ -12,6 +12,7 @@ import {
 import { FiTrendingUp, FiTrendingDown, FiMinus, FiPackage } from 'react-icons/fi';
 import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult } from '../../services/report.api';
 import { aiAPI } from '../../services/ai.api';
+import { stockAPI, StockSummary } from '../../services/stock.api';
 import { RestockAnalysis } from '../../types/domain.type';
 import { 
   ResponsiveContainer, 
@@ -112,6 +113,7 @@ const ReportsPage = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [stockAnalysis, setStockAnalysis] = useState<RestockAnalysis | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -148,8 +150,12 @@ const ReportsPage = () => {
   const loadStockAnalysis = useCallback(async () => {
     setStockLoading(true);
     try {
-      const res = await aiAPI.restockAnalysis({ target_days: 14 });
-      setStockAnalysis(res.data.data);
+      const [aiRes, summaryRes] = await Promise.all([
+        aiAPI.restockAnalysis({ target_days: 14 }),
+        stockAPI.summary(),
+      ]);
+      setStockAnalysis(aiRes.data.data);
+      setStockSummary(summaryRes.data.data);
     } catch {
       // Stock analysis is optional, silently fail
     } finally {
@@ -699,100 +705,235 @@ const ReportsPage = () => {
         </div>
       </section>
 
-      {/* AI STOCK ANALYSIS — AUTO-LOADED */}
-      <section className="rounded-lg border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <div className="flex items-center gap-2.5 border-b border-slate-100 p-4 bg-slate-50/50">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white">
-            <FiPackage className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="font-bold text-slate-800 text-sm">Phân tích tồn kho & chuỗi cung ứng AI</h2>
-            <p className="text-[10px] font-medium text-slate-500">
-              Tự động phân tích xu hướng nhu cầu, dự báo hết hàng và đề xuất nhập hàng thông minh.
-            </p>
-          </div>
-        </div>
-        {stockLoading ? (
-          <div className="py-10 flex flex-col items-center justify-center gap-3">
-            <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-blue-600 animate-spin" />
-            <span className="text-xs font-medium text-slate-400">Đang phân tích tồn kho...</span>
-          </div>
-        ) : stockAnalysis ? (
-          <div>
-            {/* Stock Summary KPIs */}
-            <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
-                <p className="mt-1 text-xl font-bold text-red-700">{stockAnalysis.summary.out_of_stock}</p>
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">Tồn thấp</p>
-                <p className="mt-1 text-xl font-bold text-amber-700">{stockAnalysis.summary.low_stock}</p>
-              </div>
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-                <p className="text-[10px] font-bold uppercase text-orange-600 tracking-wider">Sắp thiếu</p>
-                <p className="mt-1 text-xl font-bold text-orange-700">{stockAnalysis.summary.needs_restock}</p>
-              </div>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">An toàn</p>
-                <p className="mt-1 text-xl font-bold text-emerald-700">{stockAnalysis.summary.healthy}</p>
-              </div>
+      {/* AI STOCK ANALYSIS + STOCK SUMMARY DASHBOARD */}
+      <section className="rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 p-5 bg-gradient-to-r from-slate-50/80 to-white">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 text-white shadow-md">
+              <FiPackage className="w-5 h-5" />
             </div>
-            {/* Stock Alert Table */}
-            {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').length > 0 ? (
-              <div className="overflow-x-auto border-t border-slate-100">
-                <table className="min-w-full divide-y divide-slate-50 text-sm">
-                  <thead className="bg-slate-50">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Sản phẩm</th>
-                      <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Trạng thái</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Xu hướng</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn</th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn (ngày)</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Bán/ngày</th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Đề xuất nhập</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-bold text-slate-800 text-xs">{item.name}</p>
-                          <p className="text-[10px] font-medium text-slate-400">{item.sku}</p>
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                            item.alert_status === 'out_of_stock' ? 'bg-red-600 text-white' :
-                            item.alert_status === 'low_stock' ? 'bg-amber-500 text-white' :
-                            'bg-orange-500 text-white'
-                          }`}>
-                            {item.alert_status === 'out_of_stock' ? 'Hết hàng' : item.alert_status === 'low_stock' ? 'Tồn thấp' : 'Sắp thiếu'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-center"><TrendBadge trend={item.sales_trend} /></td>
-                        <td className="px-3 py-3 text-right font-bold text-slate-800 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.stock_quantity)}</td>
-                        <td className="px-3 py-3"><StockDaysBar stockDays={item.stock_days} targetDays={stockAnalysis.target_days} /></td>
-                        <td className="px-3 py-3 text-right text-xs tabular-nums">
-                          <span className="font-bold text-slate-700">{Number(item.average_daily_sales).toFixed(1)}</span>
-                          {item.sales_speed_7d !== undefined && (
-                            <span className="block text-[9px] text-slate-400">(7d: {Number(item.sales_speed_7d).toFixed(1)})</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-right font-bold text-blue-700 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.recommended_quantity)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-6 text-center text-xs font-medium text-emerald-600 bg-emerald-50/30">
-                Tất cả sản phẩm đều có tồn kho an toàn.
-              </div>
-            )}
+            <div>
+              <h2 className="font-black text-slate-800 text-base tracking-tight">Báo cáo Tồn kho & Cảnh báo AI</h2>
+              <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
+                Tổng quan giá trị kho, phân tích xu hướng nhu cầu và đề xuất nhập hàng thông minh.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={loadStockAnalysis}
+            disabled={stockLoading}
+            className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
+          >
+            {stockLoading ? 'Đang phân tích...' : 'Làm mới'}
+          </button>
+        </div>
+
+        {stockLoading ? (
+          <div className="py-14 flex flex-col items-center justify-center gap-3">
+            <div className="relative w-10 h-10">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-slate-800 animate-spin" />
+              <div className="absolute inset-1.5 rounded-full border-4 border-slate-100 border-b-blue-600 animate-spin [animation-duration:1.5s]" />
+            </div>
+            <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp dữ liệu tồn kho và phân tích AI...</span>
           </div>
         ) : (
-          <div className="p-6 text-center text-xs font-medium text-slate-400">
-            Không có dữ liệu tồn kho.
+          <div className="space-y-0 divide-y divide-slate-100">
+            {/* Stock Summary KPI Cards */}
+            {stockSummary && (
+              <div className="p-5 space-y-5">
+                {/* Row 1: Main KPIs */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="rounded-xl border border-blue-200/60 bg-blue-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-blue-500/80 tracking-wider">Tổng mặt hàng</p>
+                    <p className="mt-1.5 text-xl font-black text-blue-800 tracking-tight">{stockSummary.total_products}</p>
+                  </div>
+                  <div className="rounded-xl border border-red-200/60 bg-red-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-red-500/80 tracking-wider">Hết hàng</p>
+                    <p className={`mt-1.5 text-xl font-black tracking-tight ${stockSummary.out_of_stock_count > 0 ? 'text-red-700 animate-pulse' : 'text-slate-600'}`}>{stockSummary.out_of_stock_count}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-amber-600/80 tracking-wider">Tồn thấp</p>
+                    <p className={`mt-1.5 text-xl font-black tracking-tight ${stockSummary.low_stock_count > 0 ? 'text-amber-700' : 'text-slate-600'}`}>{stockSummary.low_stock_count}</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-emerald-500/80 tracking-wider">An toàn</p>
+                    <p className="mt-1.5 text-xl font-black text-emerald-700 tracking-tight">{stockSummary.safe_count}</p>
+                  </div>
+                  <div className="rounded-xl border border-indigo-200/60 bg-indigo-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-indigo-500/80 tracking-wider">Giá trị kho (vốn)</p>
+                    <p className="mt-1.5 text-lg font-black text-indigo-800 tracking-tight">{money(stockSummary.total_stock_value)}</p>
+                  </div>
+                  <div className="rounded-xl border border-violet-200/60 bg-violet-50/40 p-3.5">
+                    <p className="text-[9px] font-black uppercase text-violet-500/80 tracking-wider">Giá trị bán lẻ</p>
+                    <p className="mt-1.5 text-lg font-black text-violet-800 tracking-tight">{money(stockSummary.total_retail_value)}</p>
+                  </div>
+                </div>
+
+                {/* Row 2: Category Breakdown Donut + Top Low Stock */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {/* Category Breakdown Donut Chart */}
+                  {stockSummary.category_breakdown.length > 0 && (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4">
+                      <h4 className="text-[11px] font-black text-slate-700 mb-3 uppercase tracking-wider">Phân bố tồn kho theo Danh mục</h4>
+                      <div className="h-[260px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={stockSummary.category_breakdown.map(c => ({ name: c.name, value: c.total_stock }))}
+                              cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                            >
+                              {stockSummary.category_breakdown.map((_, index) => (
+                                <Cell key={`cat-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(val: any) => `${Number(val).toLocaleString('vi-VN')} sản phẩm`} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      {/* Category legend with low stock count */}
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {stockSummary.category_breakdown.map((cat, idx) => (
+                          <div key={cat.id} className="flex items-center gap-2 text-[10px]">
+                            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                            <span className="font-semibold text-slate-600 truncate">{cat.name}</span>
+                            {cat.low_stock_count > 0 && (
+                              <span className="ml-auto text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{cat.low_stock_count} cảnh báo</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top 10 Low Stock Products */}
+                  {stockSummary.top_low_stock.length > 0 && (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4">
+                      <h4 className="text-[11px] font-black text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                        Top {stockSummary.top_low_stock.length} sản phẩm cần nhập gấp
+                      </h4>
+                      <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin">
+                        {stockSummary.top_low_stock.map((item, idx) => {
+                          const ratio = item.min_stock_level > 0 ? (item.stock_quantity / item.min_stock_level) * 100 : 0;
+                          const barColor = item.stock_quantity <= 0 ? 'bg-red-500' : ratio <= 50 ? 'bg-amber-500' : 'bg-emerald-500';
+                          return (
+                            <div key={item.id} className="group rounded-xl border border-slate-200/60 bg-white p-3 hover:border-slate-300 hover:shadow-sm transition-all">
+                              <div className="flex items-start gap-2.5">
+                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-black ${
+                                  idx === 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}>{idx + 1}</span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-slate-800 truncate">{item.name}</p>
+                                      <p className="text-[10px] font-medium text-slate-400">{item.sku}{item.category ? ` • ${item.category}` : ''}</p>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <p className={`text-xs font-black tabular-nums ${item.stock_quantity <= 0 ? 'text-red-600' : 'text-amber-600'}`}>
+                                        {item.stock_quantity}
+                                      </p>
+                                      <p className="text-[9px] text-slate-400 font-semibold">/ {item.min_stock_level}</p>
+                                    </div>
+                                  </div>
+                                  {/* Stock bar */}
+                                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${Math.min(ratio, 100)}%` }} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* AI Restock Analysis Table */}
+            {stockAnalysis && (
+              <div>
+                {/* Stock Summary KPIs from AI */}
+                <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
+                  <div className="rounded-xl border border-red-200/60 bg-red-50/40 p-3">
+                    <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
+                    <p className="mt-1 text-xl font-bold text-red-700">{stockAnalysis.summary.out_of_stock}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3">
+                    <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">Tồn thấp</p>
+                    <p className="mt-1 text-xl font-bold text-amber-700">{stockAnalysis.summary.low_stock}</p>
+                  </div>
+                  <div className="rounded-xl border border-orange-200/60 bg-orange-50/40 p-3">
+                    <p className="text-[10px] font-bold uppercase text-orange-600 tracking-wider">Sắp thiếu</p>
+                    <p className="mt-1 text-xl font-bold text-orange-700">{stockAnalysis.summary.needs_restock}</p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-3">
+                    <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">An toàn</p>
+                    <p className="mt-1 text-xl font-bold text-emerald-700">{stockAnalysis.summary.healthy}</p>
+                  </div>
+                </div>
+                {/* Stock Alert Table */}
+                {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').length > 0 ? (
+                  <div className="overflow-x-auto border-t border-slate-100">
+                    <table className="min-w-full divide-y divide-slate-50 text-sm">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Sản phẩm</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Trạng thái</th>
+                          <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Xu hướng</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn</th>
+                          <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn (ngày)</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Bán/ngày</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Đề xuất nhập</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3">
+                              <p className="font-bold text-slate-800 text-xs">{item.name}</p>
+                              <p className="text-[10px] font-medium text-slate-400">{item.sku}</p>
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                                item.alert_status === 'out_of_stock' ? 'bg-red-600 text-white' :
+                                item.alert_status === 'low_stock' ? 'bg-amber-500 text-white' :
+                                'bg-orange-500 text-white'
+                              }`}>
+                                {item.alert_status === 'out_of_stock' ? 'Hết hàng' : item.alert_status === 'low_stock' ? 'Tồn thấp' : 'Sắp thiếu'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-center"><TrendBadge trend={item.sales_trend} /></td>
+                            <td className="px-3 py-3 text-right font-bold text-slate-800 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.stock_quantity)}</td>
+                            <td className="px-3 py-3"><StockDaysBar stockDays={item.stock_days} targetDays={stockAnalysis.target_days} /></td>
+                            <td className="px-3 py-3 text-right text-xs tabular-nums">
+                              <span className="font-bold text-slate-700">{Number(item.average_daily_sales).toFixed(1)}</span>
+                              {item.sales_speed_7d !== undefined && (
+                                <span className="block text-[9px] text-slate-400">(7d: {Number(item.sales_speed_7d).toFixed(1)})</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right font-bold text-blue-700 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.recommended_quantity)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs font-medium text-emerald-600 bg-emerald-50/30">
+                    Tất cả sản phẩm đều có tồn kho an toàn.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!stockAnalysis && !stockSummary && (
+              <div className="p-6 text-center text-xs font-medium text-slate-400">
+                Không có dữ liệu tồn kho.
+              </div>
+            )}
           </div>
         )}
       </section>

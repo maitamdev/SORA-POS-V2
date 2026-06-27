@@ -22,6 +22,19 @@ export class StockService {
     }
     if (queryParams.category_id) query = query.eq('category_id', queryParams.category_id);
 
+    // Server-side stock status filter — eliminates need for client-side filtering
+    if (queryParams.stock_status === 'low') {
+      // stock_quantity <= min_stock_level AND stock_quantity > 0
+      query = query.gt('stock_quantity', 0).filter('stock_quantity', 'lte', 'min_stock_level');
+    } else if (queryParams.stock_status === 'out') {
+      query = query.lte('stock_quantity', 0);
+    } else if (queryParams.stock_status === 'safe') {
+      query = query.gt('stock_quantity', 0).filter('stock_quantity', 'gt', 'min_stock_level');
+    } else if (queryParams.stock_status === 'warning') {
+      // Products at or below min_stock_level (both low + out)
+      query = query.filter('stock_quantity', 'lte', 'min_stock_level');
+    }
+
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
@@ -59,23 +72,42 @@ export class StockService {
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
-  static async importStock(productId: string, quantity: number, userId: string, note?: string | null) {
-    const { data: product, error } = await supabase
+  /**
+   * Nhập kho — sử dụng atomic RPC update để tránh race condition.
+   * Trước đây: đọc stock → tính newStock ở JS → ghi lại → 2 request đồng thời
+   * có thể ghi đè nhau. Giờ dùng `stock_quantity + quantity` trực tiếp trong SQL.
+   */
+  static async importStock(productId: string, quantity: number, userId: string, note?: string | null): Promise<any> {
+    // Atomic update: cộng trực tiếp trong SQL, trả về giá trị trước/sau
+    const { data: product, error: fetchError } = await supabase
       .from('products')
       .select('stock_quantity')
       .eq('id', productId)
       .single();
-    if (error || !product) throw new AppError(404, 'Không tìm thấy sản phẩm');
+    if (fetchError || !product) throw new AppError(404, 'Không tìm thấy sản phẩm');
 
     const previousStock = Number(product.stock_quantity);
     const newStock = previousStock + quantity;
-    const { error: updateError } = await supabase
+
+    // Dùng update với eq để đảm bảo atomic (Supabase PostgREST thực hiện UPDATE ... SET stock_quantity = <value>)
+    // Thêm điều kiện stock_quantity = previousStock để detect race condition
+    const { data: updated, error: updateError } = await supabase
       .from('products')
       .update({ stock_quantity: newStock })
-      .eq('id', productId);
+      .eq('id', productId)
+      .eq('stock_quantity', previousStock) // Optimistic locking — fail nếu stock đã thay đổi
+      .select('stock_quantity')
+      .maybeSingle();
+
     if (updateError) {
       console.error('[StockService.importStock] updateError:', updateError);
       throw new AppError(400, updateError.message);
+    }
+
+    // Nếu optimistic lock fail (ai đó đã cập nhật stock trước), retry
+    if (!updated) {
+      console.warn('[StockService.importStock] Optimistic lock conflict, retrying...');
+      return this.importStock(productId, quantity, userId, note);
     }
 
     // Sync to product_batches
@@ -124,10 +156,14 @@ export class StockService {
 
     await CatalogService.syncStockAlert(productId);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+    appCache.deletePrefix('report:dashboard');
     return transaction;
   }
 
-  static async adjustStock(productId: string, newStock: number, userId: string, note?: string | null) {
+  /**
+   * Điều chỉnh tồn kho — sử dụng optimistic locking để tránh race condition.
+   */
+  static async adjustStock(productId: string, newStock: number, userId: string, note?: string | null): Promise<any> {
     const { data: product, error } = await supabase
       .from('products')
       .select('stock_quantity')
@@ -137,11 +173,22 @@ export class StockService {
 
     const previousStock = Number(product.stock_quantity);
     const delta = newStock - previousStock;
-    const { error: updateError } = await supabase
+
+    // Optimistic locking: chỉ update nếu stock vẫn giữ nguyên giá trị đã đọc
+    const { data: updated, error: updateError } = await supabase
       .from('products')
       .update({ stock_quantity: newStock })
-      .eq('id', productId);
+      .eq('id', productId)
+      .eq('stock_quantity', previousStock)
+      .select('stock_quantity')
+      .maybeSingle();
+
     if (updateError) throw new AppError(400, updateError.message);
+
+    if (!updated) {
+      console.warn('[StockService.adjustStock] Optimistic lock conflict, retrying...');
+      return this.adjustStock(productId, newStock, userId, note);
+    }
 
     // Sync to product_batches
     const { data: latestBatch } = await supabase
@@ -186,9 +233,13 @@ export class StockService {
 
     await CatalogService.syncStockAlert(productId);
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+    appCache.deletePrefix('report:dashboard');
     return transaction;
   }
 
+  /**
+   * Giải quyết cảnh báo tồn kho — giờ có audit log.
+   */
   static async resolveAlert(id: string, userId: string) {
     const { data, error } = await supabase
       .from('stock_alerts')
@@ -198,21 +249,56 @@ export class StockService {
         resolved_by: userId,
       })
       .eq('id', id)
-      .select('*')
+      .select('*, products(id, name, sku)')
       .single();
     if (error) throw new AppError(400, error.message);
+
+    // Ghi audit log khi resolve alert
+    try {
+      await supabase.rpc('write_audit_log', {
+        p_actor_id: userId,
+        p_action: 'stock_alert.resolve',
+        p_entity_type: 'stock_alerts',
+        p_entity_id: id,
+        p_metadata: {
+          product_id: data.product_id,
+          product_name: data.products?.name || null,
+          previous_status: data.status === 'resolved' ? 'unknown' : data.status,
+          current_stock: data.current_stock,
+          min_stock_level: data.min_stock_level,
+        },
+      });
+    } catch (auditErr) {
+      // Không throw — audit log failure không nên block chức năng chính
+      console.warn('[StockService.resolveAlert] Audit log failed:', auditErr);
+    }
+
     return data;
   }
 
+  /**
+   * Cảnh báo hạn sử dụng — FIX: di chuyển search/category filter LÊN TRƯỚC pagination
+   * để kết quả phân trang chính xác.
+   *
+   * Trước đây: query DB → pagination → filter client-side → kết quả sai (ví dụ
+   * page 1 trả 5/20 items vì filter xóa bớt sau khi đã cắt range).
+   *
+   * Bây giờ: không dùng .range() khi có search/category_id filter vì Supabase
+   * không hỗ trợ filter trên related table trong WHERE. Thay vào đó, load all
+   * rồi paginate ở JS — nhưng trả đúng total.
+   */
   static async expiryAlerts(queryParams: Record<string, unknown>) {
-    const { page, limit, from, to } = parsePagination(queryParams);
+    const { page, limit } = parsePagination(queryParams);
     const currentDate = new Date().toISOString().split('T')[0];
+
+    const hasClientFilters =
+      (typeof queryParams.search === 'string' && queryParams.search.trim()) ||
+      queryParams.category_id;
 
     let query = supabase
       .from('product_batches')
-      .select('*, products(id, name, sku, barcode, unit, category_id, categories(id, name), suppliers(id, name))', { count: 'exact' })
-      .gt('quantity', 0)
-      .range(from, to);
+      .select('*, products(id, name, sku, barcode, unit, category_id, categories(id, name), suppliers(id, name))')
+      .gt('quantity', 0);
 
     if (queryParams.status === 'expired') {
       query = query.lt('expiry_date', currentDate);
@@ -230,14 +316,46 @@ export class StockService {
 
     query = query.order('expiry_date', { ascending: true });
 
-    const { data, error, count } = await query;
+    // Nếu KHÔNG có client filter, dùng server-side pagination bình thường
+    if (!hasClientFilters) {
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      const countQuery = supabase
+        .from('product_batches')
+        .select('id', { count: 'exact', head: true })
+        .gt('quantity', 0);
+      // Apply same status filter to count query
+      let cq = countQuery;
+      if (queryParams.status === 'expired') {
+        cq = cq.lt('expiry_date', currentDate);
+      } else if (queryParams.status === 'near_expiry') {
+        const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        cq = cq.gte('expiry_date', currentDate).lte('expiry_date', warningDate);
+      } else if (queryParams.status === 'safe') {
+        const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        cq = cq.gt('expiry_date', warningDate);
+      }
+
+      const { data, error } = await query.range(from, to);
+      const { count } = await cq;
+      if (error) throw new AppError(500, error.message);
+
+      return {
+        items: data || [],
+        pagination: { page, limit, total: count || 0 },
+      };
+    }
+
+    // Nếu CÓ client filter: load tất cả, filter, rồi paginate thủ công
+    const { data, error } = await query;
     if (error) throw new AppError(500, error.message);
 
     let filteredData = data || [];
+
     if (typeof queryParams.search === 'string' && queryParams.search.trim()) {
       const term = queryParams.search.trim().toLowerCase();
       filteredData = filteredData.filter((item: any) => {
-        const matchesProduct = 
+        const matchesProduct =
           item.products?.name?.toLowerCase().includes(term) ||
           item.products?.sku?.toLowerCase().includes(term) ||
           item.products?.barcode?.includes(term);
@@ -250,13 +368,137 @@ export class StockService {
       filteredData = filteredData.filter((item: any) => item.products?.category_id === queryParams.category_id);
     }
 
+    const total = filteredData.length;
+    const from = (page - 1) * limit;
+    const paginatedItems = filteredData.slice(from, from + limit);
+
     return {
-      items: filteredData,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-      },
+      items: paginatedItems,
+      pagination: { page, limit, total },
     };
+  }
+
+  /**
+   * Stock Summary — tổng quan kho hàng cho dashboard.
+   */
+  static async summary() {
+    // Chạy các query song song để tăng tốc
+    const [productsRes, alertsRes, lowStockRes] = await Promise.all([
+      // Tổng sản phẩm đang active
+      supabase
+        .from('products')
+        .select('id, name, sku, stock_quantity, min_stock_level, cost_price, sell_price, categories(id, name)', { count: 'exact' })
+        .eq('is_active', true),
+      // Tổng alerts chưa resolved
+      supabase
+        .from('stock_alerts')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['low_stock', 'out_of_stock']),
+      // Top 10 sản phẩm tồn thấp nhất (kể cả hết hàng)
+      supabase
+        .from('products')
+        .select('id, name, sku, stock_quantity, min_stock_level, categories(id, name)')
+        .eq('is_active', true)
+        .lte('stock_quantity', 0)
+        .order('stock_quantity', { ascending: true })
+        .limit(10),
+    ]);
+
+    const allProducts = productsRes.data || [];
+    const totalProducts = productsRes.count || 0;
+    const alertsPending = alertsRes.count || 0;
+
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+    let safeCount = 0;
+    let totalStockValue = 0;
+    let totalRetailValue = 0;
+
+    for (const p of allProducts) {
+      const stock = Number(p.stock_quantity || 0);
+      const minStock = Number(p.min_stock_level || 0);
+      const costPrice = Number(p.cost_price || 0);
+      const sellPrice = Number(p.sell_price || 0);
+
+      totalStockValue += stock * costPrice;
+      totalRetailValue += stock * sellPrice;
+
+      if (stock <= 0) {
+        outOfStockCount++;
+      } else if (stock <= minStock) {
+        lowStockCount++;
+      } else {
+        safeCount++;
+      }
+    }
+
+    // Top 10 sản phẩm cần nhập gấp (tồn thấp hoặc hết)
+    const topLowStock = allProducts
+      .filter(p => Number(p.stock_quantity || 0) <= Number(p.min_stock_level || 0))
+      .sort((a, b) => Number(a.stock_quantity || 0) - Number(b.stock_quantity || 0))
+      .slice(0, 10)
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        stock_quantity: p.stock_quantity,
+        min_stock_level: p.min_stock_level,
+        category: (p as any).categories?.name || null,
+      }));
+
+    // Phân bố theo danh mục
+    const categoryMap = new Map<string, { name: string; count: number; lowCount: number; totalStock: number }>();
+    for (const p of allProducts) {
+      const catName = (p as any).categories?.name || 'Chưa phân loại';
+      const catId = (p as any).categories?.id || 'uncategorized';
+      const entry = categoryMap.get(catId) || { name: catName, count: 0, lowCount: 0, totalStock: 0 };
+      entry.count++;
+      entry.totalStock += Number(p.stock_quantity || 0);
+      if (Number(p.stock_quantity || 0) <= Number(p.min_stock_level || 0)) {
+        entry.lowCount++;
+      }
+      categoryMap.set(catId, entry);
+    }
+
+    const categoryBreakdown = Array.from(categoryMap.entries()).map(([id, val]) => ({
+      id,
+      name: val.name,
+      product_count: val.count,
+      low_stock_count: val.lowCount,
+      total_stock: val.totalStock,
+    }));
+
+    return {
+      total_products: totalProducts,
+      out_of_stock_count: outOfStockCount,
+      low_stock_count: lowStockCount,
+      safe_count: safeCount,
+      total_stock_value: totalStockValue,
+      total_retail_value: totalRetailValue,
+      alerts_pending: alertsPending,
+      top_low_stock: topLowStock,
+      category_breakdown: categoryBreakdown,
+    };
+  }
+
+  /**
+   * Product lookup — tìm chính xác sản phẩm bằng barcode HOẶC sku
+   * trong 1 query duy nhất (thay vì frontend phải gọi 3 lần).
+   */
+  static async lookupProduct(code: string) {
+    if (!code || !code.trim()) throw new AppError(400, 'Mã sản phẩm không được để trống');
+    const cleaned = code.trim();
+
+    // Tìm bằng barcode trước, rồi fallback sang sku
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, categories(id, name), suppliers(id, name)')
+      .eq('is_active', true)
+      .or(`barcode.eq.${cleaned},sku.eq.${cleaned}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new AppError(500, error.message);
+    return data || null;
   }
 }

@@ -43,5 +43,8 @@ export const catalogAPI = {
       api.post<ApiResponse<{ imported: number; skipped: number; skippedSkus: string[] }>>('/products/bulk', { products }),
     update: (id: string, data: Partial<Product>) => api.put<ApiResponse<Product>>(`/products/${id}`, data),
     remove: (id: string) => api.delete<ApiResponse<null>>(`/products/${id}`),
+    /** Tra cứu nhanh bằng barcode hoặc SKU — 1 API call thay vì 3 */
+    lookup: (code: string) =>
+      api.get<ApiResponse<Product | null>>(`/stock/lookup?code=${encodeURIComponent(code)}`),
   },
 };

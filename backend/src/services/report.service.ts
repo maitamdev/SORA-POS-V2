@@ -1,6 +1,8 @@
 import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
+import { appCache, stableCacheKey } from '../utils/cache';
+
 
 const startOfDay = (date = new Date()) => {
   const value = new Date(date);
@@ -18,6 +20,10 @@ const getLocalDateString = (dateInput: Date | string) => {
 
 export class ReportService {
   static async dashboard(dateStr?: string, days = 7) {
+    const cacheKey = stableCacheKey('report:dashboard', { dateStr, days });
+    const cached = appCache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const today = dateStr ? new Date(dateStr + 'T00:00:00') : startOfDay();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -310,7 +316,7 @@ export class ReportService {
       image_url: topProductsImagesMap.get(p.product_id) || '/assets/logo.png',
     }));
 
-    return {
+    const result = {
       summary: {
         today_revenue: todayRevenue,
         today_revenue_growth: todayRevenueGrowth,
@@ -331,6 +337,8 @@ export class ReportService {
       low_stock_products,
       top_products,
     };
+    appCache.set(cacheKey, result, 30_000);
+    return result;
   }
 
   static async revenue(days = 7, endDate = startOfDay()) {

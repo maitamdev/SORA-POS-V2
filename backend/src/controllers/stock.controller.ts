@@ -44,4 +44,16 @@ export class StockController {
   static expiryAlerts = asyncHandler(async (req: Request, res: Response) => {
     successResponse(res, await StockService.expiryAlerts(req.query), 'Lấy cảnh báo hạn sử dụng thành công');
   });
+
+  /** Stock dashboard summary — tổng quan kho hàng */
+  static summary = asyncHandler(async (_req: Request, res: Response) => {
+    successResponse(res, await StockService.summary(), 'Lấy tổng quan kho hàng thành công');
+  });
+
+  /** Product lookup — barcode/SKU single lookup for POS */
+  static lookupProduct = asyncHandler(async (req: Request, res: Response) => {
+    const code = String(req.query.code || '').trim();
+    if (!code) throw new AppError(400, 'Vui lòng cung cấp mã barcode hoặc SKU');
+    successResponse(res, await StockService.lookupProduct(code), 'Tra cứu sản phẩm thành công');
+  });
 }
