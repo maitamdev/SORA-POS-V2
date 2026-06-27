@@ -7,6 +7,41 @@ import { appCache } from '../utils/cache';
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
 export class StockService {
+  private static async applyStockChangeRpc(params: {
+    productId: string;
+    mode: 'import' | 'adjustment';
+    quantity?: number | null;
+    newStock?: number | null;
+    userId: string;
+    note?: string | null;
+  }) {
+    const { data: transactionId, error } = await supabase.rpc('apply_stock_change', {
+      p_product_id: params.productId,
+      p_mode: params.mode,
+      p_quantity: params.quantity ?? null,
+      p_new_stock: params.newStock ?? null,
+      p_user_id: params.userId,
+      p_note: params.note || null,
+    });
+
+    if (error) {
+      const message = error.message || '';
+      if (message.includes('apply_stock_change') || message.includes('Could not find the function')) {
+        return null;
+      }
+      throw new AppError(400, message);
+    }
+
+    const { data: transaction, error: txError } = await supabase
+      .from('stock_transactions')
+      .select('*')
+      .eq('id', transactionId)
+      .single();
+
+    if (txError) throw new AppError(400, txError.message);
+    return transaction;
+  }
+
   static async inventory(queryParams: Record<string, unknown>) {
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
@@ -78,6 +113,19 @@ export class StockService {
    * có thể ghi đè nhau. Giờ dùng `stock_quantity + quantity` trực tiếp trong SQL.
    */
   static async importStock(productId: string, quantity: number, userId: string, note?: string | null): Promise<any> {
+    const atomicTransaction = await this.applyStockChangeRpc({
+      productId,
+      mode: 'import',
+      quantity,
+      userId,
+      note,
+    });
+    if (atomicTransaction) {
+      appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+      appCache.deletePrefix('report:dashboard');
+      return atomicTransaction;
+    }
+
     // Atomic update: cộng trực tiếp trong SQL, trả về giá trị trước/sau
     const { data: product, error: fetchError } = await supabase
       .from('products')
@@ -164,6 +212,19 @@ export class StockService {
    * Điều chỉnh tồn kho — sử dụng optimistic locking để tránh race condition.
    */
   static async adjustStock(productId: string, newStock: number, userId: string, note?: string | null): Promise<any> {
+    const atomicTransaction = await this.applyStockChangeRpc({
+      productId,
+      mode: 'adjustment',
+      newStock,
+      userId,
+      note,
+    });
+    if (atomicTransaction) {
+      appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
+      appCache.deletePrefix('report:dashboard');
+      return atomicTransaction;
+    }
+
     const { data: product, error } = await supabase
       .from('products')
       .select('stock_quantity')
@@ -331,6 +392,10 @@ export class StockService {
       } else if (queryParams.status === 'near_expiry') {
         const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         cq = cq.gte('expiry_date', currentDate).lte('expiry_date', warningDate);
+      } else if (queryParams.status === 'watchlist') {
+        const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const watchlistDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        cq = cq.gt('expiry_date', warningDate).lte('expiry_date', watchlistDate);
       } else if (queryParams.status === 'safe') {
         const warningDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         cq = cq.gt('expiry_date', warningDate);

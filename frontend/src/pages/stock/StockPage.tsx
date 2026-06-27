@@ -241,17 +241,35 @@ const StockPage = () => {
     }
   }, [canManageStock]);
 
+  const loadAllExpiryAlerts = async () => {
+    const limit = 500;
+    let page = 1;
+    let total = 0;
+    const items: ProductBatch[] = [];
+
+    do {
+      const response = await stockAPI.expiryAlerts({ limit, page });
+      const payload = response.data.data;
+      items.push(...payload.items);
+      total = payload.pagination.total;
+      page += 1;
+      if (payload.items.length === 0) break;
+    } while (items.length < total);
+
+    return items;
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [inventoryRes, alertsRes, expiryRes] = await Promise.all([
         stockAPI.inventory({ limit: 500 }),
         stockAPI.alerts({ limit: 200 }),
-        stockAPI.expiryAlerts({ limit: 10000 }),
+        loadAllExpiryAlerts(),
       ]);
       setInventory(inventoryRes.data.data.items);
       setAlerts(alertsRes.data.data.items);
-      setExpiryAlerts(expiryRes.data.data.items);
+      setExpiryAlerts(expiryRes);
       await loadTransactions(txPage);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };

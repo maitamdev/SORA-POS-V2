@@ -204,7 +204,9 @@ export function startRealtimeSubscriptions(): void {
   subscribeToShifts();
   subscribeToStockAlerts();
 
-  console.log('[Realtime] Đã đăng ký lắng nghe: orders, products, shifts, stock_alerts');
+  if (import.meta.env.DEV) {
+    console.log('[Realtime] Subscribed to orders, products, shifts, stock_alerts');
+  }
 }
 
 /**
@@ -217,5 +219,7 @@ export function stopRealtimeSubscriptions(): void {
   });
   channels = [];
   isSubscribed = false;
-  console.log('[Realtime] Đã hủy tất cả subscriptions');
+  if (import.meta.env.DEV) {
+    console.log('[Realtime] Removed all subscriptions');
+  }
 }

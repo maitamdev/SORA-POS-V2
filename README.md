@@ -72,7 +72,7 @@ Hệ thống đã được thiết lập để có thể chạy toàn bộ dự 
 1. Đăng nhập vào Supabase và tạo một Project mới.
 2. Mở mục **SQL Editor** trong thanh công cụ bên trái.
 3. Mở file `database/schema.sql` trong dự án này, copy toàn bộ nội dung và dán vào SQL Editor, sau đó nhấn **Run**.
-4. Chạy tiếp `database/app_settings.sql`, `database/hardening.sql`, và `database/enterprise_pos_core.sql` để bật cấu hình vận hành, ràng buộc dữ liệu, transaction checkout/cancel và audit log.
+4. Chạy tiếp `database/app_settings.sql`, `database/hardening.sql`, `database/enterprise_pos_core.sql`, và `database/stock_atomic_rpc.sql` để bật cấu hình vận hành, ràng buộc dữ liệu, transaction checkout/cancel, transaction kho và audit log.
 5. (Tùy chọn) Để có dữ liệu mẫu ban đầu, tiếp tục copy và chạy nội dung file `database/seed.sql`. Lưu ý file này có xóa dữ liệu cũ, chỉ dùng cho database mới/demo.
 6. Vào **Project Settings > API** để lấy `Project URL` và `service_role secret`.
 

@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
-import { startAutoSync } from '../../services/offlineSync';
+import { startAutoSync, stopAutoSync } from '../../services/offlineSync';
 import { startRealtimeSubscriptions, stopRealtimeSubscriptions } from '../../services/realtimeService';
 import { useAuthStore } from '../../stores/auth.store';
 import { HiOutlineCalendar } from 'react-icons/hi';
@@ -103,6 +103,7 @@ const MainLayout = () => {
     startRealtimeSubscriptions();
 
     return () => {
+      stopAutoSync();
       stopRealtimeSubscriptions();
     };
   }, []);

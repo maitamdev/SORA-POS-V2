@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { Product, Category, Customer } from '../types/domain.type';
 import type { CreateOrderPayload } from './order.api';
+import { useAuthStore } from '../stores/auth.store';
 
 /* ------------------------------------------------------------------ */
 /*  Offline pending order — đơn hàng tạo khi mất mạng                */
@@ -14,6 +15,7 @@ export interface PendingOrder {
   payload: CreateOrderPayload;
   /** Tổng tiền sau giảm giá — dùng hiển thị UI */
   finalAmount: number;
+  createdByUserId?: string | null;
   /** Phương thức thanh toán — dùng hiển thị UI */
   paymentMethod: string;
   /** Thời điểm tạo offline */
@@ -249,6 +251,7 @@ export async function savePendingOrder(
   paymentMethod: string
 ): Promise<PendingOrder> {
   const offlineOrderNumber = generateOfflineOrderNumber();
+  const currentUser = useAuthStore.getState().user;
   const order: PendingOrder = {
     offlineOrderNumber,
     payload: {
@@ -257,6 +260,7 @@ export async function savePendingOrder(
     },
     finalAmount,
     paymentMethod,
+    createdByUserId: currentUser?.id || null,
     createdAt: new Date().toISOString(),
     syncStatus: 'pending',
     syncError: null,

@@ -55,9 +55,7 @@ app.use(
       if (
         isSameOrigin ||
         env.corsOrigins.includes(origin) ||
-        (env.nodeEnv === 'development' && isAllowedDevOrigin(origin)) ||
-        origin.endsWith('.vercel.app') ||
-        origin.endsWith('.qzz.io')
+        (env.isLocalDevelopment && isAllowedDevOrigin(origin))
       ) {
         isAllowed = true;
       }

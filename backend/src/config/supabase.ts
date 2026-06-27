@@ -20,7 +20,9 @@ function getSupabase(): SupabaseClient {
         persistSession: false,
       },
     });
-    console.log('✅ Supabase client initialized');
+    if (env.isLocalDevelopment) {
+      console.log('Supabase client initialized');
+    }
   }
   return supabaseInstance;
 }

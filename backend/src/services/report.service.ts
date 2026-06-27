@@ -80,6 +80,7 @@ export class ReportService {
       supabase
         .from('orders')
         .select('id, order_number, final_amount, created_at, status, customers(name)')
+        .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(5),
 

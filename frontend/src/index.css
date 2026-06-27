@@ -42,10 +42,26 @@ img {
   box-sizing: border-box;
 }
 
-*,
-*::before,
-*::after {
+button,
+input,
+select,
+textarea,
+dialog,
+[role='button'],
+.rounded,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl,
+.rounded-\[24px\] {
   border-radius: 0 !important;
+}
+
+.rounded-full,
+.animate-spin {
+  border-radius: 9999px !important;
 }
 
 body, button, input, select, textarea, p, span, div, h1, h2, h3, h4, h5, h6, a {

@@ -19,6 +19,14 @@ const applySearch = (
   return query.or(columns.map((column) => `${column}.ilike.%${pattern}%`).join(','));
 };
 
+const stripCustomerSystemFields = (data: Entity): Entity => {
+  const { points, total_spent, is_active, ...safeData } = data;
+  void points;
+  void total_spent;
+  void is_active;
+  return safeData;
+};
+
 export class CatalogService {
   /**
    * Đồng bộ cảnh báo tồn kho cho sản phẩm.
@@ -221,9 +229,10 @@ export class CatalogService {
   }
 
   static async createCustomer(data: Entity) {
+    const safeData = stripCustomerSystemFields(data);
     const { data: created, error } = await supabase
       .from('customers')
-      .insert(emptyToNull(data))
+      .insert(emptyToNull(safeData))
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
@@ -231,9 +240,10 @@ export class CatalogService {
   }
 
   static async updateCustomer(id: string, data: Entity) {
+    const safeData = stripCustomerSystemFields(data);
     const { data: updated, error } = await supabase
       .from('customers')
-      .update(emptyToNull(data))
+      .update(emptyToNull(safeData))
       .eq('id', id)
       .select('*')
       .single();

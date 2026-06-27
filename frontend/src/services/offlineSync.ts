@@ -9,6 +9,7 @@ import {
   removePendingOrder,
 } from './offlineDB';
 import { orderAPI } from './order.api';
+import { useAuthStore } from '../stores/auth.store';
 
 /* ------------------------------------------------------------------ */
 /*  syncAllDataToLocal — Tải tất cả dữ liệu cần thiết xuống local   */
@@ -61,8 +62,11 @@ export async function syncPendingOrdersToServer(): Promise<{
 
   try {
     const pendingOrders = await getPendingOrders();
+    const currentUserId = useAuthStore.getState().user?.id || null;
     const ordersToSync = pendingOrders.filter(
-      (o) => o.syncStatus === 'pending' || o.syncStatus === 'failed'
+      (o) =>
+        (o.syncStatus === 'pending' || o.syncStatus === 'failed') &&
+        (!o.createdByUserId || o.createdByUserId === currentUserId)
     );
 
     if (ordersToSync.length === 0) return { synced: 0, failed: 0 };
@@ -124,6 +128,7 @@ export async function syncPendingOrdersToServer(): Promise<{
 /*  Auto Sync — tự động đồng bộ khi có mạng trở lại                  */
 /* ------------------------------------------------------------------ */
 let autoSyncRegistered = false;
+let onlineHandler: (() => Promise<void>) | null = null;
 
 /**
  * Đăng ký lắng nghe sự kiện online/offline để tự động đồng bộ.
@@ -133,7 +138,7 @@ export function startAutoSync(): void {
   if (autoSyncRegistered) return;
   autoSyncRegistered = true;
 
-  const handleOnline = async () => {
+  onlineHandler = async () => {
     console.log('[OfflineSync] Đã kết nối lại internet — bắt đầu đồng bộ...');
 
     // 1. Đồng bộ đơn hàng offline lên server trước
@@ -143,7 +148,7 @@ export function startAutoSync(): void {
     await syncAllDataToLocal();
   };
 
-  window.addEventListener('online', handleOnline);
+  window.addEventListener('online', onlineHandler);
 
   // Nếu hiện tại đang online, thử đồng bộ đơn hàng pending ngay
   if (navigator.onLine) {
@@ -151,4 +156,12 @@ export function startAutoSync(): void {
   }
 
   console.log('[OfflineSync] Auto-sync đã được đăng ký');
+}
+
+export function stopAutoSync(): void {
+  if (onlineHandler) {
+    window.removeEventListener('online', onlineHandler);
+  }
+  onlineHandler = null;
+  autoSyncRegistered = false;
 }

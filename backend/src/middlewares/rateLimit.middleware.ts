@@ -17,6 +17,11 @@ type RateLimitOptions = {
 export const rateLimitMiddleware = ({ windowMs, max, keyPrefix }: RateLimitOptions) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const now = Date.now();
+    if (buckets.size > 10000) {
+      for (const [bucketKey, bucket] of buckets.entries()) {
+        if (bucket.resetAt <= now) buckets.delete(bucketKey);
+      }
+    }
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const key = `${keyPrefix}:${ip}`;
     const current = buckets.get(key);

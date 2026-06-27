@@ -2,16 +2,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const nodeEnv = process.env.NODE_ENV || 'development';
+const isLocalDevelopment = nodeEnv === 'development' || nodeEnv === 'test';
 
-// Validate biến môi trường bắt buộc
-if (!process.env.JWT_SECRET && nodeEnv === 'production') {
-  throw new Error('❌ JWT_SECRET is required in production environment');
+if (!process.env.JWT_SECRET && !isLocalDevelopment) {
+  throw new Error('JWT_SECRET is required outside local development');
 }
 
 export const env = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv,
-  jwtSecret: process.env.JWT_SECRET || 'dev-only-fallback-secret',
+  isLocalDevelopment,
+  jwtSecret: isLocalDevelopment ? (process.env.JWT_SECRET || 'dev-only-fallback-secret') : process.env.JWT_SECRET!,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '10h',
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
