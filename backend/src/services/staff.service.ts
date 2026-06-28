@@ -32,6 +32,17 @@ const sanitizeUser = (user: any) => ({
 });
 
 export class StaffService {
+  private static getVietnamDayRange(dateStr: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      throw new AppError(400, 'Ngay bao cao khong hop le');
+    }
+
+    return {
+      start: new Date(`${dateStr}T00:00:00+07:00`),
+      end: new Date(`${dateStr}T23:59:59.999+07:00`),
+    };
+  }
+
   private static async getRoleId(roleName: string) {
     const { data, error } = await supabase
       .from('roles')
@@ -160,9 +171,7 @@ export class StaffService {
   }
 
   static async getStaffReport(staffId: string, dateStr: string) {
-    const targetDate = new Date(dateStr);
-    const startOfDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-    const endOfDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+    const { start, end } = this.getVietnamDayRange(dateStr);
 
     // Fetch all completed orders for this user on this day
     const { data: orders, error } = await supabase
@@ -170,8 +179,8 @@ export class StaffService {
       .select('id, order_number, final_amount, created_at, status, customers(name), order_details(id, product_name, quantity, unit_price, subtotal), payments(method)')
       .eq('user_id', staffId)
       .eq('status', 'completed')
-      .gte('created_at', startOfDate.toISOString())
-      .lte('created_at', endOfDate.toISOString())
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
       .order('created_at', { ascending: false });
 
     if (error) throw new AppError(500, error.message);

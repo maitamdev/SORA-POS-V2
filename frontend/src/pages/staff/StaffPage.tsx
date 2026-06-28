@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   HiOutlinePlus,
@@ -72,6 +72,10 @@ const StaffPage = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const reportableStaff = useMemo(
+    () => staff.filter((s) => s.is_active && s.role !== 'admin'),
+    [staff],
+  );
 
   const loadStaff = async () => {
     setLoading(true);
@@ -94,13 +98,13 @@ const StaffPage = () => {
 
   // Chọn nhân viên đầu tiên hoạt động làm mặc định khi tải xong danh sách
   useEffect(() => {
-    if (staff.length > 0 && !selectedStaffId) {
-      const firstActive = staff.find((s) => s.is_active);
+    if (reportableStaff.length > 0 && !selectedStaffId) {
+      const firstActive = reportableStaff[0];
       if (firstActive) {
         setSelectedStaffId(firstActive.id);
       }
     }
-  }, [staff, selectedStaffId]);
+  }, [reportableStaff, selectedStaffId]);
 
   const loadStaffReport = async () => {
     if (!selectedStaffId) return;
@@ -497,7 +501,7 @@ const StaffPage = () => {
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-705 outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="">Chọn nhân viên...</option>
-                  {staff.filter((s) => s.is_active && s.role !== 'admin').map((s) => (
+                  {reportableStaff.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.full_name} ({s.email})
                     </option>

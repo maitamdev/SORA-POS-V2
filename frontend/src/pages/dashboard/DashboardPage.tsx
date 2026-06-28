@@ -1,24 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { 
-  HiOutlineChartBar, 
-  HiOutlineCube, 
-  HiOutlineExclamationCircle, 
-  HiOutlineShoppingCart,
+import {
+  HiOutlineBell,
   HiOutlineCalendar,
-  HiOutlineArrowNarrowUp,
-  HiOutlineTrendingUp,
+  HiOutlineCash,
+  HiOutlineChartBar,
+  HiOutlineCube,
+  HiOutlineExclamationCircle,
+  HiOutlineRefresh,
+  HiOutlineShoppingCart,
+  HiOutlineSparkles,
   HiOutlineTrendingDown,
+  HiOutlineTrendingUp,
 } from 'react-icons/hi';
-import { useAuthStore } from '../../stores/auth.store';
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { DashboardData, reportAPI } from '../../services/report.api';
-import { getRoleLabel, getUserInitials } from '../../utils/userDisplay';
 
-/* ------------------------------------------------------------------ */
-/*  Utility Helpers                                                    */
-/* ------------------------------------------------------------------ */
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+const compactMoney = (value: number) => {
+  const amount = Number(value || 0);
+  if (Math.abs(amount) >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}tr`;
+  if (Math.abs(amount) >= 1_000) return `${Math.round(amount / 1_000)}k`;
+  return money(amount);
+};
 
 const formatDisplayDate = (dateStr: string) => {
   if (!dateStr) return '';
@@ -26,45 +40,58 @@ const formatDisplayDate = (dateStr: string) => {
   return `${day}/${month}/${year}`;
 };
 
-/** Inline SVG placeholder for broken product images (no external dependency) */
-const PLACEHOLDER_IMAGE = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3Ctext x='50' y='54' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%2394a3b8'%3ESP%3C/text%3E%3C/svg%3E`;
-
-const renderGrowth = (growth: number) => {
-  if (growth > 0) {
-    return (
-      <p className="text-[11px] font-semibold text-emerald-600 flex items-center gap-0.5 mt-1">
-        <HiOutlineTrendingUp className="w-3.5 h-3.5" />
-        <span>+{growth}% so với hôm qua</span>
-      </p>
-    );
-  } else if (growth < 0) {
-    return (
-      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-0.5 mt-1">
-        <HiOutlineTrendingDown className="w-3.5 h-3.5" />
-        <span>{growth}% so với hôm qua</span>
-      </p>
-    );
-  } else {
-    return (
-      <p className="text-[11px] font-semibold text-slate-400 flex items-center gap-0.5 mt-1">
-        <span className="w-2 h-[2px] bg-slate-300 inline-block mr-0.5"></span>
-        <span>0% so với hôm qua</span>
-      </p>
-    );
-  }
+const formatShortDate = (dateStr: string) => {
+  if (!dateStr) return '';
+  const [, month, day] = dateStr.split('-');
+  return `${day}/${month}`;
 };
 
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' font-family='Arial' font-size='12' fill='%2394a3b8'%3ESP%3C/text%3E%3C/svg%3E";
 
-/* ------------------------------------------------------------------ */
-/*  DashboardPage                                                      */
-/* ------------------------------------------------------------------ */
+const trendCopy = (growth: number) => {
+  if (growth > 0) return { text: `+${growth}%`, tone: 'text-emerald-600', icon: HiOutlineTrendingUp };
+  if (growth < 0) return { text: `${growth}%`, tone: 'text-rose-600', icon: HiOutlineTrendingDown };
+  return { text: '0%', tone: 'text-slate-400', icon: HiOutlineTrendingUp };
+};
+
+const statusTone = (status: string) => {
+  const lower = status.toLowerCase();
+  if (lower.includes('hoàn') || lower.includes('completed')) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (lower.includes('hủy') || lower.includes('cancel')) return 'border-rose-200 bg-rose-50 text-rose-700';
+  return 'border-amber-200 bg-amber-50 text-amber-700';
+};
+
+const RevenueTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    payload?: {
+      cumulativeRevenue: number;
+      displayDate: string;
+      orders: number;
+      revenue: number;
+    };
+  }>;
+}) => {
+  if (!active || !payload?.[0]?.payload) return null;
+  const point = payload[0].payload;
+
+  return (
+    <div className="border border-slate-800 bg-slate-950 px-3 py-2 shadow-xl">
+      <p className="text-[10px] font-bold text-slate-400">{point.displayDate}</p>
+      <p className="mt-1 text-sm font-black text-white">{money(point.revenue)}</p>
+      <p className="text-[10px] font-semibold text-blue-200">{point.orders} đơn trong ngày</p>
+    </div>
+  );
+};
+
 const DashboardPage = () => {
-  const { user } = useAuthStore();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hoveredRevenueIdx, setHoveredRevenueIdx] = useState<number | null>(null);
-
-  // Date Selector State
+  const [selectedRange, setSelectedRange] = useState<number>(7);
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -72,9 +99,6 @@ const DashboardPage = () => {
     const day = String(now.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
-
-  // Time Range Selector State (7 days or 30 days)
-  const [selectedRange, setSelectedRange] = useState<number>(7);
 
   const loadData = useCallback(async (dateStr?: string, days = 7) => {
     setLoading(true);
@@ -88,469 +112,510 @@ const DashboardPage = () => {
     }
   }, []);
 
-  // Reload data whenever selectedDate or selectedRange changes
   useEffect(() => {
     loadData(selectedDate, selectedRange);
-  }, [selectedDate, selectedRange, loadData]);
+  }, [loadData, selectedDate, selectedRange]);
 
-  /* ---- Chart calculations (memoized) ---- */
-  const chartConfig = useMemo(() => {
-    const revenuePoints = data?.revenue || [];
-    const height = 150;
-    const width = 500;
-    const px = 40;
-    const py = 25;
-    const maxRevenue = Math.max(...revenuePoints.map((item) => item.revenue), 100000);
+  const revenuePoints = useMemo(() => data?.revenue || [], [data?.revenue]);
+  const revenueChartData = useMemo(
+    () => {
+      const total = revenuePoints.reduce((sum, item) => sum + item.revenue, 0);
+      let runningRevenue = 0;
 
-    const getCoords = (idx: number, rev: number) => {
-      const x = px + idx * ((width - 2 * px) / (revenuePoints.length - 1 || 1));
-      const y = height - py - (rev / maxRevenue) * (height - 2 * py);
-      return { x, y };
-    };
-
-    let linePath = '';
-    let areaPath = '';
-    const gridLines = [20, 52, 85, 117];
-
-    if (revenuePoints.length > 0) {
-      const points = revenuePoints.map((item, idx) => getCoords(idx, item.revenue));
-      const start = points[0];
-      linePath = `M ${start.x} ${start.y}`;
-      areaPath = `M ${start.x} ${height - py} L ${start.x} ${start.y}`;
-
-      for (let i = 0; i < points.length - 1; i++) {
-        const p0 = points[i - 1] || points[i];
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = points[i + 2] || p2;
-
-        const cp1 = {
-          x: p1.x + (p2.x - p0.x) / 6,
-          y: p1.y + (p2.y - p0.y) / 6,
+      return revenuePoints.map((item, idx) => {
+        runningRevenue += item.revenue;
+        return {
+          ...item,
+          cumulativeRevenue: runningRevenue,
+          displayDate: formatDisplayDate(item.date),
+          trendRevenue: revenuePoints.length > 1 ? total / revenuePoints.length : item.revenue,
+          label: formatShortDate(item.date),
         };
-        const cp2 = {
-          x: p2.x - (p3.x - p1.x) / 6,
-          y: p2.y - (p3.y - p1.y) / 6,
-        };
-
-        const curve = ` C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p2.x} ${p2.y}`;
-        linePath += curve;
-        areaPath += curve;
-      }
-
-      const endCoords = points[points.length - 1];
-      areaPath += ` L ${endCoords.x} ${height - py} Z`;
-    }
-
-    return { revenuePoints, height, width, px, py, maxRevenue, getCoords, linePath, areaPath, gridLines };
-  }, [data?.revenue]);
-
-  /* ---- Donut chart calculations (memoized) ---- */
-  const donutConfig = useMemo(() => {
-    const paymentStats = data?.payment_stats || [];
-    const totalOrders = paymentStats.reduce((sum, item) => sum + item.count, 0);
-    const radius = 45;
-    const circumference = 2 * Math.PI * radius;
-    const colors = ['#1e40af', '#0ea5e9', '#7c3aed'];
-
-    // Pre-calculate stroke offsets so we don't mutate in render
-    let accumulated = 0;
-    const segments = paymentStats.map((item, idx) => {
-      const strokeLength = (item.percentage / 100) * circumference;
-      const offset = accumulated;
-      accumulated += strokeLength;
-      return {
-        ...item,
-        strokeLength,
-        strokeOffset: offset,
-        color: colors[idx % colors.length],
-      };
-    });
-
-    return { paymentStats, totalOrders, radius, circumference, segments };
-  }, [data?.payment_stats]);
-
-  /* ---- Category sales ---- */
-  const categorySales = data?.category_sales || [];
-  const maxCatSales = useMemo(
-    () => Math.max(...categorySales.map((item) => item.value), 100000),
-    [categorySales]
+      });
+    },
+    [revenuePoints],
   );
 
-  /* ---- Loading state ---- */
+  const categorySales = data?.category_sales || [];
+  const maxCategoryValue = useMemo(
+    () => Math.max(...categorySales.map((item) => item.value), 100000),
+    [categorySales],
+  );
+
+  const paymentConfig = useMemo(() => {
+    const stats = data?.payment_stats || [];
+    const total = stats.reduce((sum, item) => sum + item.count, 0);
+    const radius = 46;
+    const circumference = 2 * Math.PI * radius;
+    const colors = ['#2563eb', '#0ea5e9', '#10b981', '#f59e0b'];
+    let accumulated = 0;
+
+    const segments = stats.map((item, idx) => {
+      const length = (item.percentage / 100) * circumference;
+      const segment = {
+        ...item,
+        color: colors[idx % colors.length],
+        strokeLength: length,
+        strokeOffset: accumulated,
+      };
+      accumulated += length;
+      return segment;
+    });
+
+    return { circumference, radius, segments, total };
+  }, [data?.payment_stats]);
+
   if (!data) {
     return (
-      <div className="flex h-[85vh] items-center justify-center font-sans">
-        <div className="text-center space-y-4">
-          <div className="w-10 h-10 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm font-medium text-slate-500 tracking-wide animate-pulse">Đang tải dữ liệu dashboard...</p>
+      <div className="flex h-[75vh] items-center justify-center">
+        <div className="border border-slate-300 bg-white px-8 py-7 text-center shadow-sm">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-blue-600" />
+          <p className="text-sm font-semibold text-slate-600">Đang tải dữ liệu dashboard...</p>
         </div>
       </div>
     );
   }
 
   const summary = data.summary;
-  const { revenuePoints, height: chartHeight, width: chartWidth, px: paddingX, py: paddingY, getCoords, linePath, areaPath, gridLines } = chartConfig;
+  const avgOrderValue = summary.today_orders > 0 ? summary.today_revenue / summary.today_orders : 0;
+  const grossProfit = summary.today_profit ?? Math.max(summary.today_revenue - (summary.today_cogs || 0), 0);
+  const grossMargin = summary.today_revenue > 0 ? Math.round((grossProfit / summary.today_revenue) * 100) : 0;
+  const totalRevenue = revenuePoints.reduce((sum, item) => sum + item.revenue, 0);
+  const totalOrders = revenuePoints.reduce((sum, item) => sum + item.orders, 0);
+  const bestDay = revenuePoints.reduce(
+    (best, item) => (item.revenue > best.revenue ? item : best),
+    revenuePoints[0] || { date: selectedDate, revenue: 0, orders: 0 },
+  );
+
+  const kpis = [
+    {
+      label: 'Doanh thu hôm nay',
+      value: money(summary.today_revenue),
+      growth: summary.today_revenue_growth,
+      icon: HiOutlineCash,
+      accent: 'border-l-blue-600',
+    },
+    {
+      label: 'Đơn hàng',
+      value: `${summary.today_orders} đơn`,
+      growth: summary.today_orders_growth,
+      icon: HiOutlineShoppingCart,
+      accent: 'border-l-emerald-500',
+    },
+    {
+      label: 'Giá trị TB',
+      value: money(avgOrderValue),
+      growth: summary.today_orders_growth,
+      icon: HiOutlineChartBar,
+      accent: 'border-l-sky-500',
+    },
+    {
+      label: 'Sản phẩm bán ra',
+      value: `${summary.today_sold_products} món`,
+      growth: summary.today_sold_growth,
+      icon: HiOutlineCube,
+      accent: 'border-l-indigo-500',
+    },
+    {
+      label: 'Lợi nhuận gộp',
+      value: `${money(grossProfit)}`,
+      growth: summary.today_profit_growth ?? 0,
+      icon: HiOutlineSparkles,
+      accent: 'border-l-amber-500',
+      sub: `${grossMargin}% biên`,
+    },
+  ];
 
   return (
-    <div className="space-y-4 animate-fadeIn font-sans">
-      {/* HEADER SECTION */}
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Dashboard Tổng Quan</h1>
-          <p className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Hệ thống POS tích hợp quản lý kho & cảnh báo tồn kho thấp</p>
-        </div>
-        
-        <div className="flex items-center gap-2.5">
-          {/* Clickable Date Selector */}
-          <div className="relative flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer select-none transition shadow-xs">
-            <HiOutlineCalendar className="w-4 h-4 text-slate-400 pointer-events-none" />
-            <span className="pointer-events-none">Ngày: {formatDisplayDate(selectedDate)}</span>
-            <input 
-              type="date" 
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            />
+    <div className="min-h-full space-y-4 bg-slate-50 text-slate-950">
+      <section className="border border-slate-300 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-slate-300 px-4 py-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">
+                SORA-POS
+              </span>
+              <span className="text-[11px] font-semibold text-slate-400">Trung tâm vận hành cửa hàng</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-950">Dashboard Tổng Quan</h1>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Theo dõi doanh thu, đơn hàng, tồn kho và cảnh báo trong một màn hình.
+            </p>
           </div>
-        </div>
-      </header>
 
-      {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {/* Card 1: Doanh thu hôm nay */}
-        <div className="border border-slate-200 border-t-blue-600 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Doanh thu hôm nay</p>
-              <p className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">{money(summary.today_revenue)}</p>
-              {renderGrowth(summary.today_revenue_growth)}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex h-10 items-center gap-2 border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">
+              <HiOutlineCalendar className="h-4 w-4 text-slate-400" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                onClick={(event) => event.currentTarget.showPicker?.()}
+                className="h-full min-w-[140px] cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-slate-700 outline-none"
+              />
             </div>
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Đơn hàng */}
-        <div className="border border-slate-200 border-t-emerald-500 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Đơn hàng</p>
-              <p className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">{summary.today_orders} đơn</p>
-              {renderGrowth(summary.today_orders_growth)}
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-              <HiOutlineShoppingCart className="w-5 h-5" />
-            </div>
+            <button
+              type="button"
+              onClick={() => loadData(selectedDate, selectedRange)}
+              className="flex h-10 items-center justify-center gap-2 border border-slate-900 bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+            >
+              <HiOutlineRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Tải lại
+            </button>
           </div>
         </div>
 
-        {/* Card 3: Sản phẩm bán ra */}
-        <div className="border border-slate-200 border-t-indigo-500 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sản phẩm bán ra</p>
-              <p className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">{summary.today_sold_products} món</p>
-              {renderGrowth(summary.today_sold_growth)}
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-              <HiOutlineCube className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
+        <div className="grid grid-cols-1 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-5">
+          {kpis.map((item) => {
+            const TrendIcon = trendCopy(item.growth).icon;
+            const trend = trendCopy(item.growth);
+            const Icon = item.icon;
 
-        {/* Card 4: Cảnh báo tồn kho thấp */}
-        <div className="border border-rose-200 border-t-rose-600 bg-white p-4 card-hover relative overflow-hidden group shadow-sm">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cảnh báo tồn kho thấp</p>
-              <p className="text-xl md:text-2xl font-bold text-rose-600 tracking-tight">{summary.low_stock_count} mặt hàng</p>
-              <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-0.5 animate-pulse mt-1">
-                <HiOutlineArrowNarrowUp className="w-3.5 h-3.5" />
-                <span>{summary.new_low_stock_count} sản phẩm mới chạm ngưỡng</span>
+            return (
+              <div key={item.label} className={`border-l-4 ${item.accent} bg-white px-4 py-3`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{item.label}</p>
+                    <p className="mt-2 truncate text-xl font-black tracking-tight text-slate-950">{item.value}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-black ${trend.tone}`}>
+                        <TrendIcon className="h-3.5 w-3.5" />
+                        {trend.text}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">{item.sub || 'so với hôm qua'}</span>
+                    </div>
+                  </div>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-slate-300 bg-slate-50 text-slate-700">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-8">
+          <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Doanh thu theo thời gian</h2>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                Tổng {selectedRange} ngày: <span className="text-slate-950">{money(totalRevenue)}</span> · {totalOrders} đơn
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:bg-rose-100 transition-colors">
-              <HiOutlineExclamationCircle className="w-5 h-5" />
+
+            <div className="flex flex-wrap items-center gap-2">
+              {[7, 30].map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setSelectedRange(range)}
+                  className={`border px-3 py-2 text-[11px] font-black transition ${
+                    selectedRange === range
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
+                  }`}
+                >
+                  {range} ngày
+                </button>
+              ))}
+              <div className="border border-slate-300 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-500">
+                Ngày tốt nhất: <span className="text-slate-950">{formatShortDate(bestDay.date)}</span>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* CHARTS GRAPHIC SECTION */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {/* Doanh thu 7 ngày - Line Area Chart */}
-        <div className="lg:col-span-5 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Doanh thu {selectedRange} ngày</h2>
-            <select 
-              value={selectedRange}
-              onChange={(e) => setSelectedRange(Number(e.target.value))}
-              className="border border-slate-200 text-[11px] font-semibold text-slate-500 rounded-lg px-2.5 py-1.5 outline-none bg-slate-50 cursor-pointer"
-            >
-              <option value={7}>7 ngày qua</option>
-              <option value={30}>30 ngày qua</option>
-            </select>
-          </div>
-          
-          <div className="relative w-full h-44 flex items-center justify-center bg-slate-50/40 border border-slate-100">
-            {revenuePoints.length > 0 && revenuePoints.some(r => r.revenue > 0) ? (
-              <div className="relative w-full h-full">
-                <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
-                  <defs>
-                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity="0.34" />
-                      <stop offset="52%" stopColor="#38bdf8" stopOpacity="0.1" />
-                      <stop offset="100%" stopColor="#2563eb" stopOpacity="0.0" />
-                    </linearGradient>
-                    <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stopColor="#2563eb" />
-                      <stop offset="48%" stopColor="#0284c7" />
-                      <stop offset="100%" stopColor="#0f172a" />
-                    </linearGradient>
-                    <filter id="revenueGlow" x="-20%" y="-40%" width="140%" height="180%">
-                      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
+          <div className="relative h-[360px] overflow-hidden border border-slate-300 bg-white">
+            <div className="absolute inset-x-0 top-0 z-10 flex flex-col gap-3 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur xl:flex-row xl:items-center xl:justify-between">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <div className="border border-slate-300 bg-white px-4 py-2.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Hôm nay</p>
+                    <p className="mt-1 text-sm font-black text-slate-950">{money(summary.today_revenue)}</p>
+                  </div>
+                  <div className="border border-slate-300 bg-white px-4 py-2.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{selectedRange} ngày qua</p>
+                    <p className="mt-1 text-sm font-black text-slate-950">{money(totalRevenue)}</p>
+                  </div>
+                  <div className="border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">Tăng trưởng</p>
+                    <p className="mt-1 text-sm font-black text-emerald-700">{summary.today_revenue_growth >= 0 ? '+' : ''}{summary.today_revenue_growth}%</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-2 w-5 bg-blue-600" />
+                    Doanh thu
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-0 w-5 border-t border-dashed border-slate-400" />
+                    Xu hướng
+                  </span>
+                </div>
+            </div>
 
-                  {/* Horizontal grid lines */}
-                  {gridLines.map((y) => (
-                    <line key={y} x1={paddingX} y1={y} x2={chartWidth - paddingX} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 8" />
-                  ))}
-                  <line x1={paddingX} y1={chartHeight - paddingY} x2={chartWidth - paddingX} y2={chartHeight - paddingY} stroke="#94a3b8" strokeWidth="1" />
-
-                  {/* Shaded Area */}
-                  <path d={areaPath} fill="url(#areaGrad)" />
-
-                  {/* Main Line */}
-                  <path d={linePath} fill="none" stroke="#60a5fa" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" opacity="0.16" filter="url(#revenueGlow)" />
-                  <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-
-                  {/* Dashed line on Hover */}
-                  {hoveredRevenueIdx !== null && (
-                    <line 
-                      x1={getCoords(hoveredRevenueIdx, revenuePoints[hoveredRevenueIdx].revenue).x}
-                      y1={15}
-                      x2={getCoords(hoveredRevenueIdx, revenuePoints[hoveredRevenueIdx].revenue).x}
-                      y2={chartHeight - paddingY}
-                      stroke="#0f172a"
-                      strokeWidth="1"
-                      strokeDasharray="3 5"
+            <div className="absolute inset-x-0 bottom-0 top-[94px] px-4 pb-4 pt-4">
+                {revenueChartData.length > 0 && revenueChartData.some((item) => item.revenue > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={revenueChartData} margin={{ top: 8, right: 24, bottom: 4, left: 2 }}>
+                    <defs>
+                      <linearGradient id="revenueAreaFill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.24} />
+                        <stop offset="52%" stopColor="#60a5fa" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#e5edf7" strokeDasharray="4 8" vertical={false} />
+                    <XAxis
+                      axisLine={false}
+                      dataKey="label"
+                      interval={0}
+                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 800 }}
+                      tickLine={false}
                     />
-                  )}
-
-                  {/* Interactive Circles & Labels */}
-                  {revenuePoints.map((item, idx) => {
-                    const { x, y } = getCoords(idx, item.revenue);
-                    const isHovered = hoveredRevenueIdx === idx;
-                    return (
-                      <g key={item.date}>
-                        <circle 
-                          cx={x} 
-                          cy={y} 
-                          r={isHovered ? 6 : 4} 
-                          fill={isHovered ? '#0f172a' : '#2563eb'} 
-                          stroke="white" 
-                          strokeWidth={isHovered ? 3 : 2}
-                          className="transition-all duration-150 cursor-pointer drop-shadow-sm"
-                        />
-                        <text 
-                          x={x} 
-                          y={chartHeight - 5} 
-                          textAnchor="middle" 
-                          className="text-[9px] fill-slate-500 font-bold"
-                        >
-                          {item.date?.slice(5) || item.date}
-                        </text>
-                      </g>
-                    );
-                  })}
-
-                  {/* Invisible Hover Rectangles */}
-                  {revenuePoints.map((_, idx) => {
-                    const x = paddingX + idx * ((chartWidth - 2 * paddingX) / (revenuePoints.length - 1 || 1));
-                    const rectWidth = (chartWidth - 2 * paddingX) / (revenuePoints.length - 1 || 1);
-                    return (
-                      <rect 
-                        key={idx}
-                        x={x - rectWidth / 2}
-                        y="10"
-                        width={rectWidth}
-                        height={chartHeight - paddingY - 10}
-                        fill="transparent"
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredRevenueIdx(idx)}
-                        onMouseLeave={() => setHoveredRevenueIdx(null)}
-                      />
-                    );
-                  })}
-                </svg>
-
-                {/* Hover Tooltip */}
-                {hoveredRevenueIdx !== null && (
-                  <div 
-                    className="absolute bg-slate-900/95 text-white p-2.5 rounded-lg shadow-lg border border-slate-700 pointer-events-none text-left z-20 text-[11px] animate-scaleIn leading-tight"
-                    style={{
-                      left: `${(getCoords(hoveredRevenueIdx, revenuePoints[hoveredRevenueIdx].revenue).x / chartWidth) * 100 - 10}%`,
-                      top: `${(getCoords(hoveredRevenueIdx, revenuePoints[hoveredRevenueIdx].revenue).y / chartHeight) * 100 - 32}%`
-                    }}
-                  >
-                    <p className="font-semibold text-slate-300">{revenuePoints[hoveredRevenueIdx].date}</p>
-                    <p className="font-bold text-white mt-0.5 text-xs">{money(revenuePoints[hoveredRevenueIdx].revenue)}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs font-medium text-slate-400 py-16">Chưa có dữ liệu doanh thu</p>
-            )}
-          </div>
-        </div>
-
-        {/* Bán hàng theo danh mục - Bar Chart */}
-        <div className="lg:col-span-4 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Bán hàng theo danh mục</h2>
-            <span className="text-[11px] font-medium text-slate-400">{selectedRange} ngày qua</span>
-          </div>
-
-          <div className="h-44 flex items-end justify-between gap-2 px-1 bg-slate-50/40 border border-slate-100 py-3">
-            {categorySales.length > 0 ? (
-              categorySales.slice(0, 5).map((item) => {
-                const percent = (item.value / maxCatSales) * 100;
-                return (
-                  <div key={item.name} className="flex-1 flex flex-col items-center group cursor-pointer">
-                    <span className="text-[9px] font-semibold text-slate-700 mb-1 tracking-tight">
-                      {item.value >= 1000000 
-                        ? `${(item.value / 1000000).toFixed(1)}M` 
-                        : `${(item.value / 1000).toFixed(0)}K`}
-                    </span>
-                    <div className="w-full max-w-[28px] bg-slate-100 rounded-t-md h-32 flex items-end">
-                      <div 
-                        style={{ height: `${percent}%` }}
-                        className="w-full bg-gradient-to-t from-blue-700 to-blue-500 group-hover:from-blue-600 group-hover:to-blue-400 transition-all duration-300 rounded-t-md shadow-sm"
-                      />
-                    </div>
-                    <span className="text-[9px] text-slate-400 font-semibold mt-2 text-center w-full truncate block" title={item.name}>
-                      {item.name}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="w-full text-center text-xs font-medium text-slate-400 py-16">Chưa có dữ liệu danh mục</p>
-            )}
-          </div>
-        </div>
-
-        {/* Phương thức thanh toán - Donut Chart */}
-        <div className="lg:col-span-3 border border-slate-200 bg-white p-4 shadow-sm flex flex-col justify-between">
-          <div className="mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Phương thức thanh toán</h2>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 py-2">
-            {/* SVG circular donut */}
-            <div className="relative w-28 h-28 flex-shrink-0 flex items-center justify-center">
-              <svg viewBox="0 0 120 120" className="w-full h-full transform -rotate-90">
-                {donutConfig.totalOrders === 0 ? (
-                  <circle cx="60" cy="60" r={donutConfig.radius} fill="transparent" stroke="#e2e8f0" strokeWidth="14" />
-                ) : (
-                  donutConfig.segments.map((seg) => (
-                    <circle
-                      key={seg.name}
-                      cx="60"
-                      cy="60"
-                      r={donutConfig.radius}
+                    <YAxis
+                      axisLine={false}
+                      domain={[0, 'dataMax']}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
+                      tickFormatter={(value) => compactMoney(Number(value))}
+                      tickLine={false}
+                      width={54}
+                    />
+                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#0f172a', strokeDasharray: '4 5', strokeWidth: 1 }} />
+                    <Area
+                      dataKey="trendRevenue"
+                      dot={false}
                       fill="transparent"
-                      stroke={seg.color}
-                      strokeWidth="14"
-                      strokeDasharray={`${seg.strokeLength} ${donutConfig.circumference}`}
-                      strokeDashoffset={-seg.strokeOffset}
-                      className="transition-all duration-300"
+                      isAnimationActive={false}
+                      stroke="#9db4d0"
+                      strokeDasharray="4 5"
+                      strokeWidth={2}
+                      type="linear"
                     />
-                  ))
-                )}
-                {/* Inner circle mask */}
-                <circle cx="60" cy="60" r={donutConfig.radius - 8} fill="white" />
-              </svg>
-              {/* Center text */}
-              <div className="absolute text-center leading-none">
-                <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wide">Tổng</span>
-                <p className="text-lg font-bold text-slate-800 mt-1">{donutConfig.totalOrders}</p>
-              </div>
-            </div>
-
-            {/* Donut Legend */}
-            <div className="flex-1 space-y-2 w-full">
-              {donutConfig.totalOrders === 0 ? (
-                <p className="text-[11px] font-medium text-slate-400 text-center">Chưa có giao dịch thanh toán</p>
+                    <Area
+                      activeDot={{ fill: '#ffffff', r: 5, stroke: '#2563eb', strokeWidth: 3 }}
+                      dataKey="revenue"
+                      dot={false}
+                      fill="url(#revenueAreaFill)"
+                      fillOpacity={1}
+                      isAnimationActive={false}
+                      stroke="#2563eb"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      type="monotone"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
               ) : (
-                donutConfig.segments.map((seg) => (
-                  <div key={seg.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: seg.color }} />
-                      <span className="font-medium text-slate-600">{seg.name}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-slate-800">{seg.percentage}%</span>
-                      <p className="text-[9px] font-medium text-slate-400 leading-none">{seg.count} đơn</p>
-                    </div>
-                  </div>
-                ))
+                <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-400">
+                  Chưa có dữ liệu doanh thu trong khoảng thời gian này
+                </div>
               )}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* TABLES ROW */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-        {/* Giao dịch gần đây */}
-        <div className="lg:col-span-5 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Giao dịch gần đây</h2>
-            <Link to="/orders" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</Link>
+        <aside className="grid gap-4 xl:col-span-4">
+          <div className="border border-slate-300 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Cảnh báo vận hành</h2>
+              <HiOutlineBell className="h-5 w-5 text-slate-400" />
+            </div>
+
+            <div className="space-y-3">
+              <Link
+                to="/stock?tab=alerts"
+                className="block border border-rose-200 bg-rose-50 p-3 transition hover:border-rose-300"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-rose-800">Tồn kho thấp</p>
+                    <p className="mt-1 text-2xl font-black text-rose-700">{summary.low_stock_count}</p>
+                    <p className="text-[11px] font-semibold text-rose-600">{summary.new_low_stock_count} mặt hàng mới chạm ngưỡng</p>
+                  </div>
+                  <HiOutlineExclamationCircle className="h-7 w-7 text-rose-500" />
+                </div>
+              </Link>
+
+              <Link to="/stock?tab=expiry" className="block border border-amber-200 bg-amber-50 p-3 transition hover:border-amber-300">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-amber-800">Sắp hết hạn</p>
+                    <p className="mt-1 text-2xl font-black text-amber-700">HSD</p>
+                    <p className="text-[11px] font-semibold text-amber-700">Kiểm tra lô hàng cần ưu tiên bán</p>
+                  </div>
+                  <HiOutlineCalendar className="h-7 w-7 text-amber-500" />
+                </div>
+              </Link>
+
+              <div className="border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-emerald-800">Dòng tiền hôm nay</p>
+                    <p className="mt-1 text-lg font-black text-emerald-700">{money(summary.today_revenue)}</p>
+                    <p className="text-[11px] font-semibold text-emerald-700">Theo doanh thu đã ghi nhận</p>
+                  </div>
+                  <HiOutlineCash className="h-7 w-7 text-emerald-500" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto flex-1 -mx-px">
+          <div className="border border-slate-300 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Thanh toán</h2>
+              <span className="text-[11px] font-bold text-slate-400">{paymentConfig.total} đơn</span>
+            </div>
+
+            <div className="flex items-center gap-5">
+              <div className="relative h-28 w-28 shrink-0">
+                <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                  <circle cx="60" cy="60" r={paymentConfig.radius} fill="transparent" stroke="#e2e8f0" strokeWidth="14" />
+                  {paymentConfig.segments.map((segment) => (
+                    <circle
+                      key={segment.name}
+                      cx="60"
+                      cy="60"
+                      r={paymentConfig.radius}
+                      fill="transparent"
+                      stroke={segment.color}
+                      strokeDasharray={`${segment.strokeLength} ${paymentConfig.circumference}`}
+                      strokeDashoffset={-segment.strokeOffset}
+                      strokeLinecap="butt"
+                      strokeWidth="14"
+                    />
+                  ))}
+                  <circle cx="60" cy="60" r="34" fill="#ffffff" />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Tổng</span>
+                  <span className="text-lg font-black text-slate-950">{paymentConfig.total}</span>
+                </div>
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-2">
+                {paymentConfig.segments.length > 0 ? (
+                  paymentConfig.segments.map((segment) => (
+                    <div key={segment.name} className="flex items-center justify-between gap-3 text-xs">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0" style={{ backgroundColor: segment.color }} />
+                        <span className="truncate font-bold text-slate-600">{segment.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-slate-950">{segment.percentage}%</p>
+                        <p className="text-[9px] font-semibold text-slate-400">{segment.count} đơn</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs font-semibold text-slate-400">Chưa có giao dịch thanh toán</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Danh mục bán chạy</h2>
+            <span className="text-[11px] font-bold text-slate-400">{selectedRange} ngày</span>
+          </div>
+          <div className="space-y-3">
+            {categorySales.length > 0 ? (
+              categorySales.slice(0, 5).map((item) => {
+                const percent = Math.max(8, (item.value / maxCategoryValue) * 100);
+                return (
+                  <div key={item.name}>
+                    <div className="mb-1 flex items-center justify-between gap-3">
+                      <span className="truncate text-xs font-bold text-slate-700">{item.name}</span>
+                      <span className="text-xs font-black text-slate-950">{compactMoney(item.value)}</span>
+                    </div>
+                    <div className="h-2 border border-slate-300 bg-slate-100">
+                      <div className="h-full bg-blue-600" style={{ width: `${percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="py-10 text-center text-xs font-semibold text-slate-400">Chưa có dữ liệu danh mục</p>
+            )}
+          </div>
+
+          <div className="mt-5 border-t border-slate-300 pt-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Sắp hết hàng</h2>
+              <Link to="/stock?tab=alerts" className="text-[11px] font-black text-blue-700 hover:text-blue-900">
+                Xem tất cả
+              </Link>
+            </div>
+
+            <div className="space-y-3">
+              {data.low_stock_products.length > 0 ? (
+                data.low_stock_products.slice(0, 2).map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        onError={(event) => {
+                          event.currentTarget.src = PLACEHOLDER_IMAGE;
+                        }}
+                        className="h-9 w-9 shrink-0 border border-slate-300 bg-slate-50 object-contain"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-slate-800" title={item.name}>
+                          {item.name}
+                        </p>
+                        <p className="mt-1 text-[10px] font-bold text-slate-400">
+                          Tồn kho: <span className="text-rose-600">{item.stock}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700">
+                      {item.alert_status}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="py-6 text-center text-xs font-semibold text-slate-400">Tồn kho đang an toàn</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Giao dịch gần đây</h2>
+            <Link to="/orders" className="border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700 hover:border-blue-400">
+              Xem tất cả
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
             {data.recent_orders.length > 0 ? (
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[560px] text-left">
                 <thead>
-                  <tr className="border-b border-slate-100 text-[10px] font-semibold uppercase text-slate-400 tracking-wider">
-                    <th className="pb-2.5">Mã hóa đơn</th>
-                    <th className="pb-2.5">Khách hàng</th>
-                    <th className="pb-2.5">Thanh toán</th>
-                    <th className="pb-2.5">Tổng tiền</th>
-                    <th className="pb-2.5">Trạng thái</th>
+                  <tr className="border-b border-slate-300 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    <th className="pb-2">Mã hóa đơn</th>
+                    <th className="pb-2">Khách hàng</th>
+                    <th className="pb-2">Thanh toán</th>
+                    <th className="pb-2 text-right">Tổng tiền</th>
+                    <th className="pb-2 text-right">Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                <tbody className="divide-y divide-slate-100">
                   {data.recent_orders.slice(0, 5).map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 font-semibold text-slate-800">{order.order_number}</td>
-                      <td className="py-2.5 font-medium text-slate-500">{order.customer_name}</td>
-                      <td className="py-2.5">
-                        <span className="inline-flex items-center gap-1 font-medium text-slate-600">
-                          {order.payment_method === 'Tiền mặt' && <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>}
-                          {order.payment_method === 'QR Pay' && <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>}
-                          {order.payment_method === 'Thẻ Visa' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>}
-                          {order.payment_method}
-                        </span>
-                      </td>
-                      <td className="py-2.5 font-bold text-slate-800">{money(order.total_amount)}</td>
-                      <td className="py-2.5">
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md inline-flex items-center gap-0.5 ${
-                          order.status === 'Hoàn thành' 
-                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' 
-                            : 'text-rose-700 bg-rose-50 border border-rose-100'
-                        }`}>
+                    <tr key={order.id} className="text-xs transition hover:bg-slate-50">
+                      <td className="py-2.5 font-black text-slate-900">{order.order_number}</td>
+                      <td className="py-2.5 font-semibold text-slate-500">{order.customer_name}</td>
+                      <td className="py-2.5 font-semibold text-slate-600">{order.payment_method}</td>
+                      <td className="py-2.5 text-right font-black text-slate-900">{money(order.total_amount)}</td>
+                      <td className="py-2.5 text-right">
+                        <span className={`inline-flex border px-2 py-1 text-[10px] font-black ${statusTone(order.status)}`}>
                           {order.status}
                         </span>
                       </td>
@@ -559,93 +624,51 @@ const DashboardPage = () => {
                 </tbody>
               </table>
             ) : (
-              <p className="text-center text-xs font-medium text-slate-400 py-16">Không có giao dịch gần đây</p>
+              <p className="py-10 text-center text-xs font-semibold text-slate-400">Không có giao dịch gần đây</p>
             )}
           </div>
         </div>
 
-        {/* Sản phẩm sắp hết hàng */}
-        <div className="lg:col-span-4 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Sản phẩm sắp hết hàng</h2>
-            <Link to="/stock?tab=alerts" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem tất cả</Link>
-          </div>
+        <div className="grid gap-4 xl:col-span-3">
+          <div className="border border-slate-300 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Top bán chạy</h2>
+              <Link to="/reports" className="text-[11px] font-black text-blue-700 hover:text-blue-900">
+                Xem tất cả
+              </Link>
+            </div>
 
-          <div className="space-y-3 flex-1 overflow-y-auto">
-            {data.low_stock_products.length > 0 ? (
-              data.low_stock_products.slice(0, 4).map((item) => (
-                <div key={item.id} className="flex items-center justify-between border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img 
-                      src={item.image_url} 
-                      alt={item.name} 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
+            <div className="space-y-3">
+              {data.top_products.length > 0 ? (
+                data.top_products.slice(0, 4).map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <span className="w-4 text-center text-xs font-black text-slate-400">{idx + 1}</span>
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      onError={(event) => {
+                        event.currentTarget.src = PLACEHOLDER_IMAGE;
                       }}
-                      className="w-9 h-9 object-contain rounded-lg border border-slate-100 bg-slate-50 flex-shrink-0"
+                      className="h-10 w-10 shrink-0 border border-slate-300 bg-slate-50 object-contain"
                     />
-                    <div className="leading-tight min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate" title={item.name}>{item.name}</p>
-                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">Tồn kho: <span className="text-rose-600 font-semibold">{item.stock}</span></p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black text-slate-800" title={item.name}>
+                        {item.name}
+                      </p>
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold">
+                        <span className="text-slate-400">Đã bán: {item.quantity}</span>
+                        <span className="text-blue-700">{compactMoney(item.revenue)}</span>
+                      </div>
                     </div>
                   </div>
-                  
-                  <span className={`px-2 py-0.5 text-[9px] font-semibold rounded-md uppercase tracking-wide ${
-                    item.alert_status === 'Rất thấp' || item.alert_status === 'Hết hàng'
-                      ? 'text-rose-700 bg-rose-50 border border-rose-100' 
-                      : 'text-amber-700 bg-amber-50 border border-amber-100'
-                  }`}>
-                    {item.alert_status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-xs font-medium text-slate-400 py-16">Tồn kho an toàn</p>
-            )}
+                ))
+              ) : (
+                <p className="py-8 text-center text-xs font-semibold text-slate-400">Chưa có sản phẩm bán chạy</p>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Top sản phẩm bán chạy */}
-        <div className="lg:col-span-3 border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-sm font-bold uppercase text-slate-700 tracking-wide">Top bán chạy</h2>
-            <Link to="/reports" className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md">Xem báo cáo</Link>
-          </div>
-
-          <div className="space-y-3 flex-1 overflow-y-auto">
-            {data.top_products.length > 0 ? (
-              data.top_products.slice(0, 5).map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
-                  <span className="text-xs font-bold text-slate-400 w-4 flex-shrink-0 text-center">{idx + 1}</span>
-                  <img 
-                    src={item.image_url} 
-                    alt={item.name} 
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = PLACEHOLDER_IMAGE;
-                    }}
-                    className="w-9 h-9 object-contain rounded-lg border border-slate-100 bg-slate-50 flex-shrink-0"
-                  />
-                  <div className="leading-tight min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-800 truncate" title={item.name}>{item.name}</p>
-                    <div className="flex justify-between items-center mt-1 text-[10px] text-slate-400 font-medium">
-                      <span>Đã bán: <strong className="text-slate-700">{item.quantity}</strong></span>
-                      <span className="text-blue-700 font-semibold">{money(item.revenue)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center text-xs font-medium text-slate-400 py-16">Chưa có sản phẩm bán chạy</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* FOOTER SECTION */}
-      <footer className="flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 font-medium pt-4 border-t border-slate-200">
-        <p>© {new Date().getFullYear()} SORA-POS. Tất cả quyền được bảo lưu.</p>
-        <p>Phiên bản 1.0.0</p>
-      </footer>
+      </section>
     </div>
   );
 };

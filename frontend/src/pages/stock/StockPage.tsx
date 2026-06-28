@@ -517,21 +517,13 @@ const StockPage = () => {
         <div className="flex flex-wrap gap-2.5 w-full sm:w-auto shrink-0">
           {canManageStock && (
             <>
-              {activeTab === 'receipts' ? (
+              {activeTab === 'receipts' && (
                 <button
                   onClick={() => navigate('/stock/receipts/new')}
                   className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
                 >
                   <FiPlus size={16} className="stroke-[2.5]" />
                   Lập phiếu nhập mới
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowActionModal(true)}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
-                >
-                  <FiPlus size={16} className="stroke-[2.5]" />
-                  Cập nhật kho nhanh
                 </button>
               )}
               {activeTab !== 'receipts' && (

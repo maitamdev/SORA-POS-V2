@@ -139,20 +139,48 @@ export class AIService {
     stock_days: number | null;
   }, targetDays: number) {
     const unit = item.unit || 'sản phẩm';
+    const daysLeft = item.stock_days !== null ? `${item.stock_days} ngày` : 'chưa đủ dữ liệu dự báo';
+    const dailySales = Number(item.average_daily_sales || 0);
+    const actionLine = item.recommended_quantity > 0
+      ? `Đề xuất nhập **${item.recommended_quantity} ${unit}** để đạt vùng tồn khoảng **${targetDays} ngày**.`
+      : 'Chưa cần nhập thêm, ưu tiên theo dõi thêm biến động bán trong vài ngày tới.';
+    const cadenceLine = dailySales > 0
+      ? `Với tốc độ bán trung bình **${dailySales}/${unit}/ngày**, nên kiểm tra lại tồn kho sau **3-5 ngày** hoặc ngay khi có đơn lớn.`
+      : 'Do chưa có tốc độ bán ổn định, chỉ nên nhập theo ngưỡng tối thiểu và tránh ôm tồn quá nhiều.';
 
     if (item.stock_quantity <= 0) {
-      return `Hết hàng, nên nhập ngay ${item.recommended_quantity} ${unit} để tránh mất đơn.`;
+      return [
+        '- **Mức ưu tiên:** Khẩn cấp vì sản phẩm đã hết hàng.',
+        `- **Hành động:** ${actionLine}`,
+        '- **Rủi ro:** Đang có nguy cơ mất đơn ngay; nếu nhà cung cấp giao chậm, nên ưu tiên nhập lô nhỏ trước để mở bán lại.',
+        `- **Theo dõi:** ${cadenceLine}`,
+      ].join('\n');
     }
 
     if (item.stock_quantity <= item.min_stock_level) {
-      return `Tồn kho thấp, nên nhập ${item.recommended_quantity} ${unit} để đủ bán khoảng ${targetDays} ngày.`;
+      return [
+        `- **Mức ưu tiên:** Cao vì tồn hiện tại (**${item.stock_quantity} ${unit}**) đã chạm/ngang ngưỡng tối thiểu (**${item.min_stock_level} ${unit}**).`,
+        `- **Hành động:** ${actionLine}`,
+        `- **Lý do:** Dự kiến còn bán được khoảng **${daysLeft}**, thấp hơn vùng dự phòng mong muốn.`,
+        `- **Theo dõi:** ${cadenceLine}`,
+      ].join('\n');
     }
 
     if (item.stock_days !== null && item.stock_days <= targetDays) {
-      return `Tốc độ bán trung bình ${item.average_daily_sales}/ngày, nên nhập thêm ${item.recommended_quantity} ${unit} trước khi chạm ngưỡng thấp.`;
+      return [
+        `- **Mức ưu tiên:** Trung bình, chưa nguy hiểm nhưng tồn chỉ đủ khoảng **${daysLeft}**.`,
+        `- **Hành động:** ${actionLine}`,
+        '- **Lý do:** Nên đặt hàng trước khi chạm ngưỡng thấp để tránh đứt hàng bất ngờ.',
+        `- **Theo dõi:** ${cadenceLine}`,
+      ].join('\n');
     }
 
-    return `Tồn kho hiện tại đủ an toàn cho mục tiêu ${targetDays} ngày, tạm thời chỉ cần theo dõi.`;
+    return [
+      `- **Mức ưu tiên:** Thấp, tồn kho đang trong vùng an toàn cho mục tiêu **${targetDays} ngày**.`,
+      '- **Hành động:** Chưa cần nhập thêm; ưu tiên bán xoay vòng và theo dõi tốc độ bán.',
+      '- **Rủi ro:** Nếu bán chậm, nhập thêm lúc này có thể làm tăng vốn nằm kho.',
+      `- **Theo dõi:** ${cadenceLine}`,
+    ].join('\n');
   }
 
   private static async groqInsight(prompt: string) {
@@ -198,10 +226,24 @@ Với mỗi sản phẩm, hãy phân tích theo 6 KHUNG sau (chỉ phân tích k
 - Nhập bao nhiêu, khi nào, mức ưu tiên
 - ROI dự kiến nếu nhập theo đề xuất
 
+BẮT BUỘC TRẢ LỜI THEO FORMAT SAU, KHÔNG VIẾT THÀNH MỘT ĐOẠN VĂN CHUNG CHUNG:
+- **Quyết định nhập:** Nên nhập / chưa nên nhập / nhập thử lô nhỏ. Nêu số lượng cụ thể và thời điểm thực hiện.
+- **Lý do chính:** 2-3 gạch đầu dòng dựa trên tồn kho, tốc độ bán, ngày còn hàng, xu hướng 7 ngày vs 30 ngày.
+- **Rủi ro cần kiểm soát:** Nêu nguy cơ hết hàng, tồn chết, vốn nằm kho, hoặc thiếu dữ liệu. Nếu dữ liệu mùa vụ/lead time không có, phải nói rõ là giả định bảo thủ.
+- **Kế hoạch hành động:** Việc cần làm ngay sau khi duyệt đề xuất: liên hệ nhà cung cấp, ưu tiên nhập lô nào, kiểm tra lại sau bao nhiêu ngày, theo dõi chỉ số nào.
+- **Gợi ý bán hàng/vận hành:** Gợi ý trưng bày, combo, bán kèm, hoặc chuyển tồn giữa chi nhánh nếu phù hợp với loại sản phẩm.
+
+QUY TẮC CHẤT LƯỢNG:
+- Không được chỉ nói "nên nhập X" rồi dừng lại.
+- Không được bịa dữ liệu không có trong prompt. Khi thiếu dữ liệu, ghi "chưa có dữ liệu" và đưa giả định an toàn.
+- Không được mâu thuẫn với số lượng đề xuất nhập trong dữ liệu đầu vào.
+- Nếu tốc độ bán thấp nhưng sản phẩm hết hàng, phân biệt rõ: hết hàng do tồn bằng 0, không nhất thiết do nhu cầu tăng mạnh.
+- Ưu tiên câu ngắn, có hành động, đọc như trợ lý mua hàng cho chủ cửa hàng.
+
 Sử dụng Markdown:
 - **in đậm** cho số liệu quan trọng
 - Gạch đầu dòng (-) cho danh sách
-- Viết ngắn gọn 150-250 từ, đi thẳng vào vấn đề`,
+- Viết ngắn gọn 170-260 từ, đi thẳng vào vấn đề`,
           },
           { role: 'user', content: prompt },
         ],
@@ -504,6 +546,15 @@ Sử dụng Markdown:
       const sellThroughDays = speed30d > 0 
         ? Math.ceil(item.recommended_quantity / speed30d) 
         : null;
+      const stockAfterImport = item.stock_quantity + item.recommended_quantity;
+      const statusText =
+        item.alert_status === 'out_of_stock'
+          ? 'HẾT HÀNG'
+          : item.alert_status === 'low_stock'
+            ? 'TỒN THẤP'
+            : item.alert_status === 'needs_restock'
+              ? 'SẮP THIẾU'
+              : 'AN TOÀN';
 
       const prompt = [
         `═══ BÁO CÁO PHÂN TÍCH SẢN PHẨM ═══`,
@@ -519,8 +570,11 @@ Sử dụng Markdown:
         `• Biên lợi nhuận: ${profitMargin}%`,
         ``,
         `─── TỒN KHO ───`,
+        `• Trạng thái cảnh báo: ${statusText}`,
         `• Tồn hiện tại: ${item.stock_quantity} ${item.unit}`,
         `• Ngưỡng tối thiểu: ${item.min_stock_level} ${item.unit}`,
+        `• Tồn mục tiêu theo hệ thống: ${item.target_stock} ${item.unit}`,
+        `• Tồn dự kiến sau khi nhập đề xuất: ${stockAfterImport} ${item.unit}`,
         stockDaysLeft !== null 
           ? `• Dự kiến hết hàng sau: ${stockDaysLeft} ngày` 
           : `• Chưa có dữ liệu bán hàng đủ để dự báo`,
@@ -539,13 +593,15 @@ Sử dụng Markdown:
         `• Mục tiêu tồn kho: ${analysis.target_days} ngày`,
         ``,
         `═══ YÊU CẦU PHÂN TÍCH ═══`,
-        `Dựa trên dữ liệu trên, hãy phân tích theo 6 khung:`,
-        `1. Tình trạng tồn kho (nguy hiểm/ổn/dư thừa?)`,
-        `2. Xu hướng nhu cầu khách hàng (tăng/giảm/ổn định? Tại sao?)`,
-        `3. Yếu tố mùa vụ & thời điểm (peak season? Lễ tết sắp tới?)`,
-        `4. Chiến lược giá & biên lợi nhuận (đáng đầu tư nhập nhiều?)`,
-        `5. Rủi ro chuỗi cung ứng (lead time, chi phí cơ hội)`,
-        `6. Khuyến nghị hành động cụ thể (nhập bao nhiêu, khi nào, ROI)`,
+        `Dựa trên dữ liệu trên, hãy viết như trợ lý mua hàng cho chủ cửa hàng, không viết chung chung.`,
+        `Bắt buộc có các mục sau bằng gạch đầu dòng Markdown:`,
+        `1. Quyết định nhập: nhập bao nhiêu, nhập ngay hay nhập thử lô nhỏ, ưu tiên cao/trung bình/thấp.`,
+        `2. Vì sao: dựa trên tồn hiện tại, ngưỡng tối thiểu, số ngày còn hàng, tốc độ 7 ngày và 30 ngày.`,
+        `3. Rủi ro: nguy cơ hết hàng, tồn chết, vốn nằm kho, hoặc thiếu dữ liệu nhà cung cấp/lead time.`,
+        `4. Kế hoạch hành động: liên hệ nhà cung cấp, kiểm tra lại sau bao nhiêu ngày, theo dõi chỉ số nào.`,
+        `5. Gợi ý vận hành/bán hàng: trưng bày, combo, bán kèm, ưu tiên bán trước, hoặc chuyển tồn nếu phù hợp.`,
+        `Không được mâu thuẫn với số lượng đề xuất nhập ${item.recommended_quantity} ${item.unit}.`,
+        `Nếu thiếu dữ liệu mùa vụ hoặc lead time, nói rõ "chưa có dữ liệu" và đưa giả định bảo thủ.`,
       ].filter(Boolean).join('\n');
 
       const aiInsight = (await this.groqInsight(prompt)) || item.ai_insight;
