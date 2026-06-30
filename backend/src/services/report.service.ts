@@ -4,18 +4,32 @@ import { env } from '../config/env';
 import { appCache, stableCacheKey } from '../utils/cache';
 
 
+const getVietnamTime = (dateInput: Date | string = new Date()) => {
+  const date = new Date(dateInput);
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  return new Date(utc + 7 * 3600000);
+};
+
 const startOfDay = (date = new Date()) => {
-  const value = new Date(date);
-  value.setHours(0, 0, 0, 0);
-  return value;
+  const vnDate = getVietnamTime(date);
+  vnDate.setHours(0, 0, 0, 0);
+  const y = vnDate.getFullYear();
+  const m = vnDate.getMonth();
+  const d = vnDate.getDate();
+  return new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - 7 * 3600000);
 };
 
 const getLocalDateString = (dateInput: Date | string) => {
-  const d = new Date(dateInput);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const vnDate = getVietnamTime(dateInput);
+  const y = vnDate.getFullYear();
+  const m = String(vnDate.getMonth() + 1).padStart(2, '0');
+  const day = String(vnDate.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+const parseLocalDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - 7 * 3600000);
 };
 
 export class ReportService {
@@ -24,7 +38,7 @@ export class ReportService {
     const cached = appCache.get<any>(cacheKey);
     if (cached) return cached;
 
-    const today = dateStr ? new Date(dateStr + 'T00:00:00') : startOfDay();
+    const today = dateStr ? parseLocalDate(dateStr) : startOfDay();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
