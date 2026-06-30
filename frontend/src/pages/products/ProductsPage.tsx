@@ -1621,7 +1621,7 @@ const ProductsPage = () => {
             </svg>
             <div className="absolute flex flex-col items-center leading-none text-center">
               <span className="text-lg font-black text-slate-800">{stats.total}</span>
-              <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Đang xem</span>
+              <span className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Sản phẩm</span>
             </div>
           </div>
 

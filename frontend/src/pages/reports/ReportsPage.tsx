@@ -404,7 +404,7 @@ const ReportsPage = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 tracking-tight">Tổng Quan Sức Khỏe Tài Chính</h3>
+                    <h3 className="text-base font-bold text-slate-900 tracking-tight">Báo cáo Phân tích Kinh doanh</h3>
                   </div>
                   <p className="text-[13px] text-slate-600 font-medium leading-relaxed">{aiAnalysisData.summary}</p>
                 </div>

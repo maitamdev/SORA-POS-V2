@@ -748,7 +748,7 @@ const StaffPage = () => {
                       {/* Logo and Store Name */}
                       <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-200">
                         <h3 className="text-base font-black text-slate-900 tracking-tight">SORA POS</h3>
-                        <p className="text-[10px] text-slate-400 font-bold">HÓA ĐƠN BÁN LẺ</p>
+                        <p className="text-[10px] text-slate-400 font-bold">HÓA ĐƠN BÁN HÀNG</p>
                         <div className="flex justify-center items-center gap-1.5 text-xs text-slate-500 font-semibold mt-1">
                           <HiOutlineCalendar size={12} />
                           {formatDate(selectedOrder.created_at)}

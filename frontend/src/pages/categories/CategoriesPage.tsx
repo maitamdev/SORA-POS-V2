@@ -796,7 +796,7 @@ const CategoriesPage = () => {
                             <th className="py-2.5 px-3">Tên sản phẩm</th>
                             <th className="py-2.5 px-3">Danh mục hiện tại</th>
                             <th className="py-2.5 px-3 text-right">Giá bán</th>
-                            <th className="py-2.5 px-3 text-center">Hành động</th>
+                            <th className="py-2.5 px-3 text-center">Thao tác</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">

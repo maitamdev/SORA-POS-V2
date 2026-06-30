@@ -232,7 +232,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
             <FiDollarSign size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Đã chi thanh toán</p>
+            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Đã thanh toán</p>
             <h4 className="text-xl sm:text-2xl font-black text-slate-800 mt-0.5 tracking-tight">{formatCurrency(stats.paidAmount)}</h4>
           </div>
         </div>
@@ -247,7 +247,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
             <FiTrendingDown size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Công nợ NCC còn lại</p>
+            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Công nợ còn lại</p>
             <h4 className={`text-xl sm:text-2xl font-black mt-0.5 tracking-tight ${stats.debtAmount > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{formatCurrency(stats.debtAmount)}</h4>
           </div>
         </div>
@@ -379,7 +379,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
                 <th className="px-5 py-4 text-center">Trạng thái thanh toán</th>
                 <th className="px-5 py-4">Ngày nhập</th>
                 <th className="px-5 py-4">Người lập phiếu</th>
-                <th className="px-5 py-4 text-center">Hành động</th>
+                <th className="px-5 py-4 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">

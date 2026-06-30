@@ -994,7 +994,7 @@ const ShiftsPage = () => {
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-100 overflow-hidden animate-fadeIn" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
-                <p className="text-xs font-black uppercase text-amber-600">Chốt ca nhân viên</p>
+                <p className="text-xs font-black uppercase text-amber-600">Chốt ca làm việc</p>
                 <h3 className="text-base font-black text-slate-900 mt-0.5">
                   {closingShift.employee?.full_name} — {closingShift.shift_name || 'Ca bán hàng'}
                 </h3>

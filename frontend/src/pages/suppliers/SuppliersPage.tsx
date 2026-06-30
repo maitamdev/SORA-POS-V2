@@ -178,6 +178,7 @@ const SuppliersPage = () => {
 
   // AI suggestion state
   const [aiLoading, setAiLoading] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
   const [aiWebsite, setAiWebsite] = useState('');
 
   // Menu dropdown state
@@ -402,7 +403,7 @@ const SuppliersPage = () => {
   };
 
   const handleHardDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn XÓA HOÀN TOÀN nhà cung cấp "${name}" khỏi hệ thống? Hành động này sẽ không thể hoàn tác.`)) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn XÓA HOÀN TOÀN nhà cung cấp "${name}" khỏi hệ thống? Thao tác này sẽ không thể hoàn tác.`)) return;
     try {
       const res = await catalogAPI.suppliers.remove(id, { hard: true });
       const msg = res.data?.data?.message || 'Đã xóa hoàn toàn nhà cung cấp khỏi hệ thống.';
@@ -518,8 +519,9 @@ const SuppliersPage = () => {
       </section>
 
       {/* 3. Main Workspace Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6 items-start">
-        {/* 3.1 Search & Filter Sidebar */}
+      <div className={`grid grid-cols-1 ${showFilter ? 'xl:grid-cols-[300px_1fr]' : ''} gap-6 items-start`}>
+        {/* 3.1 Search & Filter Sidebar — Collapsible */}
+        {showFilter && (
         <aside className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-sm font-black uppercase text-slate-750 flex items-center gap-2">
@@ -619,9 +621,38 @@ const SuppliersPage = () => {
             </div>
           </form>
         </aside>
+        )}
 
         {/* 3.2 Suppliers List Table Area */}
         <section className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs">
+          {/* Filter toggle bar */}
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-100">
+            <button
+              onClick={() => setShowFilter(!showFilter)}
+              className={`flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold transition-all ${
+                showFilter
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              <FiSliders size={13} />
+              Bộ lọc
+              {(appliedFilters.name || appliedFilters.contact || appliedFilters.phone || appliedFilters.email || appliedFilters.status !== 'all') && (
+                <span className="ml-0.5 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-black flex items-center justify-center">
+                  {[appliedFilters.name, appliedFilters.contact, appliedFilters.phone, appliedFilters.email].filter(Boolean).length + (appliedFilters.status !== 'all' ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            {(appliedFilters.name || appliedFilters.contact || appliedFilters.phone || appliedFilters.email || appliedFilters.status !== 'all') && (
+              <button
+                onClick={handleResetFilters}
+                className="flex items-center gap-1 h-7 px-2 rounded-md text-[10px] font-bold text-rose-600 hover:bg-rose-50 transition"
+              >
+                <FiX size={11} />
+                Xóa lọc
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200/80 tracking-wider">
@@ -690,7 +721,7 @@ const SuppliersPage = () => {
                               {supplier.phone}
                             </div>
                           ) : (
-                            <span className="text-slate-300 font-medium italic">Chưa có</span>
+                            <span className="text-slate-300 font-medium italic">Chưa có SĐT</span>
                           )}
                         </td>
 
@@ -704,25 +735,25 @@ const SuppliersPage = () => {
                               {supplier.email}
                             </div>
                           ) : (
-                            <span className="text-slate-300 font-medium italic">Chưa có</span>
+                            <span className="text-slate-300 font-medium italic">Chưa có email</span>
                           )}
                         </td>
 
                         {/* 5. Status Badges */}
                         <td className="px-5 py-4 text-center">
                           {status === 'active' && (
-                            <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-extrabold text-emerald-700 shadow-2xs">
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">
                               Hoạt động
                             </span>
                           )}
                           {status === 'suspended' && (
-                            <span className="inline-flex rounded-full border border-amber-250 bg-amber-50 px-2.5 py-0.5 text-xs font-extrabold text-amber-700 shadow-2xs">
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-amber-250 bg-amber-50 px-2.5 py-1 text-[11px] font-extrabold text-amber-700">
                               Tạm ngưng
                             </span>
                           )}
                           {status === 'inactive' && (
-                            <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-extrabold text-rose-700 shadow-2xs">
-                              Ngừng hợp tác
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-extrabold text-rose-700">
+                              Ngừng HT
                             </span>
                           )}
                         </td>

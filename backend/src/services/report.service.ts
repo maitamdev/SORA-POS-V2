@@ -534,146 +534,203 @@ export class ReportService {
       { name: 'Thẻ', percentage: Math.round((paymentCounts.card / totalPaymentCount) * 1000) / 10, count: paymentCounts.card, amount: paymentStats.card },
     ];
 
-    // Aggregates
+    // ═══════════════════════════════════════════════════════════════════
+    //  ADVANCED ANALYTICS COMPUTATION
+    // ═══════════════════════════════════════════════════════════════════
+
+    // Basic aggregates
     const totalRevenue = revenueTrend.reduce((sum, item) => sum + item.revenue, 0);
     const totalOrders = revenueTrend.reduce((sum, item) => sum + item.orders, 0);
     const totalCogs = revenueTrend.reduce((sum, item) => sum + (item.cogs || 0), 0);
     const totalProfit = revenueTrend.reduce((sum, item) => sum + (item.profit || 0), 0);
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     const averageOrderVal = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const cogsRatio = totalRevenue > 0 ? (totalCogs / totalRevenue) * 100 : 0;
 
-    // Formatting currency for prompt
+    // Revenue days analysis
+    const activeDays = revenueTrend.filter(d => d.revenue > 0);
+    const zeroDays = revenueTrend.filter(d => d.revenue === 0);
+    const avgDailyRevenue = activeDays.length > 0 ? totalRevenue / activeDays.length : 0;
+    const avgDailyOrders = activeDays.length > 0 ? totalOrders / activeDays.length : 0;
+
+    // Peak & trough analysis
+    const peakDay = activeDays.length > 0 ? activeDays.reduce((max, d) => d.revenue > max.revenue ? d : max, activeDays[0]) : null;
+    const troughDay = activeDays.length > 0 ? activeDays.reduce((min, d) => d.revenue < min.revenue ? d : min, activeDays[0]) : null;
+    const revenueVolatility = activeDays.length > 1
+      ? Math.sqrt(activeDays.reduce((sum, d) => sum + Math.pow(d.revenue - avgDailyRevenue, 2), 0) / activeDays.length) / avgDailyRevenue * 100
+      : 0;
+
+    // Week-over-week growth (last 7 active days vs prior 7 active days)
+    const recent7 = activeDays.slice(-7);
+    const prior7 = activeDays.slice(-14, -7);
+    const recent7Revenue = recent7.reduce((s, d) => s + d.revenue, 0);
+    const prior7Revenue = prior7.reduce((s, d) => s + d.revenue, 0);
+    const wowGrowth = prior7Revenue > 0 ? ((recent7Revenue - prior7Revenue) / prior7Revenue * 100) : null;
+
+    // Category concentration (Herfindahl-like)
+    const catShares = category_sales.map(c => ({
+      name: c.name,
+      value: c.value,
+      share: totalRevenue > 0 ? (c.value / totalRevenue * 100) : 0
+    }));
+    const herfindahl = catShares.reduce((sum, c) => sum + Math.pow(c.share / 100, 2), 0);
+    const concentrationRisk = herfindahl > 0.5 ? 'Rất cao' : herfindahl > 0.3 ? 'Cao' : herfindahl > 0.2 ? 'Trung bình' : 'Thấp';
+
+    // Top product concentration
+    const top2Revenue = topProductsRaw.slice(0, 2).reduce((s, p) => s + p.revenue, 0);
+    const top2Share = totalRevenue > 0 ? (top2Revenue / totalRevenue * 100) : 0;
+
+    // Formatting helpers
     const money = (value: number) => `${Math.round(value || 0).toLocaleString('vi-VN')} VND`;
+    const pct = (value: number) => `${value.toFixed(1)}%`;
+    const fmtDate = (d: string) => d.split('-').reverse().join('/');
 
-    // Construct detailed prompt
-    const topProductsList = topProductsRaw.slice(0, 5).map((p, idx) => 
-      `- Top ${idx + 1}: ${p.product_name} - Số lượng: ${p.quantity} - Doanh thu: ${money(p.revenue)}`
-    ).join('\n') || '- Không có sản phẩm nào bán ra';
+    // ═══════════════════════════════════════════════════════════════════
+    //  CONSTRUCT DATA BLOCKS FOR PROMPT
+    // ═══════════════════════════════════════════════════════════════════
 
-    const categorySalesList = category_sales.map((c) => 
-      `- ${c.name}: ${money(c.value)}`
-    ).join('\n') || '- Chưa có dữ liệu doanh thu danh mục';
+    const topProductsList = topProductsRaw.slice(0, 5).map((p, idx) => {
+      const share = totalRevenue > 0 ? (p.revenue / totalRevenue * 100).toFixed(1) : '0';
+      return `  ${idx + 1}. ${p.product_name}\n     ├─ Doanh thu: ${money(p.revenue)} (chiếm ${share}% tổng DT)\n     └─ Sản lượng: ${p.quantity} đơn vị`;
+    }).join('\n') || '  Không có sản phẩm nào bán ra trong kỳ.';
 
-    const paymentStatsList = payment_stats.map((p) => 
-      `- ${p.name}: Chiếm ${p.percentage}% (${p.count} giao dịch - ${money(p.amount)})`
+    const categorySalesList = catShares.map(c =>
+      `  • ${c.name}: ${money(c.value)} — chiếm ${pct(c.share)} tổng doanh thu`
+    ).join('\n') || '  Chưa phát sinh doanh thu theo danh mục.';
+
+    const paymentStatsList = payment_stats.map(p =>
+      `  • ${p.name}: ${pct(p.percentage)} (${p.count} giao dịch, tổng ${money(p.amount)})`
     ).join('\n');
 
-    // Only take the last 14 days to reduce prompt tokens
     const recentRevenueTrend = revenueTrend.length > 14 ? revenueTrend.slice(-14) : revenueTrend;
-    const revenueTrendList = recentRevenueTrend.map((r) => 
-      `+ Ngày ${r.date.split('-').reverse().join('/')}: Doanh thu: ${money(r.revenue)} | Lợi nhuận: ${money(r.profit)} | Đơn hàng: ${r.orders}`
-    ).join('\n');
+    const revenueTrendList = recentRevenueTrend.map(r => {
+      const dayMargin = r.revenue > 0 ? ((r.profit || 0) / r.revenue * 100).toFixed(1) : '—';
+      return `  ${fmtDate(r.date)}: DT ${money(r.revenue)} | LN ${money(r.profit)} | Margin ${dayMargin}% | ${r.orders} đơn`;
+    }).join('\n');
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  SYSTEM INSTRUCTION — Enterprise Financial Analyst
+    // ═══════════════════════════════════════════════════════════════════
 
     if (!env.groqApiKey) {
       throw new AppError(400, 'Groq API Key chưa được cấu hình ở Backend');
     }
 
-    const systemInstruction = `Bạn là Giám đốc Tài chính (CFO) kiêm Chuyên gia Phân tích Dữ liệu cấp cao chuyên về hệ thống POS bán lẻ.
-Nhiệm vụ: Phân tích dữ liệu kinh doanh thực tế, đưa ra đánh giá chiến lược và khuyến nghị có thể hành động được.
+    const systemInstruction = `Bạn là Trưởng phòng Kiểm soát Tài chính (Financial Controller) tại một tập đoàn bán lẻ, với 15+ năm kinh nghiệm phân tích P&L, quản trị doanh thu và tối ưu vận hành cửa hàng.
 
-BẮT BUỘC trả về JSON hợp lệ (không markdown, không \`\`\`json). Chỉ trả về MỘT JSON object duy nhất.
+PHONG CÁCH PHÂN TÍCH:
+- Sử dụng ngôn ngữ chuyên nghiệp, mang tính doanh nghiệp — như đang viết báo cáo trình Ban Giám đốc
+- Mỗi nhận định PHẢI kèm theo số liệu chính xác + so sánh tương đối (%, lần, tỉ lệ)
+- Phân tích nguyên nhân gốc rễ (root cause), không chỉ mô tả hiện tượng bề mặt
+- Recommendations phải khả thi, có timeline, KPI đo lường và mức độ ưu tiên
+- Sử dụng thuật ngữ tài chính chuẩn: COGS, Gross Margin, AOV, Revenue Mix, Concentration Risk, WoW Growth, Volatility
+- KHÔNG sử dụng ngôn ngữ AI/chatbot ("Tôi sẽ phân tích...", "Chúng ta hãy xem...")
+- Viết trực tiếp, đi thẳng vào vấn đề như một CFO
 
-Cấu trúc JSON bắt buộc:
+BẮT BUỘC trả về JSON hợp lệ (không markdown, không \`\`\`json). Chỉ MỘT JSON object duy nhất.
+
+Cấu trúc JSON:
 {
   "health_score": 72,
-  "summary": "Đánh giá tổng quan sức khỏe tài chính 3-5 câu, bao gồm: tổng doanh thu, lợi nhuận, xu hướng tăng/giảm, và điểm mạnh/yếu nổi bật nhất. Phải nêu con số cụ thể.",
+  "summary": "<Bản tóm tắt điều hành 4-6 câu. Mở đầu bằng đánh giá tổng thể ('Hiệu quả kinh doanh kỳ này ở mức...'), tiếp theo là 2-3 chỉ số tài chính cốt lõi, và kết bằng đánh giá xu hướng + rủi ro chính cần lưu ý.>",
   "insights": [
-    "Phân tích 1: Về hiệu suất doanh thu và xu hướng (so sánh giữa các ngày cao/thấp, phát hiện pattern)",
-    "Phân tích 2: Về cơ cấu sản phẩm bán chạy và tỉ trọng đóng góp doanh thu",
-    "Phân tích 3: Về biên lợi nhuận và hiệu quả kinh doanh (margin analysis)",
-    "Phân tích 4: Về hành vi thanh toán khách hàng và xu hướng digital payment",
-    "Phân tích 5: Về điểm yếu, rủi ro hoặc cơ hội bị bỏ lỡ"
+    "<Phân tích 1 — HIỆU SUẤT DOANH THU: Đánh giá tổng doanh thu vs benchmark ngành bán lẻ, phân tích biến động theo ngày (volatility), xác định ngày peak/trough và nguyên nhân tiềm năng. Nếu có ngày doanh thu = 0, phân tích tác động.>",
+    "<Phân tích 2 — CƠ CẤU SẢN PHẨM & REVENUE MIX: Đánh giá mức độ tập trung doanh thu (concentration risk), tỉ trọng đóng góp của top sản phẩm, phân tích danh mục nào đang 'gánh' doanh thu và danh mục nào underperform.>",
+    "<Phân tích 3 — BIÊN LỢI NHUẬN & HIỆU QUẢ CHI PHÍ: Phân tích Gross Margin so với chuẩn ngành (25-35% cho bán lẻ F&B), đánh giá COGS ratio, xác định sản phẩm/danh mục nào có margin cao/thấp nhất, cơ hội tối ưu.>",
+    "<Phân tích 4 — HÀNH VI KHÁCH HÀNG & THANH TOÁN: Phân tích AOV, tần suất đơn hàng, tỉ lệ thanh toán số vs tiền mặt, xu hướng chuyển đổi digital payment, rủi ro quản lý tiền mặt.>",
+    "<Phân tích 5 — RỦI RO & CƠ HỘI: Xác định 2-3 rủi ro kinh doanh cụ thể (ví dụ: phụ thuộc vào 1-2 sản phẩm, ngày không phát sinh doanh thu, margin bị ép). Đề xuất cơ hội tăng trưởng bị bỏ lỡ.>"
   ],
   "recommendations": [
-    "Hành động 1: Chiến lược tăng doanh thu cụ thể (sản phẩm nào, cách nào, mục tiêu bao nhiêu %)",
-    "Hành động 2: Tối ưu chi phí / cải thiện biên lợi nhuận",
-    "Hành động 3: Chiến lược khuyến mãi hoặc cross-sell/upsell",
-    "Hành động 4: Cải thiện trải nghiệm thanh toán / vận hành",
-    "Hành động 5: Chiến lược dài hạn cho tháng tiếp theo"
+    "<HÀNH ĐỘNG 1 — TĂNG TRƯỞNG DOANH THU [Ưu tiên: CAO]: Chiến lược cụ thể (sản phẩm/danh mục nào, cách triển khai, timeline 2-4 tuần). KPI mục tiêu: tăng X% doanh thu trong 30 ngày tới.>",
+    "<HÀNH ĐỘNG 2 — TỐI ƯU CHI PHÍ & MARGIN [Ưu tiên: CAO]: Giải pháp cải thiện biên lợi nhuận — đàm phán giá vốn, điều chỉnh pricing, cắt giảm sản phẩm margin thấp. KPI mục tiêu: cải thiện Gross Margin thêm X điểm %.>",
+    "<HÀNH ĐỘNG 3 — ĐA DẠNG HÓA & GIẢM RỦI RO [Ưu tiên: TRUNG BÌNH]: Chiến lược giảm concentration risk, phát triển danh mục mới, cross-sell/upsell. KPI mục tiêu: giảm tỉ trọng top 2 sản phẩm xuống dưới X%.>",
+    "<HÀNH ĐỘNG 4 — VẬN HÀNH & TRẢI NGHIỆM [Ưu tiên: TRUNG BÌNH]: Cải thiện tần suất bán hàng (giảm ngày trống), tối ưu thanh toán số, tăng giờ hoạt động hoặc kênh bán. KPI mục tiêu.>",
+    "<HÀNH ĐỘNG 5 — CHIẾN LƯỢC TRUNG HẠN [Ưu tiên: DÀI HẠN]: Kế hoạch 60-90 ngày cho phát triển sản phẩm, mở rộng tệp khách hàng, loyalty program. KPI mục tiêu.>"
   ],
   "charts": [
     {
-      "title": "Cơ cấu doanh thu theo danh mục sản phẩm",
+      "title": "Cơ cấu doanh thu theo danh mục",
       "type": "pie",
-      "data": [
-        { "name": "Tên danh mục 1", "value": 5000000 },
-        { "name": "Tên danh mục 2", "value": 3000000 }
-      ]
+      "data": [{ "name": "Danh mục 1", "value": 5000000 }, { "name": "Danh mục 2", "value": 3000000 }]
     },
     {
-      "title": "Xu hướng doanh thu theo ngày",
+      "title": "Biến động doanh thu theo ngày",
       "type": "bar",
-      "data": [
-        { "name": "Ngày 01/06", "value": 1500000 }
-      ]
+      "data": [{ "name": "01/06", "value": 1500000 }]
     },
     {
-      "title": "Xu hướng lợi nhuận gộp theo ngày",
+      "title": "Lợi nhuận gộp theo ngày (VND)",
       "type": "line",
-      "data": [
-        { "name": "Ngày 01/06", "value": 450000 }
-      ]
+      "data": [{ "name": "01/06", "value": 450000 }]
     },
     {
-      "title": "Top 5 sản phẩm bán chạy (doanh thu)",
+      "title": "Top 5 sản phẩm theo doanh thu",
       "type": "bar",
-      "data": [
-        { "name": "Sản phẩm A", "value": 3000000 }
-      ]
+      "data": [{ "name": "Sản phẩm A", "value": 3000000 }]
     },
     {
-      "title": "Phân bổ phương thức thanh toán",
+      "title": "Cơ cấu phương thức thanh toán",
       "type": "pie",
-      "data": [
-        { "name": "Tiền mặt", "value": 45 },
-        { "name": "QR Pay", "value": 40 },
-        { "name": "Thẻ", "value": 15 }
-      ]
+      "data": [{ "name": "Tiền mặt", "value": 45 }, { "name": "QR Pay", "value": 40 }]
     }
   ]
 }
 
-QUY TẮC QUAN TRỌNG:
-1. BẮT BUỘC tạo CHÍNH XÁC 5 biểu đồ theo đúng thứ tự và loại ở trên.
-2. "health_score" là số nguyên từ 0-100 đánh giá sức khỏe tổng thể của cửa hàng.
-3. Mỗi insight PHẢI chứa con số cụ thể từ dữ liệu (ví dụ: "chiếm 45% tổng doanh thu", "tăng 23% so với...").
-4. Mỗi recommendation PHẢI nêu hành động cụ thể + kỳ vọng kết quả (ví dụ: "Tăng combo upsell → kỳ vọng tăng AOV thêm 15%").
-5. Dữ liệu biểu đồ PHẢI sử dụng số liệu thực tế được cung cấp, KHÔNG bịa số.
-6. Insights phải đủ 5 mục, recommendations phải đủ 5 mục, charts phải đủ 5 biểu đồ.`;
+QUY TẮC BẮT BUỘC:
+1. CHÍNH XÁC 5 biểu đồ theo đúng thứ tự và loại trên. Dữ liệu biểu đồ PHẢI dùng số thực tế, KHÔNG bịa.
+2. health_score: 0-100 — Đánh giá khách quan dựa trên: margin (30%), tăng trưởng (25%), ổn định (20%), đa dạng hóa (15%), vận hành (10%).
+3. Insights: Đủ 5 mục, mỗi mục 3-5 câu phân tích sâu, PHẢI có số liệu cụ thể.
+4. Recommendations: Đủ 5 mục, mỗi mục có [Ưu tiên], hành động cụ thể, và KPI đo lường.
+5. Ngôn ngữ: Chuyên nghiệp, trang trọng, như báo cáo trình hội đồng quản trị.
+6. QUAN TRỌNG: Biểu đồ #3 "Lợi nhuận gộp theo ngày" — value PHẢI là số tiền VND tuyệt đối (ví dụ: 450000, 1200000), KHÔNG PHẢI tỉ lệ phần trăm. Lấy từ dữ liệu "LN" (lợi nhuận) trong mục VI.`;
 
-    const userPrompt = `PHÂN TÍCH BÁO CÁO KINH DOANH TOÀN DIỆN — ${days} NGÀY QUA
+    const userPrompt = `BÁO CÁO PHÂN TÍCH HIỆU QUẢ KINH DOANH — KỲ ${days} NGÀY
 
-═══════════════════════════════════
-1. CHỈ SỐ TÀI CHÍNH TỔNG QUAN
-═══════════════════════════════════
-• Tổng doanh thu (Revenue): ${money(totalRevenue)}
-• Tổng giá vốn hàng bán (COGS): ${money(totalCogs)}
-• Tổng lợi nhuận gộp (Gross Profit): ${money(totalProfit)}
-• Tỉ suất lợi nhuận gộp (Gross Margin): ${profitMargin.toFixed(1)}%
-• Tổng số đơn hàng: ${totalOrders} đơn
-• Giá trị trung bình mỗi đơn (AOV): ${money(averageOrderVal)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+I. TÓM TẮT TÀI CHÍNH (P&L SUMMARY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Doanh thu thuần (Net Revenue):     ${money(totalRevenue)}
+  Giá vốn hàng bán (COGS):          ${money(totalCogs)}  [COGS Ratio: ${pct(cogsRatio)}]
+  Lợi nhuận gộp (Gross Profit):     ${money(totalProfit)}
+  Biên lợi nhuận gộp (Gross Margin): ${pct(profitMargin)}
+  Tổng đơn hàng:                     ${totalOrders} đơn
+  Giá trị TB/đơn (AOV):             ${money(averageOrderVal)}
 
-═══════════════════════════════════
-2. TOP 5 SẢN PHẨM BÁN CHẠY NHẤT
-═══════════════════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+II. CHỈ SỐ VẬN HÀNH NÂNG CAO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Số ngày hoạt động:        ${activeDays.length}/${days} ngày (${(activeDays.length / days * 100).toFixed(0)}%)
+  Số ngày không có doanh thu: ${zeroDays.length} ngày${zeroDays.length > 0 ? ` [⚠ Cảnh báo: mất ${pct(zeroDays.length / days * 100)} thời gian kinh doanh]` : ''}
+  Doanh thu TB/ngày hoạt động: ${money(avgDailyRevenue)}
+  Đơn hàng TB/ngày hoạt động: ${avgDailyOrders.toFixed(1)} đơn
+  Biến động doanh thu (Volatility): ${pct(revenueVolatility)}${revenueVolatility > 50 ? ' [⚠ Biến động cao]' : revenueVolatility > 30 ? ' [Biến động trung bình]' : ' [Ổn định]'}
+${peakDay ? `  Ngày doanh thu cao nhất: ${fmtDate(peakDay.date)} — ${money(peakDay.revenue)} (${peakDay.orders} đơn)` : ''}
+${troughDay && troughDay !== peakDay ? `  Ngày doanh thu thấp nhất: ${fmtDate(troughDay.date)} — ${money(troughDay.revenue)} (${troughDay.orders} đơn)` : ''}
+${wowGrowth !== null ? `  Tăng trưởng WoW (7 ngày gần nhất vs 7 ngày trước): ${wowGrowth >= 0 ? '+' : ''}${pct(wowGrowth)}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+III. TOP 5 SẢN PHẨM BÁN CHẠY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${topProductsList}
+  ─── Rủi ro tập trung: Top 2 sản phẩm chiếm ${pct(top2Share)} tổng doanh thu [Mức độ: ${top2Share > 60 ? '⚠ CAO' : top2Share > 40 ? 'TRUNG BÌNH' : 'THẤP'}]
 
-═══════════════════════════════════
-3. DOANH THU THEO DANH MỤC SẢN PHẨM
-═══════════════════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IV. CƠ CẤU DOANH THU THEO DANH MỤC (REVENUE MIX)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${categorySalesList}
+  ─── Chỉ số tập trung danh mục (HHI): ${(herfindahl * 10000).toFixed(0)} điểm [Mức độ rủi ro: ${concentrationRisk}]
 
-═══════════════════════════════════
-4. CƠ CẤU PHƯƠNG THỨC THANH TOÁN
-═══════════════════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+V. CƠ CẤU THANH TOÁN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${paymentStatsList}
 
-═══════════════════════════════════
-5. DỮ LIỆU DOANH THU & LỢI NHUẬN HÀNG NGÀY
-═══════════════════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VI. DỮ LIỆU DOANH THU & LỢI NHUẬN HÀNG NGÀY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${revenueTrendList}
 
-Hãy phân tích TOÀN DIỆN và trả về JSON theo đúng cấu trúc đã yêu cầu. Đảm bảo health_score phản ánh đúng tình hình, insights có chiều sâu với con số cụ thể, recommendations có thể thực hiện được ngay, và tất cả 5 biểu đồ đều dùng dữ liệu thực tế.`;
+Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc yêu cầu. Đảm bảo health_score phản ánh khách quan, insights phân tích sâu với root cause, recommendations khả thi với KPI cụ thể, và biểu đồ dùng đúng số liệu thực tế.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -688,8 +745,8 @@ Hãy phân tích TOÀN DIỆN và trả về JSON theo đúng cấu trúc đã y
           { role: 'system', content: systemInstruction },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.25,
-        max_tokens: 3000,
+        temperature: 0.2,
+        max_tokens: 4000,
       }),
     });
 

@@ -27,4 +27,7 @@ export const env = {
   smtpUser: process.env.SMTP_USER || '',
   smtpPass: process.env.SMTP_PASS || '',
   smtpFrom: process.env.SMTP_FROM || 'Sora POS <noreply@sorapos.com>',
+  payosClientId: process.env.PAYOS_CLIENT_ID || '',
+  payosApiKey: process.env.PAYOS_API_KEY || '',
+  payosChecksumKey: process.env.PAYOS_CHECKSUM_KEY || '',
 };

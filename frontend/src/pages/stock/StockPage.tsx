@@ -502,7 +502,7 @@ const StockPage = () => {
   const summary = analysis?.summary;
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-6 animate-fadeIn pb-10 mx-auto w-full max-w-[1560px] px-4 sm:px-6 lg:px-8">
       {/* 1. Header */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-5">
         <div>
@@ -619,42 +619,43 @@ const StockPage = () => {
       </div>
 
       {/* 3. Tab Navigation Section */}
-      <div className="border-b border-slate-200 pb-1 overflow-x-auto scrollbar-none flex items-center justify-between gap-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {/* Navigation Tabs (iOS Capsule style with horizontal scroll for responsiveness) */}
-        <div className="flex bg-slate-100 p-1 rounded-xl w-fit border border-slate-200/40 shrink-0">
+      <div className="overflow-x-auto border border-slate-300 bg-white shadow-sm" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="flex min-w-max divide-x divide-slate-300">
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
               activeTab === 'inventory'
-                ? 'bg-white text-slate-800 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-slate-950 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiList size={14} className="stroke-[2.5]" />
-            Tồn thực tế
+            Tồn kho hiện tại
           </button>
           <button
             onClick={() => setActiveTab('alerts')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
               activeTab === 'alerts'
-                ? 'bg-white text-slate-800 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-slate-950 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiAlertCircle size={14} className="stroke-[2.5]" />
             Cảnh báo
             {alerts.length > 0 && (
-              <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white leading-none">
+              <span className={`border px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                activeTab === 'alerts' ? 'border-white/30 bg-white text-slate-950' : 'border-rose-200 bg-rose-500 text-white'
+              }`}>
                 {alerts.length}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('expiry')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
               activeTab === 'expiry'
-                ? 'bg-white text-slate-800 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-slate-950 text-white'
+                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiCalendar size={14} className="stroke-[2.5]" />
@@ -664,7 +665,9 @@ const StockPage = () => {
               const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
               return days <= 30;
             }).length > 0 && (
-              <span className="rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-black text-white leading-none">
+              <span className={`border px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                activeTab === 'expiry' ? 'border-white/30 bg-white text-slate-950' : 'border-rose-200 bg-rose-500 text-white'
+              }`}>
                 {expiryAlerts.filter(item => {
                   const diff = new Date(item.expiry_date).getTime() - new Date().getTime();
                   const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
@@ -677,10 +680,10 @@ const StockPage = () => {
             <>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
                   activeTab === 'transactions'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-950 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiClock size={14} className="stroke-[2.5]" />
@@ -688,10 +691,10 @@ const StockPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('receipts')}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
                   activeTab === 'receipts'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-950 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiTruck size={14} className="stroke-[2.5]" />
@@ -699,10 +702,10 @@ const StockPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('audit')}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-black rounded-lg transition-all duration-200 ${
+                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
                   activeTab === 'audit'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-slate-950 text-white'
+                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiSliders size={14} className="stroke-[2.5]" />
@@ -790,21 +793,30 @@ const StockPage = () => {
             </div>
 
             {/* Inventory Table Container */}
-            <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-left text-sm">
-                  <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+            <div className="overflow-hidden border border-slate-300 bg-white shadow-sm">
+              <div className="scrollbar-none overflow-x-auto">
+                <table className="w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col className="w-[34%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[12%]" />
+                  </colgroup>
+                  <thead className="border-b border-slate-300 bg-slate-100 text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
                     <tr>
-                      <th className="px-5 py-4 w-1/3">Sản phẩm</th>
-                      <th className="px-5 py-4">Danh mục</th>
-                      <th className="px-5 py-4 text-right">Số lượng tồn</th>
-                      <th className="px-5 py-4 text-right">Cảnh báo tồn</th>
-                      <th className="px-5 py-4 text-right">Giá nhập vốn</th>
-                      <th className="px-5 py-4 text-right">Giá bán lẻ</th>
-                      <th className="px-5 py-4 text-center">Trạng thái</th>
+                      <th className="px-4 py-4">Sản phẩm</th>
+                      <th className="px-4 py-4">Danh mục</th>
+                      <th className="px-4 py-4 text-right">Tồn hiện tại</th>
+                      <th className="px-4 py-4 text-right">Ngưỡng</th>
+                      <th className="px-4 py-4 text-right">Giá vốn</th>
+                      <th className="px-4 py-4 text-right">Giá bán</th>
+                      <th className="px-4 py-4 text-center">Trạng thái</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+                  <tbody className="divide-y divide-slate-200 font-semibold text-slate-700">
                     {loading ? (
                       <tr>
                         <td colSpan={7} className="py-20 text-center text-slate-400 font-bold">
@@ -823,21 +835,21 @@ const StockPage = () => {
                       filteredInventory.map((product) => {
                         const isLowStock = product.stock_quantity <= product.min_stock_level;
                         return (
-                          <tr key={product.id} className="hover:bg-slate-50/50 transition duration-150">
+                          <tr key={product.id} className="transition duration-150 hover:bg-slate-50">
                             {/* Product Info with initials Avatar */}
-                            <td className="px-5 py-4">
+                            <td className="px-4 py-4 align-middle">
                               <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded-xl border flex items-center justify-center text-xs font-black shrink-0 shadow-inner ${getAvatarColor(product.name)}`}>
+                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center border text-xs font-black shadow-inner ${getAvatarColor(product.name)}`}>
                                   {getInitials(product.name)}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-extrabold text-slate-900 leading-snug truncate">{product.name}</p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-sm">
-                                      {product.sku}
+                                  <p className="truncate text-sm font-black leading-snug text-slate-950">{product.name}</p>
+                                  <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                                    <span className="max-w-[150px] truncate border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-500" title={product.sku}>
+                                      SKU: {product.sku}
                                     </span>
                                     {product.barcode && (
-                                      <span className="text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-sm">
+                                      <span className="hidden max-w-[120px] truncate border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-400 xl:inline-block" title={product.barcode}>
                                         {product.barcode}
                                       </span>
                                     )}
@@ -846,42 +858,46 @@ const StockPage = () => {
                               </div>
                             </td>
                             {/* Category */}
-                            <td className="px-5 py-4">
-                              <span className="inline-flex items-center gap-1 text-slate-600 bg-slate-100/70 rounded-lg px-2.5 py-1 text-xs font-bold border border-slate-200/30">
+                            <td className="px-4 py-4 align-middle">
+                              <span className="inline-flex max-w-full items-center gap-1 truncate border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-black text-slate-700" title={product.categories?.name || 'Chưa phân loại'}>
                                 <FiTag size={10} />
-                                {product.categories?.name || 'Chưa phân loại'}
+                                <span className="truncate">{product.categories?.name || 'Chưa phân loại'}</span>
                               </span>
                             </td>
                             {/* Stock and Progress bar */}
-                            <td className="px-5 py-4 text-right">
-                              <span className={`font-black text-base ${isLowStock ? 'text-rose-600' : 'text-slate-900'}`}>
-                                {formatNumber(product.stock_quantity)}
-                              </span>
-                              <span className="text-xs text-slate-400 ml-1 font-bold">{product.unit || 'cái'}</span>
-                              <div className="flex justify-end mt-1.5">
-                                <div className="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden shadow-inner">
+                            <td className="px-4 py-4 text-right align-middle">
+                              <div className="ml-auto w-full max-w-[130px]">
+                                <div className="flex items-baseline justify-end gap-1">
+                                  <span className={`text-lg font-black ${isLowStock ? 'text-rose-600' : 'text-slate-950'}`}>
+                                    {formatNumber(product.stock_quantity)}
+                                  </span>
+                                  <span className="text-xs font-black text-slate-400">{product.unit || 'cái'}</span>
+                                </div>
+                                <div className="mt-2 h-1.5 overflow-hidden border border-slate-200 bg-slate-100 shadow-inner">
                                   <div 
-                                    className={`h-full transition-all duration-500 rounded-full ${getStockBarColor(product.stock_quantity, product.min_stock_level)}`}
+                                    className={`h-full transition-all duration-500 ${getStockBarColor(product.stock_quantity, product.min_stock_level)}`}
                                     style={{ width: `${getStockBarPercentage(product.stock_quantity, product.min_stock_level)}%` }}
                                   />
                                 </div>
                               </div>
                             </td>
                             {/* Min Stock level */}
-                            <td className="px-5 py-4 text-right text-slate-400 font-bold">
-                              {formatNumber(product.min_stock_level)}
+                            <td className="px-4 py-4 text-right align-middle">
+                              <span className="inline-flex min-w-14 justify-end text-sm font-black text-slate-500">
+                                {formatNumber(product.min_stock_level)}
+                              </span>
                             </td>
                             {/* Cost Price */}
-                            <td className="px-5 py-4 text-right text-slate-500 font-mono font-bold">
+                            <td className="px-4 py-4 text-right align-middle font-mono text-sm font-bold text-slate-500">
                               {formatNumber(product.cost_price)}đ
                             </td>
                             {/* Sell Price */}
-                            <td className="px-5 py-4 text-right text-slate-900 font-mono font-black">
+                            <td className="px-4 py-4 text-right align-middle font-mono text-sm font-black text-slate-950">
                               {formatNumber(product.sell_price)}đ
                             </td>
                             {/* Status Badge */}
-                            <td className="px-5 py-4 text-center">
-                              <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-extrabold shadow-2xs ${
+                            <td className="px-4 py-4 text-center align-middle">
+                              <span className={`inline-flex min-w-[92px] justify-center whitespace-nowrap border px-2 py-1 text-xs font-black shadow-2xs ${
                                 isLowStock
                                   ? 'bg-rose-50 text-rose-700 border-rose-200'
                                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
@@ -1606,7 +1622,7 @@ const StockPage = () => {
                     </div>
                     <div className="py-2.5">
                       <p className="text-sm font-black text-amber-600">{summary.needs_restock}</p>
-                      <p className="text-[9px] font-extrabold uppercase text-slate-400 mt-0.5 tracking-wider">Cần chú ý</p>
+                      <p className="text-[9px] font-extrabold uppercase text-slate-400 mt-0.5 tracking-wider">Sắp hết</p>
                     </div>
                     <div className="py-2.5">
                       <p className="text-sm font-black text-blue-600">{formatNumber(summary.total_recommended_quantity)}</p>
@@ -1614,7 +1630,7 @@ const StockPage = () => {
                     </div>
                     <div className="py-2.5">
                       <p className="text-sm font-black text-emerald-600">{summary.healthy}</p>
-                      <p className="text-[9px] font-extrabold uppercase text-slate-400 mt-0.5 tracking-wider">An toàn</p>
+                      <p className="text-[9px] font-extrabold uppercase text-slate-400 mt-0.5 tracking-wider">Đủ hàng</p>
                     </div>
                   </div>
                 )}
@@ -1713,9 +1729,9 @@ const StockPage = () => {
                               </span>
                             </div>
                             
-                            <p className="text-xs font-semibold text-slate-500 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 line-clamp-3">
+                            <div className="text-xs font-semibold text-slate-500 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-100 line-clamp-3">
                               {renderInsight(item.ai_insight || item.reason || '')}
-                            </p>
+                            </div>
 
                             <div className="flex items-center justify-between border-t border-slate-100/60 pt-2 text-[10px] font-bold">
                               <span className="text-slate-400">Trạng thái: Đang chờ</span>

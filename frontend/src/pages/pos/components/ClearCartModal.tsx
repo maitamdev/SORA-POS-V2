@@ -21,7 +21,7 @@ const ClearCartModal = () => {
         {/* Body */}
         <div className="p-6">
           <p className="text-sm font-semibold text-slate-600">
-            Bạn có chắc chắn muốn xóa toàn bộ sản phẩm trong giỏ hàng không? Hành động này không thể khôi phục lại.
+            Bạn có chắc chắn muốn xóa toàn bộ sản phẩm trong giỏ hàng không? Thao tác này không thể khôi phục lại.
           </p>
         </div>
 
