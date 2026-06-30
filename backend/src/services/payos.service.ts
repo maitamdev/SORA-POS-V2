@@ -1,6 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const PayOSModule = require('@payos/node');
-const PayOS = PayOSModule.PayOS || PayOSModule.default || PayOSModule;
+import { PayOS } from '@payos/node';
 import { env } from '../config/env';
 
 // Khởi tạo PayOS SDK
