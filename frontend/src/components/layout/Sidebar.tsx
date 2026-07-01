@@ -102,12 +102,6 @@ const menuItems = [
     roles: ['admin', 'manager'],
   },
   {
-    label: 'Audit log',
-    icon: HiOutlineClipboardList,
-    path: '/audit-logs',
-    roles: ['admin', 'manager'],
-  },
-  {
     label: 'Cài đặt',
     icon: HiOutlineCog,
     path: '/settings',

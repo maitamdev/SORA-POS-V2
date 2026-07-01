@@ -5,27 +5,27 @@ export class NotificationService {
   /**
    * Gửi tin nhắn đến Telegram qua Bot API
    */
-  static async sendTelegramMessage(text: string): Promise<boolean> {
+  /**
+   * Gửi tin nhắn Telegram đến một Chat ID cụ thể
+   */
+  static async sendTelegramMessageTo(chatId: string | number, text: string): Promise<boolean> {
     const token = env.telegramBotToken;
-    const chatId = env.telegramChatId;
-
-    console.log(`[NotificationService.sendTelegramMessage] token: ${token ? 'exists' : 'missing'}, chatId: ${chatId || 'missing'}`);
+    console.log(`[NotificationService.sendTelegramMessageTo] token: ${token ? 'exists' : 'missing'}, chatId: ${chatId}`);
 
     if (!token || !chatId) {
-      console.log('[NotificationService] Telegram credentials missing (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID), skipping notification.');
+      console.log('[NotificationService] Telegram credentials missing, skipping.');
       return false;
     }
 
     try {
       const url = `https://api.telegram.org/bot${token}/sendMessage`;
-      console.log(`[NotificationService.sendTelegramMessage] sending request to: ${url}`);
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chat_id: chatId,
+          chat_id: String(chatId),
           text,
           parse_mode: 'HTML',
         }),
@@ -33,16 +33,19 @@ export class NotificationService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[NotificationService] Failed to send Telegram alert: ${response.statusText}`, errorText);
+        console.error(`[NotificationService] Failed to send Telegram alert to ${chatId}: ${response.statusText}`, errorText);
         return false;
       }
 
-      console.log('[NotificationService] Telegram notification sent successfully.');
       return true;
     } catch (error) {
-      console.error('[NotificationService] Error sending Telegram message:', error);
+      console.error(`[NotificationService] Error sending Telegram message to ${chatId}:`, error);
       return false;
     }
+  }
+
+  static async sendTelegramMessage(text: string): Promise<boolean> {
+    return this.sendTelegramMessageTo(env.telegramChatId, text);
   }
 
   /**
