@@ -160,6 +160,7 @@ CREATE TABLE IF NOT EXISTS order_details (
   product_name VARCHAR(255) NOT NULL,   -- Lưu tên tại thời điểm mua
   quantity INTEGER NOT NULL,
   unit_price DECIMAL(15, 2) NOT NULL,   -- Giá bán tại thời điểm mua
+  cost_price DECIMAL(15, 2) NOT NULL DEFAULT 0, -- Giá vốn tại thời điểm bán
   discount DECIMAL(15, 2) DEFAULT 0,
   subtotal DECIMAL(15, 2) NOT NULL,     -- quantity * unit_price - discount
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -273,7 +274,30 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
 );
 
 -- ============================================
--- 17. AUDIT LOGS (Nhật ký kiểm toán)
+-- 17. AI REVENUE ANALYSES (Luu lich su phan tich doanh thu AI)
+-- ============================================
+CREATE TABLE IF NOT EXISTS ai_revenue_analyses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  days INTEGER NOT NULL CHECK (days > 0 AND days <= 365),
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+  health_score INTEGER CHECK (health_score >= 0 AND health_score <= 100),
+  total_revenue DECIMAL(15, 2) NOT NULL DEFAULT 0,
+  total_orders INTEGER NOT NULL DEFAULT 0,
+  total_cogs DECIMAL(15, 2) NOT NULL DEFAULT 0,
+  total_profit DECIMAL(15, 2) NOT NULL DEFAULT 0,
+  profit_margin DECIMAL(8, 2) NOT NULL DEFAULT 0,
+  average_order_value DECIMAL(15, 2) NOT NULL DEFAULT 0,
+  analysis JSONB NOT NULL,
+  metrics_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  generated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 18. AUDIT LOGS (Nhat ky kiem toan)
 -- ============================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -319,6 +343,9 @@ CREATE INDEX IF NOT EXISTS idx_stock_transactions_type ON stock_transactions(typ
 CREATE INDEX IF NOT EXISTS idx_stock_alerts_product_id ON stock_alerts(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_alerts_status ON stock_alerts(status);
 CREATE INDEX IF NOT EXISTS idx_ai_recommendations_product_id ON ai_recommendations(product_id);
+CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_generated_at ON ai_revenue_analyses(generated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_period ON ai_revenue_analyses(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_generated_by ON ai_revenue_analyses(generated_by);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
@@ -344,4 +371,5 @@ CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXE
 CREATE TRIGGER update_shift_sessions_updated_at BEFORE UPDATE ON shift_sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_stock_alerts_updated_at BEFORE UPDATE ON stock_alerts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ai_recommendations_updated_at BEFORE UPDATE ON ai_recommendations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_ai_revenue_analyses_updated_at BEFORE UPDATE ON ai_revenue_analyses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_goods_receipts_updated_at BEFORE UPDATE ON goods_receipts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

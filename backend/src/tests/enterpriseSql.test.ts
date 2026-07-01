@@ -32,3 +32,11 @@ test('enterprise POS SQL records loyalty and cancellation audit columns', () => 
   assert.match(sql, /ADD COLUMN IF NOT EXISTS cancelled_at/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.audit_logs/);
 });
+
+test('enterprise POS SQL snapshots cost price on order details', () => {
+  const sql = findEnterpriseSql();
+
+  assert.match(sql, /ALTER TABLE public\.order_details\s+ADD COLUMN IF NOT EXISTS cost_price/);
+  assert.match(sql, /INSERT INTO public\.order_details\([\s\S]*cost_price[\s\S]*\)/);
+  assert.match(sql, /p\.cost_price/);
+});

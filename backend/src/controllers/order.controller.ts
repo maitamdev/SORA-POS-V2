@@ -11,7 +11,7 @@ export class OrderController {
   });
 
   static get = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await OrderService.getById(req.params.id), 'Lấy hóa đơn thành công');
+    successResponse(res, await OrderService.getById(req.params.id, req.user), 'Lấy hóa đơn thành công');
   });
 
   static create = asyncHandler(async (req: Request, res: Response) => {
@@ -36,7 +36,7 @@ export class OrderController {
       throw new AppError(400, 'Vui lòng cung cấp địa chỉ email');
     }
 
-    const order = await OrderService.getById(id);
+    const order = await OrderService.getById(id, req.user);
     await EmailService.sendInvoice(email, order);
 
     successResponse(res, null, 'Gửi email hóa đơn thành công');

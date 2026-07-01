@@ -39,6 +39,9 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS cancelled_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS shift_code VARCHAR(16);
 
+ALTER TABLE public.order_details
+  ADD COLUMN IF NOT EXISTS cost_price numeric(15, 2) NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_orders_shift_code 
   ON public.orders(shift_code);
 
@@ -442,6 +445,7 @@ BEGIN
     product_name,
     quantity,
     unit_price,
+    cost_price,
     discount,
     subtotal
   )
@@ -451,6 +455,7 @@ BEGIN
     p.name,
     i.quantity,
     p.sell_price,
+    p.cost_price,
     i.discount,
     (p.sell_price * i.quantity - i.discount)
   FROM pg_temp.pos_order_items i

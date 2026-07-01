@@ -29,7 +29,7 @@ categoryRoutes.delete('/:id', roleMiddleware('admin'), CategoryController.delete
 
 export const supplierRoutes = Router();
 supplierRoutes.use(authMiddleware);
-supplierRoutes.get('/', SupplierController.list);
+supplierRoutes.get('/', roleMiddleware('admin', 'manager'), SupplierController.list);
 supplierRoutes.post('/', roleMiddleware('admin', 'manager'), validateMiddleware(supplierCreateSchema), SupplierController.create);
 supplierRoutes.put('/:id', roleMiddleware('admin', 'manager'), validateMiddleware(supplierUpdateSchema), SupplierController.update);
 supplierRoutes.delete('/:id', roleMiddleware('admin'), SupplierController.delete);

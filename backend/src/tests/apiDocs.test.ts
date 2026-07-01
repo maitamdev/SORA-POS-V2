@@ -10,6 +10,9 @@ test('OpenAPI spec exposes critical POS endpoints', () => {
     '/orders/{id}/cancel',
     '/stock/alerts',
     '/reports/dashboard',
+    '/reports/ai-analysis',
+    '/reports/ai-analysis/history',
+    '/reports/ai-analysis/{id}',
     '/ai/recommend-restock',
     '/settings/operation',
   ];

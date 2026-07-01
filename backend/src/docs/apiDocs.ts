@@ -68,7 +68,7 @@ export const openApiSpec: OpenApiSpec = {
   },
   servers: [
     { url: '/api', description: 'Current server' },
-    { url: 'http://localhost:4000/api', description: 'Local development' },
+    { url: 'http://localhost:3001/api', description: 'Local development' },
   ],
   tags: [
     { name: 'System', description: 'Health and API discovery' },
@@ -344,7 +344,7 @@ export const openApiSpec: OpenApiSpec = {
       delete: { tags: ['Categories'], summary: 'Delete category', description: 'Roles: admin only', security: auth, parameters: [idParam()], responses: { '200': ok() } },
     },
     '/suppliers': {
-      get: { tags: ['Suppliers'], summary: 'List suppliers', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      get: { tags: ['Suppliers'], summary: 'List suppliers', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
       post: { tags: ['Suppliers'], summary: 'Create supplier', description: 'Roles: admin, manager', security: auth, requestBody: refBody('Supplier'), responses: { '201': ok('Created') } },
     },
     '/suppliers/{id}': {
@@ -396,6 +396,55 @@ export const openApiSpec: OpenApiSpec = {
     },
     '/reports/top-products': {
       get: { tags: ['Reports'], summary: 'Top products report', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
+    },
+    '/reports/ai-analysis': {
+      post: {
+        tags: ['Reports'],
+        summary: 'Generate and save AI revenue analysis',
+        description: 'Roles: admin, manager. The generated AI report is persisted in ai_revenue_analyses.',
+        security: auth,
+        requestBody: jsonBody({
+          type: 'object',
+          properties: {
+            days: { type: 'integer', minimum: 1, maximum: 365, default: 30 },
+          },
+        }),
+        responses: { '200': ok('Generated and saved') },
+      },
+    },
+    '/reports/ai-analysis/history': {
+      get: {
+        tags: ['Reports'],
+        summary: 'List saved AI revenue analyses',
+        description: 'Roles: admin, manager',
+        security: auth,
+        parameters: [
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+          { name: 'days', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 365 } },
+          { name: 'date_from', in: 'query', schema: { type: 'string', format: 'date' } },
+          { name: 'date_to', in: 'query', schema: { type: 'string', format: 'date' } },
+        ],
+        responses: { '200': ok() },
+      },
+    },
+    '/reports/ai-analysis/{id}': {
+      get: {
+        tags: ['Reports'],
+        summary: 'Get saved AI revenue analysis detail',
+        description: 'Roles: admin, manager',
+        security: auth,
+        parameters: [idParam()],
+        responses: { '200': ok(), '404': ok('Not found') },
+      },
+      delete: {
+        tags: ['Reports'],
+        summary: 'Delete saved AI revenue analysis',
+        description: 'Roles: admin only',
+        security: auth,
+        parameters: [idParam()],
+        responses: { '200': ok(), '403': ok('Forbidden') },
+      },
     },
     '/ai/recommendations': {
       get: { tags: ['AI'], summary: 'List AI recommendations', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },

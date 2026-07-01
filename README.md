@@ -167,3 +167,14 @@ Dự án này được cấp phép theo tiêu chuẩn **MIT License**. Bạn có
 - Fully integrated keyless barcode search logic with iCheck fallback scan checking.
 - Designed automated role-based shifts logs, checkout bank transfer VietQR receipts.
 
+## Database Migration Notes
+
+For an existing Supabase database, also run these newer migrations after the base schema:
+
+1. `database/order_details_cost_snapshot.sql`
+2. `database/ai_revenue_analyses.sql`
+3. `database/hardening.sql`
+4. `database/enterprise_pos_core.sql`
+
+These keep historical profit reports accurate and persist AI revenue analysis reports in the database.
+

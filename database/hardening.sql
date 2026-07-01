@@ -35,6 +35,7 @@ BEGIN
       CHECK (
         quantity > 0
         AND unit_price >= 0
+        AND cost_price >= 0
         AND discount >= 0
         AND subtotal >= 0
       ) NOT VALID;
@@ -83,6 +84,21 @@ BEGIN
         AND status IN ('pending', 'approved', 'rejected')
       ) NOT VALID;
   END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ai_revenue_analyses')
+     AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ai_revenue_analyses_metric_check') THEN
+    ALTER TABLE ai_revenue_analyses
+      ADD CONSTRAINT ai_revenue_analyses_metric_check
+      CHECK (
+        days > 0
+        AND days <= 365
+        AND (health_score IS NULL OR (health_score >= 0 AND health_score <= 100))
+        AND total_revenue >= 0
+        AND total_orders >= 0
+        AND total_cogs >= 0
+        AND average_order_value >= 0
+      ) NOT VALID;
+  END IF;
 END $$;
 
 -- ============================================
@@ -101,6 +117,7 @@ ALTER TABLE public.shift_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_alerts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_revenue_analyses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goods_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goods_receipt_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cash_drawer_transactions ENABLE ROW LEVEL SECURITY;

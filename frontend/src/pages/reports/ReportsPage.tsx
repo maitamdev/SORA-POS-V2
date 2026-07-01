@@ -7,10 +7,12 @@ import {
   HiOutlineCalculator as HiCalc,
   HiOutlineCalendar as HiCal,
   HiOutlineClock as HiClock,
-  HiOutlineDownload
+  HiOutlineDownload,
+  HiOutlineEye,
+  HiOutlineTrash
 } from 'react-icons/hi';
 import { FiTrendingUp, FiTrendingDown, FiMinus, FiPackage } from 'react-icons/fi';
-import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult } from '../../services/report.api';
+import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult, AiAnalysisReportSummary } from '../../services/report.api';
 import { aiAPI } from '../../services/ai.api';
 import { stockAPI, StockSummary } from '../../services/stock.api';
 import { RestockAnalysis } from '../../types/domain.type';
@@ -42,6 +44,17 @@ const formatDateLabel = (dateStr: string) => {
   const parts = dateStr.split('-');
   if (parts.length < 3) return dateStr;
   return `${parts[2]}/${parts[1]}`;
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '';
+  return new Date(value).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
@@ -110,6 +123,10 @@ const ReportsPage = () => {
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [aiAnalysisData, setAiAnalysisData] = useState<AiAnalysisResult | null>(null);
+  const [activeAiReport, setActiveAiReport] = useState<AiAnalysisReportSummary | null>(null);
+  const [aiHistory, setAiHistory] = useState<AiAnalysisReportSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [stockAnalysis, setStockAnalysis] = useState<RestockAnalysis | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
@@ -131,21 +148,66 @@ const ReportsPage = () => {
     }
   }, [days]);
 
+  const loadAiHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await reportAPI.aiAnalysisHistory({ page: 1, limit: 8 });
+      setAiHistory(res.data.data.items);
+    } catch {
+      toast.error('Khong tai duoc lich su phan tich AI');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const handleOpenSavedAnalysis = useCallback(async (id: string) => {
+    setSelectedHistoryId(id);
+    try {
+      const res = await reportAPI.aiAnalysisDetail(id);
+      const report = res.data.data;
+      setAiAnalysisData(report.analysis);
+      setActiveAiReport(report);
+      toast.success('Da mo lai ban phan tich da luu');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Khong mo duoc ban phan tich da luu');
+    } finally {
+      setSelectedHistoryId(null);
+    }
+  }, []);
+
+  const handleDeleteSavedAnalysis = useCallback(async (id: string) => {
+    if (!window.confirm('Xoa ban phan tich doanh thu da luu nay?')) return;
+    try {
+      await reportAPI.deleteAiAnalysis(id);
+      setAiHistory((items) => items.filter((item) => item.id !== id));
+      if (activeAiReport?.id === id) {
+        setActiveAiReport(null);
+        setAiAnalysisData(null);
+      }
+      toast.success('Da xoa ban phan tich da luu');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Khong xoa duoc ban phan tich');
+    }
+  }, [activeAiReport?.id]);
+
   const handleAiAnalysis = useCallback(async () => {
     setAiLoading(true);
     setAiAnalysisData(null);
+    setActiveAiReport(null);
     try {
       const res = await reportAPI.aiAnalysis(days);
       const data = typeof res.data.data.analysis === 'string' 
         ? JSON.parse(res.data.data.analysis) 
         : res.data.data.analysis;
       setAiAnalysisData(data);
+      setActiveAiReport(res.data.data.saved_report);
+      await loadAiHistory();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Không thể thực hiện phân tích tài chính AI');
     } finally {
       setAiLoading(false);
     }
-  }, [days]);
+  }, [days, loadAiHistory]);
 
   const loadStockAnalysis = useCallback(async () => {
     setStockLoading(true);
@@ -166,15 +228,27 @@ const ReportsPage = () => {
   // Auto-load everything on page open
   useEffect(() => {
     loadData();
+    loadAiHistory();
     loadStockAnalysis();
-  }, [loadData, loadStockAnalysis]);
+  }, [loadData, loadAiHistory, loadStockAnalysis]);
 
-  // Auto-trigger AI analysis after revenue data loads
   useEffect(() => {
-    if (revenue.length > 0 && !aiAnalysisData && !aiLoading) {
-      handleAiAnalysis();
+    setAiAnalysisData(null);
+    setActiveAiReport(null);
+  }, [days]);
+
+  // Auto-open saved AI analysis first; generate a new one only when no saved report exists for the range.
+  useEffect(() => {
+    if (revenue.length === 0 || aiAnalysisData || aiLoading || historyLoading) return;
+
+    const savedForCurrentRange = aiHistory.find((item) => item.days === days);
+    if (savedForCurrentRange) {
+      handleOpenSavedAnalysis(savedForCurrentRange.id);
+      return;
     }
-  }, [revenue]);
+
+    handleAiAnalysis();
+  }, [revenue, days, aiAnalysisData, aiLoading, historyLoading, aiHistory, handleOpenSavedAnalysis, handleAiAnalysis]);
 
   // Aggregate metrics
   const totalRevenue = useMemo(() => revenue.reduce((sum, item) => sum + item.revenue, 0), [revenue]);
@@ -352,6 +426,89 @@ const ReportsPage = () => {
           >
             {aiLoading ? 'Đang phân tích...' : 'Phân tích lại'}
           </button>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-blue-800">
+                <HiClock className="h-4 w-4" />
+                Ban phan tich da luu trong CSDL
+              </h3>
+              {activeAiReport ? (
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  Dang xem ban #{activeAiReport.id.slice(0, 8)} - Ky {activeAiReport.days} ngay - Tao luc {formatDateTime(activeAiReport.generated_at)}
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  Moi lan phan tich AI thanh cong se duoc luu thanh mot ban ghi rieng.
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={loadAiHistory}
+              disabled={historyLoading}
+              className="h-8 rounded-lg border border-blue-200 bg-white px-3 text-[11px] font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+            >
+              {historyLoading ? 'Dang tai...' : 'Lam moi lich su'}
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
+            {historyLoading && aiHistory.length === 0 ? (
+              <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
+                Dang tai lich su phan tich...
+              </div>
+            ) : aiHistory.length === 0 ? (
+              <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
+                Chua co ban phan tich nao duoc luu.
+              </div>
+            ) : (
+              aiHistory.map((item) => (
+                <div key={item.id} className={`rounded-lg border bg-white p-3 transition-colors ${activeAiReport?.id === item.id ? 'border-blue-400 ring-1 ring-blue-200' : 'border-blue-100 hover:border-blue-200'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">
+                          {item.health_score ?? '--'} diem
+                        </span>
+                        <span className="text-[11px] font-black text-slate-800">Ky {item.days} ngay</span>
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {formatDateLabel(item.period_start)} - {formatDateLabel(item.period_end)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                        {money(item.total_revenue)} - {item.total_orders} don - LN {money(item.total_profit)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-medium text-slate-400">
+                        {formatDateTime(item.generated_at)}{item.generated_by_user?.full_name ? ` - ${item.generated_by_user.full_name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenSavedAnalysis(item.id)}
+                        disabled={selectedHistoryId === item.id}
+                        title="Mo ban phan tich"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50"
+                      >
+                        <HiOutlineEye className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSavedAnalysis(item.id)}
+                        title="Xoa ban phan tich"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-600"
+                      >
+                        <HiOutlineTrash className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         <div className="mt-5">

@@ -77,7 +77,7 @@ export class OrderService {
     return { items: data || [], pagination: { page, limit, total: count || 0 } };
   }
 
-  static async getById(id: string) {
+  static async getById(id: string, currentUser?: JwtPayload) {
     const { data: order, error } = await supabase
       .from('orders')
       .select(orderSelect)
@@ -88,6 +88,10 @@ export class OrderService {
       if (error) console.error('[OrderService.getById] Supabase Error:', error);
       throw new AppError(404, 'Không tìm thấy hóa đơn');
     }
+    if (currentUser?.role === 'cashier' && order.user_id !== currentUser.userId) {
+      throw new AppError(403, 'Cashiers can only view their own orders');
+    }
+
     return order;
   }
 

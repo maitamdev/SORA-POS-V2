@@ -29,6 +29,18 @@ export class ReportController {
 
   static aiAnalysis = asyncHandler(async (req: Request, res: Response) => {
     const days = parseDays(req.body.days, 30);
-    successResponse(res, await ReportService.aiAnalysis(days), 'Phân tích báo cáo doanh thu AI thành công');
+    successResponse(res, await ReportService.aiAnalysis(days, req.user?.userId), 'Phân tích báo cáo doanh thu AI thành công');
+  });
+
+  static aiAnalysisHistory = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.aiAnalysisHistory(req.query), 'Lay lich su phan tich doanh thu AI thanh cong');
+  });
+
+  static aiAnalysisDetail = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.aiAnalysisDetail(req.params.id), 'Lay chi tiet phan tich doanh thu AI thanh cong');
+  });
+
+  static deleteAiAnalysis = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.deleteAiAnalysis(req.params.id), 'Xoa ban phan tich doanh thu AI thanh cong');
   });
 }

@@ -84,6 +84,7 @@ export interface OrderDetail {
   product_name: string;
   quantity: number;
   unit_price: number;
+  cost_price?: number;
   discount: number;
   subtotal: number;
 }

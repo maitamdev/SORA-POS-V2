@@ -1,29 +1,34 @@
-# 🗄️ Database - Sora POS
+# Database - Sora POS
 
-## Tổng quan
+Thu muc nay chua cac file SQL de thiet lap co so du lieu PostgreSQL/Supabase cho Sora POS.
 
-Thư mục này chứa các file SQL để thiết lập cơ sở dữ liệu cho hệ thống Sora POS trên PostgreSQL (Supabase).
+## Thu Tu Chay Migration
 
-## Thứ tự chạy Migration
+Chay cac file trong Supabase SQL Editor theo dung thu tu:
 
-Hãy đăng nhập vào **SQL Editor** trên Supabase Dashboard và chạy các file SQL theo đúng thứ tự dưới đây:
-
-| Thứ tự | File | Mô tả |
+| Thu tu | File | Mo ta |
 |---|---|---|
-| 1 | `schema.sql` | Tạo toàn bộ cấu trúc bảng hệ thống, chỉ mục (indexes), và triggers cập nhật thời gian |
-| 2 | `app_settings.sql` | Tạo bảng lưu cấu hình vận hành và hoạt động của cửa hàng |
-| 3 | `hardening.sql` | Thêm các ràng buộc dữ liệu an toàn và kích hoạt Row Level Security (RLS) bảo vệ toàn bộ bảng |
-| 4 | `enterprise_pos_core.sql` | Đăng ký các hàm xử lý Transaction an toàn (checkout, hủy đơn, nhập kho) và Audit log |
-| 5 | `seed.sql` | Khởi tạo dữ liệu mẫu (vai trò thành viên và tài khoản admin mặc định) |
+| 1 | `schema.sql` | Tao bang, indexes va triggers co ban |
+| 2 | `app_settings.sql` | Tao cau hinh van hanh cua cua hang |
+| 3 | `order_details_cost_snapshot.sql` | Bo sung gia von tai thoi diem ban de bao cao loi nhuan qua khu chinh xac |
+| 4 | `ai_revenue_analyses.sql` | Tao bang luu lich su phan tich doanh thu AI |
+| 5 | `hardening.sql` | Them rang buoc du lieu va bat Row Level Security |
+| 6 | `enterprise_pos_core.sql` | Tao RPC transaction cho checkout, huy don, nhap kho va audit log |
+| 7 | `stock_atomic_rpc.sql` | Tao RPC thao tac kho atomic |
+| 8 | `expiry_setup.sql` | Tao bang/chuc nang quan ly lo hang va han su dung neu can |
+| 9 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
 
-> ⚠️ **Cảnh báo**: Chỉ chạy `seed.sql` khi thiết lập môi trường thử nghiệm hoặc ban đầu. Không chạy trên môi trường production có dữ liệu thực tế vì script này chứa các lệnh xóa dữ liệu cũ.
+## Luu Y
 
-## Tài khoản mặc định
+- Khong chay `seed.sql` tren database dang co du lieu that vi file nay co the xoa/ghi de du lieu mau.
+- Backend dung `SUPABASE_SERVICE_ROLE_KEY` de thuc hien CRUD qua Express API.
+- Frontend chi nen dung Supabase anon key cho Realtime/subscription, khong CRUD truc tiep.
+- Sau khi them migration moi, cap nhat ca `schema.sql` va file migration rieng de ho tro database moi lan database dang ton tai.
 
-| Email | Mật khẩu | Vai trò |
+## Tai Khoan Demo
+
+| Email | Mat khau | Vai tro |
 |---|---|---|
-| admin@sorapos.com | password123 | Admin |
+| `admin@sorapos.com` | `password123` | Admin |
 
-## Sơ đồ quan hệ thực thể (ERD)
-
-Xem chi tiết tại: [docs/database-design.md](../docs/database-design.md)
+Mat khau demo chi dung cho moi truong thuyet trinh/kiem thu. Khi dua len production can doi ngay tai khoan mac dinh.

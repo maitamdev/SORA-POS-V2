@@ -91,11 +91,44 @@ export interface AiAnalysisResult {
   charts: AiChartData[];
 }
 
+export interface AiAnalysisReportSummary {
+  id: string;
+  days: number;
+  period_start: string;
+  period_end: string;
+  health_score?: number | null;
+  total_revenue: number;
+  total_orders: number;
+  total_profit: number;
+  profit_margin: number;
+  generated_at: string;
+  generated_by?: string | null;
+  generated_by_user?: { full_name?: string; email?: string } | null;
+}
+
+export interface AiAnalysisReportDetail extends AiAnalysisReportSummary {
+  total_cogs: number;
+  average_order_value: number;
+  analysis: AiAnalysisResult;
+  metrics_snapshot: Record<string, unknown>;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  pagination: { page: number; limit: number; total: number };
+}
+
 export const reportAPI = {
   dashboard: (date?: string, days = 7) => api.get<ApiResponse<DashboardData>>(`/reports/dashboard${buildQuery({ date, days })}`),
   revenue: (days = 30) => api.get<ApiResponse<RevenuePoint[]>>(`/reports/revenue${buildQuery({ days })}`),
   topProducts: (days = 30, limit = 10) =>
     api.get<ApiResponse<TopProduct[]>>(`/reports/top-products${buildQuery({ days, limit })}`),
   aiAnalysis: (days = 30) =>
-    api.post<ApiResponse<{ analysis: AiAnalysisResult; generated_at: string; days: number }>>('/reports/ai-analysis', { days }),
+    api.post<ApiResponse<{ analysis: AiAnalysisResult; generated_at: string; days: number; saved_report: AiAnalysisReportSummary }>>('/reports/ai-analysis', { days }),
+  aiAnalysisHistory: (params: { page?: number; limit?: number; days?: number } = {}) =>
+    api.get<ApiResponse<PaginatedResult<AiAnalysisReportSummary>>>(`/reports/ai-analysis/history${buildQuery(params)}`),
+  aiAnalysisDetail: (id: string) =>
+    api.get<ApiResponse<AiAnalysisReportDetail>>(`/reports/ai-analysis/${id}`),
+  deleteAiAnalysis: (id: string) =>
+    api.delete<ApiResponse<{ id: string }>>(`/reports/ai-analysis/${id}`),
 };

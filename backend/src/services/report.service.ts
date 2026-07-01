@@ -2,6 +2,7 @@ import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { appCache, stableCacheKey } from '../utils/cache';
+import { parsePagination } from '../utils/query';
 
 
 const getVietnamTime = (dateInput: Date | string = new Date()) => {
@@ -31,6 +32,8 @@ const parseLocalDate = (dateStr: string) => {
   const [y, m, d] = dateStr.split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - 7 * 3600000);
 };
+
+type AnalysisHistoryQuery = Record<string, unknown>;
 
 export class ReportService {
   static async dashboard(dateStr?: string, days = 7) {
@@ -161,7 +164,7 @@ export class ReportService {
     ] = await Promise.all([
       // Dependent Task 1: Fetch order details and cost price to compute COGS
       allCompletedOrderIds.length > 0
-        ? supabase.from('order_details').select('order_id, quantity, products(cost_price)').in('order_id', allCompletedOrderIds)
+        ? supabase.from('order_details').select('order_id, quantity, cost_price, products(cost_price)').in('order_id', allCompletedOrderIds)
         : Promise.resolve({ data: null, error: null }),
 
       // Dependent Task 2: Fetch order details for category sales
@@ -201,7 +204,7 @@ export class ReportService {
     if (details) {
       for (const d of details) {
         const qty = Number(d.quantity || 0);
-        const costPrice = Number((d.products as any)?.cost_price || 0);
+        const costPrice = Number(d.cost_price ?? (d.products as any)?.cost_price ?? 0);
         const cogs = costPrice * qty;
 
         if (todayOrderIds.includes(d.order_id)) {
@@ -375,7 +378,7 @@ export class ReportService {
     if (orderIds.length > 0) {
       const { data, error: detailsErr } = await supabase
         .from('order_details')
-        .select('order_id, quantity, products(cost_price)')
+        .select('order_id, quantity, cost_price, products(cost_price)')
         .in('order_id', orderIds);
       if (detailsErr) throw new AppError(500, detailsErr.message);
       details = data || [];
@@ -384,7 +387,7 @@ export class ReportService {
     // Calculate COGS per order
     const orderCogsMap = new Map<string, number>();
     for (const d of details) {
-      const costPrice = Number((d.products as any)?.cost_price || 0);
+      const costPrice = Number(d.cost_price ?? (d.products as any)?.cost_price ?? 0);
       const qty = Number(d.quantity || 0);
       const cogs = costPrice * qty;
       orderCogsMap.set(d.order_id, (orderCogsMap.get(d.order_id) || 0) + cogs);
@@ -455,7 +458,7 @@ export class ReportService {
       .slice(0, limit);
   }
 
-  static async aiAnalysis(days = 30) {
+  static async aiAnalysis(days = 30, generatedBy?: string) {
     const today = startOfDay();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -783,10 +786,138 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       throw new AppError(500, 'AI trả về dữ liệu không đúng định dạng JSON');
     }
 
+    const generatedAt = new Date().toISOString();
+    const metricsSnapshot = {
+      revenue: revenueTrend,
+      top_products: topProductsRaw,
+      category_sales,
+      payment_stats,
+      totals: {
+        total_revenue: totalRevenue,
+        total_orders: totalOrders,
+        total_cogs: totalCogs,
+        total_profit: totalProfit,
+        profit_margin: Number(profitMargin.toFixed(2)),
+        average_order_value: Number(averageOrderVal.toFixed(2)),
+        cogs_ratio: Number(cogsRatio.toFixed(2)),
+        active_days: activeDays.length,
+        zero_days: zeroDays.length,
+        avg_daily_revenue: Number(avgDailyRevenue.toFixed(2)),
+        avg_daily_orders: Number(avgDailyOrders.toFixed(2)),
+        revenue_volatility: Number(revenueVolatility.toFixed(2)),
+        wow_growth: wowGrowth === null ? null : Number(wowGrowth.toFixed(2)),
+        top2_share: Number(top2Share.toFixed(2)),
+      },
+      generated_at: generatedAt,
+    };
+
+    const { data: savedAnalysis, error: saveError } = await supabase
+      .from('ai_revenue_analyses')
+      .insert({
+        days,
+        period_start: getLocalDateString(rangeDaysAgo),
+        period_end: getLocalDateString(today),
+        health_score: typeof parsedAnalysis.health_score === 'number' ? parsedAnalysis.health_score : null,
+        total_revenue: totalRevenue,
+        total_orders: totalOrders,
+        total_cogs: totalCogs,
+        total_profit: totalProfit,
+        profit_margin: Number(profitMargin.toFixed(2)),
+        average_order_value: Number(averageOrderVal.toFixed(2)),
+        analysis: parsedAnalysis,
+        metrics_snapshot: metricsSnapshot,
+        generated_by: generatedBy || null,
+        generated_at: generatedAt,
+      })
+      .select('id, days, period_start, period_end, health_score, total_revenue, total_orders, total_profit, profit_margin, generated_at, generated_by')
+      .single();
+
+    if (saveError) {
+      if (saveError.message.includes('ai_revenue_analyses')) {
+        throw new AppError(500, 'Chua chay migration bang ai_revenue_analyses trong database/schema.sql');
+      }
+      throw new AppError(500, saveError.message);
+    }
+
     return {
       analysis: parsedAnalysis,
-      generated_at: new Date().toISOString(),
-      days
+      generated_at: generatedAt,
+      days,
+      saved_report: savedAnalysis
     };
+  }
+
+  static async aiAnalysisHistory(queryParams: AnalysisHistoryQuery) {
+    const { page, limit, from, to } = parsePagination(queryParams);
+    let query = supabase
+      .from('ai_revenue_analyses')
+      .select('id, days, period_start, period_end, health_score, total_revenue, total_orders, total_profit, profit_margin, generated_at, generated_by, users:generated_by(full_name, email)', { count: 'exact' })
+      .order('generated_at', { ascending: false })
+      .range(from, to);
+
+    if (queryParams.days) query = query.eq('days', Number(queryParams.days));
+    if (queryParams.date_from) query = query.gte('period_start', String(queryParams.date_from));
+    if (queryParams.date_to) query = query.lte('period_end', String(queryParams.date_to));
+
+    const { data, error, count } = await query;
+    if (error) {
+      if (error.message.includes('ai_revenue_analyses')) {
+        throw new AppError(500, 'Chua chay migration bang ai_revenue_analyses trong database/schema.sql');
+      }
+      throw new AppError(500, error.message);
+    }
+
+    return {
+      items: (data || []).map((item: any) => ({
+        id: item.id,
+        days: item.days,
+        period_start: item.period_start,
+        period_end: item.period_end,
+        health_score: item.health_score,
+        total_revenue: Number(item.total_revenue || 0),
+        total_orders: Number(item.total_orders || 0),
+        total_profit: Number(item.total_profit || 0),
+        profit_margin: Number(item.profit_margin || 0),
+        generated_at: item.generated_at,
+        generated_by: item.generated_by,
+        generated_by_user: item.users || null,
+      })),
+      pagination: { page, limit, total: count || 0 },
+    };
+  }
+
+  static async aiAnalysisDetail(id: string) {
+    const { data, error } = await supabase
+      .from('ai_revenue_analyses')
+      .select('*, users:generated_by(full_name, email)')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') throw new AppError(404, 'Khong tim thay ban phan tich doanh thu');
+      throw new AppError(500, error.message);
+    }
+
+    return {
+      ...data,
+      total_revenue: Number(data.total_revenue || 0),
+      total_orders: Number(data.total_orders || 0),
+      total_cogs: Number(data.total_cogs || 0),
+      total_profit: Number(data.total_profit || 0),
+      profit_margin: Number(data.profit_margin || 0),
+      average_order_value: Number(data.average_order_value || 0),
+      generated_by_user: data.users || null,
+      users: undefined,
+    };
+  }
+
+  static async deleteAiAnalysis(id: string) {
+    const { error } = await supabase
+      .from('ai_revenue_analyses')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new AppError(500, error.message);
+    return { id };
   }
 }
