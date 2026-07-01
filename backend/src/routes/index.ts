@@ -16,6 +16,7 @@ import shiftRoutes from './shift.routes';
 import auditRoutes from './audit.routes';
 import goodsReceiptRoutes from './goodsReceipt.routes';
 import payosRoutes from './payos.routes';
+import webhookRoutes from './webhook.routes';
 
 const router = Router();
 
@@ -42,6 +43,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/shifts',
       '/api/audit-logs',
       '/api/payos',
+      '/api/webhooks',
     ],
   });
 });
@@ -70,5 +72,6 @@ router.use('/settings', settingsRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/payos', payosRoutes);
+router.use('/webhooks', webhookRoutes);
 
 export default router;

@@ -58,7 +58,7 @@ const LoginPage = () => {
         style={{
           backgroundImage: `url('/assets/sora_pos_blue_warehouse.png')`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: 'left center',
         }}
       >
         {/* Subtle dark overlay for depth */}

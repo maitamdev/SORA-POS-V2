@@ -2,6 +2,7 @@ import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { emptyToNull, parsePagination } from '../utils/query';
 import { appCache, stableCacheKey } from '../utils/cache';
+import { NotificationService } from './notification.service';
 
 type Query = Record<string, unknown>;
 type Entity = Record<string, unknown>;
@@ -46,10 +47,10 @@ export class CatalogService {
     const minStock = Number(product.min_stock_level);
     const status = currentStock <= 0 ? 'out_of_stock' : currentStock <= minStock ? 'low_stock' : null;
 
-    // Lấy TẤT CẢ active alerts (không chỉ 1) để xử lý duplicate
+    // Lấy TẤT CẢ active alerts (không chỉ 1) để xử lý duplicate, đồng thời lấy cột status để nhận diện chuyển trạng thái
     const { data: activeAlerts } = await supabase
       .from('stock_alerts')
-      .select('id')
+      .select('id, status')
       .eq('product_id', productId)
       .in('status', ['low_stock', 'out_of_stock'])
       .order('created_at', { ascending: false });
@@ -76,8 +77,20 @@ export class CatalogService {
     };
 
     if (allActiveAlerts.length > 0) {
+      const oldStatus = allActiveAlerts[0].status;
+
       // Update alert đầu tiên (mới nhất)
       await supabase.from('stock_alerts').update(payload).eq('id', allActiveAlerts[0].id);
+
+      // Nếu trạng thái chuyển đổi (ví dụ từ low_stock thành out_of_stock), kích hoạt thông báo mới
+      if (oldStatus !== status) {
+        NotificationService.sendStockAlertNotification(
+          productId,
+          currentStock,
+          minStock,
+          status as 'low_stock' | 'out_of_stock'
+        ).catch(err => console.error('[NotificationService Error]', err));
+      }
 
       // Resolve các alert thừa (duplicate) nếu có
       if (allActiveAlerts.length > 1) {
@@ -90,6 +103,14 @@ export class CatalogService {
     } else {
       // Không có alert nào → tạo mới
       await supabase.from('stock_alerts').insert(payload);
+
+      // Kích hoạt gửi thông báo Telegram
+      NotificationService.sendStockAlertNotification(
+        productId,
+        currentStock,
+        minStock,
+        status as 'low_stock' | 'out_of_stock'
+      ).catch(err => console.error('[NotificationService Error]', err));
     }
   }
 

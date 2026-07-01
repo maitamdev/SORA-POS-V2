@@ -30,4 +30,6 @@ export const env = {
   payosClientId: process.env.PAYOS_CLIENT_ID || '',
   payosApiKey: process.env.PAYOS_API_KEY || '',
   payosChecksumKey: process.env.PAYOS_CHECKSUM_KEY || '',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
 };
