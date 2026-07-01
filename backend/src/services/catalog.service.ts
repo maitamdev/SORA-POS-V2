@@ -445,9 +445,8 @@ export class CatalogService {
     }
 
     if (inserted) {
-      for (const p of inserted) {
-        await this.syncStockAlert(p.id);
-      }
+      // Chạy song song thay vì tuần tự — giảm latency O(N) → O(1)
+      await Promise.all(inserted.map((p) => this.syncStockAlert(p.id)));
     }
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
 
@@ -504,7 +503,7 @@ export class CatalogService {
   static async deleteAllProducts() {
     throw new AppError(
       403,
-      'He thong POS doanh nghiep khong cho xoa toan bo san pham. Hay dung ngung kinh doanh, import dieu chinh, hoac backup/restore co kiem soat.'
+      'Hệ thống POS doanh nghiệp không cho xóa toàn bộ sản phẩm. Hãy dùng ngừng kinh doanh, import điều chỉnh, hoặc backup/restore có kiểm soát.'
     );
   }
 

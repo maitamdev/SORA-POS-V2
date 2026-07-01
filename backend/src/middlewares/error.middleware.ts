@@ -26,9 +26,6 @@ export const errorHandler = (
   console.error('❌ Unhandled Error:', err.message);
   console.error(err.stack);
 
-  // Log full stack trace cho lỗi không xác định
-  console.error(err.stack);
-
   res.status(500).json({
     success: false,
     message: process.env.NODE_ENV === 'production'

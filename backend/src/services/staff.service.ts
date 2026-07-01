@@ -34,7 +34,7 @@ const sanitizeUser = (user: any) => ({
 export class StaffService {
   private static getVietnamDayRange(dateStr: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      throw new AppError(400, 'Ngay bao cao khong hop le');
+      throw new AppError(400, 'Ngày báo cáo không hợp lệ');
     }
 
     return {
@@ -50,7 +50,7 @@ export class StaffService {
       .eq('name', roleName)
       .single();
 
-    if (error || !data) throw new AppError(500, `Khong tim thay role ${roleName}`);
+    if (error || !data) throw new AppError(500, `Không tìm thấy role ${roleName}`);
     return data.id as string;
   }
 
@@ -66,7 +66,7 @@ export class StaffService {
       if (!error && !data) return code;
     }
 
-    throw new AppError(500, 'Khong tao duoc ma dang nhap nhan vien');
+    throw new AppError(500, 'Không tạo được mã đăng nhập nhân viên');
   }
 
   private static async ensureUserExists(id: string) {
@@ -76,7 +76,7 @@ export class StaffService {
       .eq('id', id)
       .single();
 
-    if (error || !data) throw new AppError(404, 'Khong tim thay nhan vien');
+    if (error || !data) throw new AppError(404, 'Không tìm thấy nhân viên');
   }
 
   static async list(queryParams: Query) {

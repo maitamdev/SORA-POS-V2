@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
@@ -77,6 +78,12 @@ app.use(
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Gzip compression — giảm 60-80% kích thước response
+app.use(compression({
+  threshold: 1024,  // Chỉ nén response > 1KB
+  level: 6,         // Cân bằng giữa tốc độ nén và tỉ lệ nén
+}) as any);
 
 // HTTP logger (chỉ hiện trong development)
 if (env.nodeEnv === 'development') {

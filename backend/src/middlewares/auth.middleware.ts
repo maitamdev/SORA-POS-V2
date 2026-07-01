@@ -24,7 +24,7 @@ export const authMiddleware = async (
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      errorResponse(res, 'Token khong duoc cung cap', 401);
+      errorResponse(res, 'Token không được cung cấp', 401);
       return;
     }
 
@@ -32,7 +32,7 @@ export const authMiddleware = async (
     const decoded = jwt.verify(token, env.jwtSecret) as JwtPayload;
 
     if (!decoded?.userId) {
-      errorResponse(res, 'Token khong hop le', 401);
+      errorResponse(res, 'Token không hợp lệ', 401);
       return;
     }
 
@@ -49,13 +49,13 @@ export const authMiddleware = async (
     }
 
     if ((error && error.code === 'PGRST116') || !user) {
-      errorResponse(res, 'Tai khoan khong con hoat dong hoac khong ton tai', 401);
+      errorResponse(res, 'Tài khoản không còn hoạt động hoặc không tồn tại', 401);
       return;
     }
 
     const role = getRoleName(user.roles);
     if (!role) {
-      errorResponse(res, 'Tai khoan chua duoc gan vai tro hop le', 403);
+      errorResponse(res, 'Tài khoản chưa được gán vai trò hợp lệ', 403);
       return;
     }
 
@@ -72,9 +72,9 @@ export const authMiddleware = async (
       return;
     }
     if (error instanceof jwt.JsonWebTokenError) {
-      errorResponse(res, 'Token khong hop le', 401);
+      errorResponse(res, 'Token không hợp lệ', 401);
       return;
     }
-    errorResponse(res, 'Loi xac thuc', 401);
+    errorResponse(res, 'Lỗi xác thực', 401);
   }
 };

@@ -51,10 +51,15 @@ function App() {
   }, [checkAuth]);
 
   // Đồng bộ dữ liệu xuống IndexedDB khi đăng nhập thành công (chuẩn bị cho offline)
+  // Defer 2s sau khi login để không block UI render ban đầu
   useEffect(() => {
-    if (isAuthenticated) {
+    if (!isAuthenticated) return;
+
+    const timer = setTimeout(() => {
       syncAllDataToLocal();
-    }
+    }, 2000);
+
+    return () => clearTimeout(timer);
   }, [isAuthenticated]);
 
   return (

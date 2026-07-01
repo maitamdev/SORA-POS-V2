@@ -125,7 +125,7 @@ export class NotificationService {
           detailsText = `
 💰 <b>Tổng tiền:</b> <code>${Number(metadata.final_amount || 0).toLocaleString('vi-VN')} đ</code>
 🔢 <b>Số lượng mặt hàng:</b> <code>${metadata.item_count || 0}</code>
-💳 <b>Thanh toán:</b> <code>${metadata.payment_method || 'mặt đất'}</code>
+💳 <b>Thanh toán:</b> <code>${metadata.payment_method || 'tiền mặt'}</code>
           `.trim();
           break;
         case 'order.cancel':

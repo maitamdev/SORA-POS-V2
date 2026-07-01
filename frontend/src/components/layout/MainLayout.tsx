@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { memo, Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
@@ -20,10 +20,10 @@ const PageTransitionLoader = () => (
 );
 
 /**
- * TopHeader — Thanh trạng thái hiển thị ngày, giờ, tài khoản toàn cục
+ * LiveClock — Component đồng hồ tách riêng để isolate re-render mỗi giây
+ * Chỉ component này re-render mỗi 1s, KHÔNG lan ra TopHeader
  */
-const TopHeader = () => {
-  const { user } = useAuthStore();
+const LiveClock = memo(() => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -32,6 +32,21 @@ const TopHeader = () => {
   }, []);
 
   const formattedTime = currentTime.toLocaleTimeString('vi-VN', { hour12: false });
+
+  return (
+    <div className="flex items-center gap-2 bg-slate-950 text-white rounded-xl px-3 py-1.5 text-[11px] font-black shadow-sm select-none">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <span className="font-mono tracking-wider">{formattedTime}</span>
+    </div>
+  );
+});
+LiveClock.displayName = 'LiveClock';
+
+/**
+ * TopHeader — Thanh trạng thái hiển thị ngày, giờ, tài khoản toàn cục
+ */
+const TopHeader = () => {
+  const { user } = useAuthStore();
 
   const getDisplayDate = () => {
     const now = new Date();
@@ -69,11 +84,8 @@ const TopHeader = () => {
           <span>{getDisplayDate()}</span>
         </div>
 
-        {/* Real-time Clock */}
-        <div className="flex items-center gap-2 bg-slate-950 text-white rounded-xl px-3 py-1.5 text-[11px] font-black shadow-sm select-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono tracking-wider">{formattedTime}</span>
-        </div>
+        {/* Real-time Clock — isolated re-render */}
+        <LiveClock />
 
         {/* Profile Info */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/60">

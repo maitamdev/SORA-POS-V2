@@ -22,7 +22,7 @@ export class AuditService {
     const { data, error, count } = await query;
     if (error) {
       if (error.message.includes('audit_logs')) {
-        throw new AppError(500, 'Chua chay migration database/enterprise_pos_core.sql tren Supabase');
+        throw new AppError(500, 'Chưa chạy migration database/enterprise_pos_core.sql trên Supabase');
       }
       throw new AppError(500, error.message);
     }

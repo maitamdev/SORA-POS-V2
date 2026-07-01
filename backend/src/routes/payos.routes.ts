@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PayOSService } from '../services/payos.service';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { roleMiddleware } from '../middlewares/role.middleware';
 
 const router = Router();
 
@@ -7,7 +9,7 @@ const router = Router();
  * POST /api/payos/create
  * Tạo payment link PayOS cho đơn hàng
  */
-router.post('/create', async (req: Request, res: Response) => {
+router.post('/create', authMiddleware, roleMiddleware('admin', 'manager', 'cashier'), async (req: Request, res: Response) => {
   try {
     if (!PayOSService.isConfigured()) {
       return res.status(400).json({
@@ -53,7 +55,7 @@ router.post('/create', async (req: Request, res: Response) => {
  * GET /api/payos/status/:orderCode
  * Kiểm tra trạng thái thanh toán
  */
-router.get('/status/:orderCode', async (req: Request, res: Response) => {
+router.get('/status/:orderCode', authMiddleware, roleMiddleware('admin', 'manager', 'cashier'), async (req: Request, res: Response) => {
   try {
     const orderCode = Number(req.params.orderCode);
     if (!orderCode) {

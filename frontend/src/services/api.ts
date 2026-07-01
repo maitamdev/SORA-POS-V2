@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/auth.store';
 
 // Axios instance với base URL và interceptors
@@ -41,11 +42,9 @@ api.interceptors.response.use(
   (error) => {
     // Xử lý chặn Demo Mode
     if (axios.isCancel(error) && error.message === 'DEMO_MODE_INTERCEPT') {
-      import('react-hot-toast').then(({ default: toast }) => {
-        toast.success('Thao tác thành công (Chế độ Demo - Dữ liệu không lưu)', {
-          icon: '🎮',
-          duration: 3000,
-        });
+      toast.success('Thao tác thành công (Chế độ Demo - Dữ liệu không lưu)', {
+        icon: '🎮',
+        duration: 3000,
       });
       // Mock a successful response
       return Promise.resolve({

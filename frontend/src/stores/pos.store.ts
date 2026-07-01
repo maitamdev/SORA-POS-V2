@@ -308,72 +308,48 @@ export const usePOSStore = create<POSState>()((set, get) => ({
 }));
 
 /* ------------------------------------------------------------------ */
+/*  Shared computation helper (eliminates duplicate calculations)       */
+/* ------------------------------------------------------------------ */
+
+function computePOS(s: POSState) {
+  const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
+  const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
+  const safeValue =
+    s.discountType === 'percent'
+      ? Math.min(s.discountValue, maxPercent)
+      : s.discountValue;
+  const discount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
+  const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
+  const finalAmount = Math.max(total - discount - pointsDiscount, 0);
+  return { total, discount, pointsDiscount, finalAmount };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Derived Selectors (hook-based for re-render isolation)             */
 /* ------------------------------------------------------------------ */
 
 export const usePOSTotal = () =>
-  usePOSStore((s) =>
-    s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0)
-  );
+  usePOSStore((s) => computePOS(s).total);
 
 export const usePOSDiscountAmount = () =>
-  usePOSStore((s) => {
-    const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
-    const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
-    const safeValue =
-      s.discountType === 'percent'
-        ? Math.min(s.discountValue, maxPercent)
-        : s.discountValue;
-    if (s.discountType === 'percent') {
-      return Math.floor((total * safeValue) / 100);
-    }
-    return safeValue;
-  });
+  usePOSStore((s) => computePOS(s).discount);
 
 export const usePOSPointsDiscount = () =>
-  usePOSStore((s) => (s.isRedeemingPoints ? s.usedPoints * 1000 : 0));
+  usePOSStore((s) => computePOS(s).pointsDiscount);
 
 export const usePOSFinalAmount = () =>
-  usePOSStore((s) => {
-    const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
-    const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
-    const safeValue =
-      s.discountType === 'percent'
-        ? Math.min(s.discountValue, maxPercent)
-        : s.discountValue;
-    const discount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
-    const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
-    return Math.max(total - discount - pointsDiscount, 0);
-  });
+  usePOSStore((s) => computePOS(s).finalAmount);
 
 export const usePOSChangeAmount = () =>
   usePOSStore((s) => {
     if (s.paymentMethod !== 'cash') return 0;
-    const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
-    const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
-    const safeValue =
-      s.discountType === 'percent'
-        ? Math.min(s.discountValue, maxPercent)
-        : s.discountValue;
-    const discount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
-    const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
-    const finalAmount = Math.max(total - discount - pointsDiscount, 0);
-    return Math.max(s.receivedAmount - finalAmount, 0);
+    return Math.max(s.receivedAmount - computePOS(s).finalAmount, 0);
   });
 
 export const usePOSCashSuggestions = () =>
   usePOSStore(
     useShallow((s) => {
-      const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
-      const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
-      const safeValue =
-        s.discountType === 'percent'
-          ? Math.min(s.discountValue, maxPercent)
-          : s.discountValue;
-      const discount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
-      const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
-      const finalAmount = Math.max(total - discount - pointsDiscount, 0);
-
+      const { finalAmount } = computePOS(s);
       const rounded10k = Math.ceil(finalAmount / 10000) * 10000;
       const rounded50k = Math.ceil(finalAmount / 50000) * 50000;
       const rounded100k = Math.ceil(finalAmount / 100000) * 100000;
@@ -399,3 +375,4 @@ export const usePOSSortedProducts = () =>
       return items;
     })
   );
+

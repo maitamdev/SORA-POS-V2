@@ -36,7 +36,7 @@ export const rateLimitMiddleware = ({ windowMs, max, keyPrefix }: RateLimitOptio
     if (current.count > max) {
       const retryAfter = Math.ceil((current.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfter));
-      errorResponse(res, 'Qua nhieu yeu cau, vui long thu lai sau', 429);
+      errorResponse(res, 'Quá nhiều yêu cầu, vui lòng thử lại sau', 429);
       return;
     }
 

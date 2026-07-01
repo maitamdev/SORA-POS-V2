@@ -39,7 +39,7 @@ const mapRpcError = (message?: string) => {
     text.includes('Could not find the function') ||
     text.includes('function public.')
   ) {
-    return 'Chua chay migration database/enterprise_pos_core.sql tren Supabase';
+    return 'Chưa chạy migration database/enterprise_pos_core.sql trên Supabase';
   }
 
   return text;
@@ -86,7 +86,7 @@ export class OrderService {
 
     if (error || !order) {
       if (error) console.error('[OrderService.getById] Supabase Error:', error);
-      throw new AppError(404, 'Khong tim thay hoa don');
+      throw new AppError(404, 'Không tìm thấy hóa đơn');
     }
     return order;
   }
@@ -152,14 +152,14 @@ export class OrderService {
   static async deleteAll() {
     throw new AppError(
       403,
-      'He thong POS doanh nghiep khong cho xoa toan bo hoa don. Hay huy hoa don de giu audit trail.'
+      'Hệ thống POS doanh nghiệp không cho xóa toàn bộ hóa đơn. Hãy hủy hóa đơn để giữ audit trail.'
     );
   }
 
   static async delete(_id: string) {
     throw new AppError(
       403,
-      'He thong POS doanh nghiep khong cho xoa cung hoa don. Hay dung chuc nang huy/hoan tien.'
+      'Hệ thống POS doanh nghiệp không cho xóa cứng hóa đơn. Hãy dùng chức năng hủy/hoàn tiền.'
     );
   }
 }
