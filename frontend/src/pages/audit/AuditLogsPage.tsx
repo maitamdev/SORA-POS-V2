@@ -4,8 +4,8 @@ import { HiOutlineClipboardList, HiOutlineRefresh } from 'react-icons/hi';
 import { auditAPI, AuditLog } from '../../services/audit.api';
 
 const actionLabel: Record<string, string> = {
-  'order.create': 'Tao hoa don',
-  'order.cancel': 'Huy hoa don',
+  'order.create': 'Tạo hóa đơn',
+  'order.cancel': 'Hủy hóa đơn',
 };
 
 const formatDate = (value: string) => new Date(value).toLocaleString('vi-VN');
@@ -39,7 +39,7 @@ const AuditLogsPage = () => {
       setItems(response.data.data.items);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Khong tai duoc audit log');
+      toast.error(err.response?.data?.message || 'Không tải được audit log');
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ const AuditLogsPage = () => {
             <HiOutlineClipboardList className="h-6 w-6 text-blue-600" />
             Audit log
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500">Nhat ky thao tac quan trong tren hoa don va kho.</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500">Nhật ký thao tác quan trọng trên hóa đơn và kho.</p>
         </div>
         <button
           onClick={loadData}
@@ -78,12 +78,12 @@ const AuditLogsPage = () => {
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500"
           >
             <option value="all">Tat ca</option>
-            <option value="order.create">Tao hoa don</option>
-            <option value="order.cancel">Huy hoa don</option>
+            <option value="order.create">Tạo hóa đơn</option>
+            <option value="order.cancel">Hủy hóa đơn</option>
           </select>
         </label>
         <label className="space-y-1.5">
-          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Tu ngay</span>
+          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Từ ngày</span>
           <input
             type="date"
             value={dateFrom}
@@ -92,7 +92,7 @@ const AuditLogsPage = () => {
           />
         </label>
         <label className="space-y-1.5">
-          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Den ngay</span>
+          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Đến ngày</span>
           <input
             type="date"
             value={dateTo}
@@ -127,11 +127,11 @@ const AuditLogsPage = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center font-semibold text-slate-400">Dang tai...</td>
+                  <td colSpan={5} className="px-4 py-8 text-center font-semibold text-slate-400">Đang tải...</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center font-semibold text-slate-400">Chua co audit log</td>
+                  <td colSpan={5} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có audit log</td>
                 </tr>
               ) : (
                 items.map((item) => (

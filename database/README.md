@@ -1,6 +1,6 @@
 # Database - Sora POS
 
-Thu muc nay chua cac file SQL de thiet lap co so du lieu PostgreSQL/Supabase cho Sora POS.
+Thư mục này chứa các file SQL để thiết lập cơ sở dữ liệu PostgreSQL/Supabase cho Sora POS.
 
 ## Thu Tu Chay Migration
 
@@ -8,22 +8,22 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 
 | Thu tu | File | Mo ta |
 |---|---|---|
-| 1 | `schema.sql` | Tao bang, indexes va triggers co ban |
-| 2 | `app_settings.sql` | Tao cau hinh van hanh cua cua hang |
-| 3 | `order_details_cost_snapshot.sql` | Bo sung gia von tai thoi diem ban de bao cao loi nhuan qua khu chinh xac |
-| 4 | `ai_revenue_analyses.sql` | Tao bang luu lich su phan tich doanh thu AI |
-| 5 | `hardening.sql` | Them rang buoc du lieu va bat Row Level Security |
-| 6 | `enterprise_pos_core.sql` | Tao RPC transaction cho checkout, huy don, nhap kho va audit log |
-| 7 | `stock_atomic_rpc.sql` | Tao RPC thao tac kho atomic |
-| 8 | `expiry_setup.sql` | Tao bang/chuc nang quan ly lo hang va han su dung neu can |
+| 1 | `schema.sql` | Tạo bảng, indexes và triggers cơ bản |
+| 2 | `app_settings.sql` | Tạo cấu hình vận hành của cửa hàng |
+| 3 | `order_details_cost_snapshot.sql` | Bổ sung giá vốn tại thời điểm bán để báo cáo lợi nhuận quá khứ chính xác |
+| 4 | `ai_revenue_analyses.sql` | Tạo bảng lưu lịch sử phân tích doanh thu AI |
+| 5 | `hardening.sql` | Thêm ràng buộc dữ liệu và bật Row Level Security |
+| 6 | `enterprise_pos_core.sql` | Tạo RPC transaction cho checkout, hủy đơn, nhập kho và audit log |
+| 7 | `stock_atomic_rpc.sql` | Tạo RPC thao tác kho atomic |
+| 8 | `expiry_setup.sql` | Tạo bảng/chức năng quản lý lô hàng và hạn sử dụng nếu cần |
 | 9 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
 
 ## Luu Y
 
-- Khong chay `seed.sql` tren database dang co du lieu that vi file nay co the xoa/ghi de du lieu mau.
+- Không chạy `seed.sql` trên database đang có dữ liệu thật vì file này có thể xóa/ghi đè dữ liệu mẫu.
 - Backend dung `SUPABASE_SERVICE_ROLE_KEY` de thuc hien CRUD qua Express API.
-- Frontend chi nen dung Supabase anon key cho Realtime/subscription, khong CRUD truc tiep.
-- Sau khi them migration moi, cap nhat ca `schema.sql` va file migration rieng de ho tro database moi lan database dang ton tai.
+- Frontend chỉ nên dùng Supabase anon key cho Realtime/subscription, không CRUD trực tiếp.
+- Sau khi thêm migration mới, cập nhật cả `schema.sql` và file migration riêng để hỗ trợ database mới lẫn database đang tồn tại.
 
 ## Tai Khoan Demo
 
@@ -31,4 +31,4 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 |---|---|---|
 | `admin@sorapos.com` | `password123` | Admin |
 
-Mat khau demo chi dung cho moi truong thuyet trinh/kiem thu. Khi dua len production can doi ngay tai khoan mac dinh.
+Mật khẩu demo chỉ dùng cho môi trường thuyết trình/kiểm thử. Khi đưa lên production cần đổi ngay tài khoản mặc định.

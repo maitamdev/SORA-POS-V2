@@ -57,6 +57,19 @@ const formatDateTime = (value?: string) => {
   });
 };
 
+const escapeHtml = (value: unknown) => {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+const pdfMoney = (value: number) => `${Math.round(value || 0).toLocaleString('vi-VN')} VND`;
+
+const pdfPercent = (value: number) => `${Number.isFinite(value) ? value.toFixed(1) : '0.0'}%`;
+
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
 
 const CustomTooltip = ({ active, payload }: any) => {
@@ -154,7 +167,7 @@ const ReportsPage = () => {
       const res = await reportAPI.aiAnalysisHistory({ page: 1, limit: 8 });
       setAiHistory(res.data.data.items);
     } catch {
-      toast.error('Khong tai duoc lich su phan tich AI');
+      toast.error('Không tải được lịch sử phân tích AI');
     } finally {
       setHistoryLoading(false);
     }
@@ -167,26 +180,26 @@ const ReportsPage = () => {
       const report = res.data.data;
       setAiAnalysisData(report.analysis);
       setActiveAiReport(report);
-      toast.success('Da mo lai ban phan tich da luu');
+      toast.success('Đã mở lại bản phân tích đã lưu');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Khong mo duoc ban phan tich da luu');
+      toast.error(err.response?.data?.message || 'Không mở được bản phân tích đã lưu');
     } finally {
       setSelectedHistoryId(null);
     }
   }, []);
 
   const handleDeleteSavedAnalysis = useCallback(async (id: string) => {
-    if (!window.confirm('Xoa ban phan tich doanh thu da luu nay?')) return;
+    if (!window.confirm('Xóa bản phân tích doanh thu đã lưu này?')) return;
     try {
       await reportAPI.deleteAiAnalysis(id);
       setAiHistory((items) => items.filter((item) => item.id !== id));
       if (activeAiReport?.id === id) {
-        setActiveAiReport(null);
-        setAiAnalysisData(null);
-      }
-      toast.success('Da xoa ban phan tich da luu');
+      setActiveAiReport(null);
+      setAiAnalysisData(null);
+    }
+      toast.success('Đã xóa bản phân tích đã lưu');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Khong xoa duoc ban phan tich');
+      toast.error(err.response?.data?.message || 'Không xóa được bản phân tích');
     }
   }, [activeAiReport?.id]);
 
@@ -287,6 +300,191 @@ const ReportsPage = () => {
     XLSX.writeFile(workbook, `Bao_cao_SoraPOS_${days}_ngay.xlsx`);
     toast.success('Xuất file Excel thành công!');
   };
+
+  const handleExportAiPdf = useCallback(() => {
+    if (!aiAnalysisData) {
+      toast.error('Chưa có báo cáo AI để xuất PDF');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=1120,height=820');
+    if (!printWindow) {
+      toast.error('Trình duyệt đang chặn popup. Hãy cho phép popup để xuất PDF.');
+      return;
+    }
+
+    const reportDays = activeAiReport?.days ?? days;
+    const generatedAt = activeAiReport?.generated_at ? formatDateTime(activeAiReport.generated_at) : formatDateTime(new Date().toISOString());
+    const periodText = activeAiReport?.period_start && activeAiReport?.period_end
+      ? `${formatDateLabel(activeAiReport.period_start)} - ${formatDateLabel(activeAiReport.period_end)}`
+      : `${reportDays} ngày gần đây`;
+    const reportId = activeAiReport?.id ? `#${activeAiReport.id.slice(0, 8).toUpperCase()}` : 'Bản tạm thời';
+    const healthScore = typeof aiAnalysisData.health_score === 'number' ? aiAnalysisData.health_score : 0;
+    const scoreLabel = healthScore >= 70 ? 'Tốt' : healthScore >= 40 ? 'Cần cải thiện' : 'Cần cảnh báo';
+    const scoreColor = healthScore >= 70 ? '#059669' : healthScore >= 40 ? '#d97706' : '#dc2626';
+
+    const metricCards = [
+      { label: 'Doanh thu', value: pdfMoney(totalRevenue), note: 'Tổng doanh thu trong kỳ' },
+      { label: 'Số đơn hàng', value: totalOrders.toLocaleString('vi-VN'), note: 'Tổng đơn hàng đã ghi nhận' },
+      { label: 'Giá vốn COGS', value: pdfMoney(totalCogs), note: 'Chi phí vốn hàng bán' },
+      { label: 'Lợi nhuận gộp', value: pdfMoney(totalProfit), note: 'Doanh thu trừ giá vốn' },
+      { label: 'Tỷ suất LN', value: pdfPercent(profitMargin), note: 'Biên lợi nhuận gộp' },
+      { label: 'AOV', value: pdfMoney(averageOrderVal), note: 'Giá trị trung bình mỗi đơn' },
+    ];
+
+    const renderList = (items: string[] = [], type: 'insight' | 'recommendation') => {
+      if (items.length === 0) return '<div class="empty">Chưa có dữ liệu.</div>';
+      return items.map((item, index) => `
+        <div class="list-row ${type}">
+          <div class="list-index">${index + 1}</div>
+          <div>${escapeHtml(item)}</div>
+        </div>
+      `).join('');
+    };
+
+    const renderCharts = () => {
+      if (!aiAnalysisData.charts?.length) return '<div class="empty">Báo cáo AI chưa có bảng dữ liệu biểu đồ.</div>';
+      return aiAnalysisData.charts.map((chart) => `
+        <section class="chart-box">
+          <div class="chart-head">
+            <h3>${escapeHtml(chart.title)}</h3>
+            <span>${escapeHtml(chart.type.toUpperCase())}</span>
+          </div>
+          <table>
+            <thead><tr><th>Hạng mục</th><th>Giá trị</th></tr></thead>
+            <tbody>
+              ${chart.data.map((point) => `
+                <tr>
+                  <td>${escapeHtml(point.name)}</td>
+                  <td>${pdfMoney(Number(point.value || 0))}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </section>
+      `).join('');
+    };
+
+    const reportHtml = `
+      <!doctype html>
+      <html lang="vi">
+        <head>
+          <meta charset="utf-8" />
+          <title>Báo cáo AI doanh thu Sora POS</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body { margin: 0; background: #f8fafc; color: #0f172a; font-family: Inter, Arial, sans-serif; font-size: 12px; line-height: 1.55; }
+            .page { width: 210mm; min-height: 297mm; margin: 0 auto; background: #ffffff; padding: 26px; }
+            .hero { border-radius: 14px; background: #0f172a; color: #ffffff; padding: 26px; margin-bottom: 22px; border-bottom: 4px solid #2563eb; }
+            .brand { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+            .eyebrow { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
+            h1 { margin: 0; font-size: 25px; line-height: 1.18; letter-spacing: 0; }
+            .meta { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+            .meta div { border: 1px solid rgba(255,255,255,.25); border-radius: 12px; padding: 10px; background: rgba(255,255,255,.1); }
+            .meta span, .metric span { display: block; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #64748b; letter-spacing: .08em; }
+            .meta strong { display: block; margin-top: 3px; color: #ffffff; font-size: 12px; }
+            .score { min-width: 120px; border-radius: 16px; background: rgba(255,255,255,.95); color: #0f172a; padding: 14px; text-align: center; }
+            .score-number { color: ${scoreColor}; font-size: 34px; font-weight: 900; line-height: 1; }
+            .score-label { margin-top: 6px; font-size: 10px; font-weight: 900; text-transform: uppercase; color: #475569; }
+            .section { margin-top: 18px; break-inside: avoid; }
+            .section-title { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: #0f172a; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+            .section-title::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: #2563eb; }
+            .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .metric { border: 1px solid #e2e8f0; border-radius: 14px; padding: 13px; background: #f8fafc; }
+            .metric strong { display: block; margin: 5px 0 3px; font-size: 18px; color: #0f172a; }
+            .metric small { color: #64748b; font-weight: 700; }
+            .summary { border: 1px solid #dbeafe; border-radius: 14px; background: #eff6ff; padding: 15px; color: #1e293b; font-weight: 650; }
+            .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+            .list-row { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; border: 1px solid #e2e8f0; border-radius: 12px; padding: 11px; margin-bottom: 8px; background: #ffffff; break-inside: avoid; }
+            .list-row.insight { border-color: #dbeafe; background: #f8fafc; }
+            .list-row.recommendation { border-color: #d1fae5; background: #f8fafc; }
+            .list-index { width: 24px; height: 24px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: #0f172a; color: #ffffff; font-size: 10px; font-weight: 900; }
+            .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .chart-box { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; break-inside: avoid; }
+            .chart-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+            .chart-head h3 { margin: 0; font-size: 12px; color: #0f172a; }
+            .chart-head span { height: 22px; border-radius: 999px; background: #f1f5f9; color: #334155; padding: 4px 8px; font-size: 9px; font-weight: 900; }
+            table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 10px; }
+            th, td { padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+            th { background: #f1f5f9; color: #475569; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+            td:last-child, th:last-child { text-align: right; font-weight: 800; }
+            .empty { border: 1px dashed #cbd5e1; border-radius: 12px; padding: 14px; color: #64748b; font-weight: 700; text-align: center; }
+            .footer { margin-top: 22px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 10px; font-weight: 700; }
+            @media print { body { background: #ffffff; } .page { width: auto; min-height: auto; padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <main class="page">
+            <section class="hero">
+              <div class="brand">
+                <div>
+                  <p class="eyebrow">SORA POS / AI Revenue Intelligence</p>
+                  <h1>Báo cáo phân tích doanh thu AI</h1>
+                </div>
+                <div class="score">
+                  <div class="score-number">${escapeHtml(healthScore)}</div>
+                  <div class="score-label">${escapeHtml(scoreLabel)}</div>
+                </div>
+              </div>
+              <div class="meta">
+                <div><span>Mã báo cáo</span><strong>${escapeHtml(reportId)}</strong></div>
+                <div><span>Kỳ báo cáo</span><strong>${escapeHtml(`${reportDays} ngày`)}</strong></div>
+                <div><span>Khoảng ngày</span><strong>${escapeHtml(periodText)}</strong></div>
+                <div><span>Thời điểm tạo</span><strong>${escapeHtml(generatedAt)}</strong></div>
+              </div>
+            </section>
+
+            <section class="section">
+              <h2 class="section-title">Chỉ số tổng quan</h2>
+              <div class="metrics">
+                ${metricCards.map((metric) => `
+                  <div class="metric">
+                    <span>${escapeHtml(metric.label)}</span>
+                    <strong>${escapeHtml(metric.value)}</strong>
+                    <small>${escapeHtml(metric.note)}</small>
+                  </div>
+                `).join('')}
+              </div>
+            </section>
+
+            <section class="section">
+              <h2 class="section-title">Tóm tắt điều hành</h2>
+              <div class="summary">${escapeHtml(aiAnalysisData.summary)}</div>
+            </section>
+
+            <section class="section two-col">
+              <div>
+                <h2 class="section-title">Phân tích chuyên sâu</h2>
+                ${renderList(aiAnalysisData.insights, 'insight')}
+              </div>
+              <div>
+                <h2 class="section-title">Đề xuất hành động</h2>
+                ${renderList(aiAnalysisData.recommendations, 'recommendation')}
+              </div>
+            </section>
+
+            <section class="section">
+              <h2 class="section-title">Bảng dữ liệu biểu đồ AI</h2>
+              <div class="chart-grid">${renderCharts()}</div>
+            </section>
+
+            <div class="footer">
+              Báo cáo được tạo từ dữ liệu doanh thu, giá vốn, lợi nhuận và kết quả phân tích AI đã lưu trong CSDL Sora POS.
+              Khi nộp file, chọn Print / Save as PDF để lưu thành tệp PDF.
+            </div>
+          </main>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 450);
+    toast.success('Đã mở bản in PDF báo cáo AI');
+  }, [activeAiReport, aiAnalysisData, averageOrderVal, days, profitMargin, totalCogs, totalOrders, totalProfit, totalRevenue]);
 
   // Format Y Axis label
   const formatYAxis = (val: number) => {
@@ -420,6 +618,15 @@ const ReportsPage = () => {
             </p>
           </div>
           <button
+            type="button"
+            onClick={handleExportAiPdf}
+            disabled={!aiAnalysisData || aiLoading}
+            className="flex items-center justify-center gap-2 h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            <HiOutlineDownload className="w-4 h-4" />
+            <span>Xuất PDF</span>
+          </button>
+          <button
             onClick={handleAiAnalysis}
             disabled={aiLoading || loading || revenue.length === 0}
             className="flex items-center justify-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
@@ -433,15 +640,15 @@ const ReportsPage = () => {
             <div>
               <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-blue-800">
                 <HiClock className="h-4 w-4" />
-                Ban phan tich da luu trong CSDL
+                Bản phân tích đã lưu trong CSDL
               </h3>
               {activeAiReport ? (
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                  Dang xem ban #{activeAiReport.id.slice(0, 8)} - Ky {activeAiReport.days} ngay - Tao luc {formatDateTime(activeAiReport.generated_at)}
+                  Đang xem bản #{activeAiReport.id.slice(0, 8)} - Kỳ {activeAiReport.days} ngày - Tạo lúc {formatDateTime(activeAiReport.generated_at)}
                 </p>
               ) : (
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                  Moi lan phan tich AI thanh cong se duoc luu thanh mot ban ghi rieng.
+                  Mỗi lần phân tích AI thành công sẽ được lưu thành một bản ghi riêng.
                 </p>
               )}
             </div>
@@ -451,18 +658,18 @@ const ReportsPage = () => {
               disabled={historyLoading}
               className="h-8 rounded-lg border border-blue-200 bg-white px-3 text-[11px] font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
             >
-              {historyLoading ? 'Dang tai...' : 'Lam moi lich su'}
+              {historyLoading ? 'Đang tải...' : 'Làm mới lịch sử'}
             </button>
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
             {historyLoading && aiHistory.length === 0 ? (
               <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
-                Dang tai lich su phan tich...
+                Đang tải lịch sử phân tích...
               </div>
             ) : aiHistory.length === 0 ? (
               <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
-                Chua co ban phan tich nao duoc luu.
+                Chưa có bản phân tích nào được lưu.
               </div>
             ) : (
               aiHistory.map((item) => (
@@ -471,15 +678,15 @@ const ReportsPage = () => {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">
-                          {item.health_score ?? '--'} diem
+                          {item.health_score ?? '--'} điểm
                         </span>
-                        <span className="text-[11px] font-black text-slate-800">Ky {item.days} ngay</span>
+                        <span className="text-[11px] font-black text-slate-800">Kỳ {item.days} ngày</span>
                         <span className="text-[10px] font-semibold text-slate-400">
                           {formatDateLabel(item.period_start)} - {formatDateLabel(item.period_end)}
                         </span>
                       </div>
                       <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                        {money(item.total_revenue)} - {item.total_orders} don - LN {money(item.total_profit)}
+                        {money(item.total_revenue)} - {item.total_orders} đơn - LN {money(item.total_profit)}
                       </p>
                       <p className="mt-0.5 text-[10px] font-medium text-slate-400">
                         {formatDateTime(item.generated_at)}{item.generated_by_user?.full_name ? ` - ${item.generated_by_user.full_name}` : ''}
@@ -490,7 +697,7 @@ const ReportsPage = () => {
                         type="button"
                         onClick={() => handleOpenSavedAnalysis(item.id)}
                         disabled={selectedHistoryId === item.id}
-                        title="Mo ban phan tich"
+                        title="Mở bản phân tích"
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50"
                       >
                         <HiOutlineEye className="h-4 w-4" />
@@ -498,7 +705,7 @@ const ReportsPage = () => {
                       <button
                         type="button"
                         onClick={() => handleDeleteSavedAnalysis(item.id)}
-                        title="Xoa ban phan tich"
+                        title="Xóa bản phân tích"
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-600"
                       >
                         <HiOutlineTrash className="h-4 w-4" />

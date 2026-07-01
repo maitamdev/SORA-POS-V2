@@ -33,14 +33,14 @@ export class ReportController {
   });
 
   static aiAnalysisHistory = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await ReportService.aiAnalysisHistory(req.query), 'Lay lich su phan tich doanh thu AI thanh cong');
+    successResponse(res, await ReportService.aiAnalysisHistory(req.query), 'Lấy lịch sử phân tích doanh thu AI thành công');
   });
 
   static aiAnalysisDetail = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await ReportService.aiAnalysisDetail(req.params.id), 'Lay chi tiet phan tich doanh thu AI thanh cong');
+    successResponse(res, await ReportService.aiAnalysisDetail(req.params.id), 'Lấy chi tiết phân tích doanh thu AI thành công');
   });
 
   static deleteAiAnalysis = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await ReportService.deleteAiAnalysis(req.params.id), 'Xoa ban phan tich doanh thu AI thanh cong');
+    successResponse(res, await ReportService.deleteAiAnalysis(req.params.id), 'Xóa bản phân tích doanh thu AI thành công');
   });
 }

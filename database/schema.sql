@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS ai_recommendations (
 );
 
 -- ============================================
--- 17. AI REVENUE ANALYSES (Luu lich su phan tich doanh thu AI)
+-- 17. AI REVENUE ANALYSES (Lưu lịch sử phân tích doanh thu AI)
 -- ============================================
 CREATE TABLE IF NOT EXISTS ai_revenue_analyses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS ai_revenue_analyses (
 );
 
 -- ============================================
--- 18. AUDIT LOGS (Nhat ky kiem toan)
+-- 18. AUDIT LOGS (Nhật ký kiểm toán)
 -- ============================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

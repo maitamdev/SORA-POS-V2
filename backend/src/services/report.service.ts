@@ -834,7 +834,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
 
     if (saveError) {
       if (saveError.message.includes('ai_revenue_analyses')) {
-        throw new AppError(500, 'Chua chay migration bang ai_revenue_analyses trong database/schema.sql');
+        throw new AppError(500, 'Chưa chạy migration bảng ai_revenue_analyses trong database/schema.sql');
       }
       throw new AppError(500, saveError.message);
     }
@@ -862,7 +862,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
     const { data, error, count } = await query;
     if (error) {
       if (error.message.includes('ai_revenue_analyses')) {
-        throw new AppError(500, 'Chua chay migration bang ai_revenue_analyses trong database/schema.sql');
+        throw new AppError(500, 'Chưa chạy migration bảng ai_revenue_analyses trong database/schema.sql');
       }
       throw new AppError(500, error.message);
     }
@@ -894,7 +894,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       .single();
 
     if (error) {
-      if (error.code === 'PGRST116') throw new AppError(404, 'Khong tim thay ban phan tich doanh thu');
+      if (error.code === 'PGRST116') throw new AppError(404, 'Không tìm thấy bản phân tích doanh thu');
       throw new AppError(500, error.message);
     }
 

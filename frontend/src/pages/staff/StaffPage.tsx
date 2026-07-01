@@ -144,7 +144,7 @@ const StaffPage = () => {
 
   const startEdit = (item: StaffUser) => {
     if (!canManageStaff) {
-      toast.error('Chi admin moi co quyen cap nhat nhan vien');
+      toast.error('Chỉ admin mới có quyền cập nhật nhân viên');
       return;
     }
     setEditing(item);
@@ -161,7 +161,7 @@ const StaffPage = () => {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canManageStaff) {
-      toast.error('Chi admin moi co quyen luu tai khoan nhan vien');
+      toast.error('Chỉ admin mới có quyền lưu tài khoản nhân viên');
       return;
     }
 
@@ -208,7 +208,7 @@ const StaffPage = () => {
 
   const deactivate = async (item: StaffUser) => {
     if (!canManageStaff) {
-      toast.error('Chi admin moi co quyen khoa tai khoan nhan vien');
+      toast.error('Chỉ admin mới có quyền khóa tài khoản nhân viên');
       return;
     }
     if (!window.confirm(`Vô hiệu hóa tài khoản ${item.full_name}? Nhân viên này sẽ không đăng nhập được nữa.`)) return;

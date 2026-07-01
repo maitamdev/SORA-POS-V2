@@ -144,7 +144,7 @@ export class StaffService {
     if (payload.role) updates.role_id = await this.getRoleId(payload.role);
 
     if (Object.keys(updates).length === 0) {
-      throw new AppError(400, 'Khong co du lieu de cap nhat');
+      throw new AppError(400, 'Không có dữ liệu để cập nhật');
     }
 
     const { data: updated, error } = await supabase
