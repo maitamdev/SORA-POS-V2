@@ -205,17 +205,24 @@ BEGIN
   -- Extract shift_code from payload
   v_shift_code := upper(NULLIF(trim(p_payload->>'shift_code'), ''));
 
-  -- Determine Shift ID
+  -- Determine Shift ID. A provided shift code must point to an active checked-in
+  -- shift; cashiers may only bind orders to their own shift.
   IF v_shift_code IS NOT NULL THEN
-    -- Try to match by shift_code
     SELECT id
     INTO v_shift_id
     FROM public.shift_sessions
     WHERE shift_code = v_shift_code
+      AND status = 'checked_in'
+      AND (v_role <> 'cashier' OR employee_id = p_user_id)
+    ORDER BY created_at DESC
     LIMIT 1;
+
+    IF v_shift_id IS NULL THEN
+      RAISE EXCEPTION 'Invalid or inactive shift code';
+    END IF;
   END IF;
 
-  -- Fallback if shift_code is missing or not found on server
+  -- Fallback if shift_code is missing on server
   IF v_shift_id IS NULL AND v_role = 'cashier' THEN
     SELECT id
     INTO v_shift_id

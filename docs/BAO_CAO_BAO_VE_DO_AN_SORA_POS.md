@@ -463,7 +463,7 @@ Han che hien tai:
 - Offline order van co the sync fail neu ton kho server khong du.
 - Chua co role permission granular theo tung action.
 - Chua co test E2E frontend.
-- Bundle frontend con lon do chart/xlsx.
+- Bundle frontend can tiep tuc toi uu do cac thu vien chart va xuat/quet ma QR.
 
 Huong phat trien:
 
@@ -474,4 +474,3 @@ Huong phat trien:
 - Them dashboard realtime nang cao.
 - Them FIFO/weighted average cost cho gia von.
 - Them module barcode label/in tem san pham.
-

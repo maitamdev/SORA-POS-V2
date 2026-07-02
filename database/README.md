@@ -12,11 +12,12 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 | 2 | `app_settings.sql` | Tạo cấu hình vận hành của cửa hàng |
 | 3 | `order_details_cost_snapshot.sql` | Bổ sung giá vốn tại thời điểm bán để báo cáo lợi nhuận quá khứ chính xác |
 | 4 | `ai_revenue_analyses.sql` | Tạo bảng lưu lịch sử phân tích doanh thu AI |
-| 5 | `hardening.sql` | Thêm ràng buộc dữ liệu và bật Row Level Security |
-| 6 | `enterprise_pos_core.sql` | Tạo RPC transaction cho checkout, hủy đơn, nhập kho và audit log |
-| 7 | `stock_atomic_rpc.sql` | Tạo RPC thao tác kho atomic |
-| 8 | `expiry_setup.sql` | Tạo bảng/chức năng quản lý lô hàng và hạn sử dụng nếu cần |
-| 9 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
+| 5 | `payment_intents.sql` | Tạo bảng lưu trạng thái thanh toán ngoài hệ thống như PayOS |
+| 6 | `hardening.sql` | Thêm ràng buộc dữ liệu và bật Row Level Security |
+| 7 | `enterprise_pos_core.sql` | Tạo RPC transaction cho checkout, hủy đơn, nhập kho và audit log |
+| 8 | `stock_atomic_rpc.sql` | Tạo RPC thao tác kho atomic |
+| 9 | `expiry_setup.sql` | Tạo bảng/chức năng quản lý lô hàng và hạn sử dụng nếu cần |
+| 10 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
 
 ## Luu Y
 

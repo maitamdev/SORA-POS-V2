@@ -15,11 +15,16 @@
     "build": "npm run build --workspace=frontend && npx shx rm -rf dist && npx shx mv frontend/dist dist",
     "build:backend": "npm run build --workspace=backend",
     "build:frontend": "npm run build --workspace=frontend",
+    "typecheck:scanner": "npm run typecheck --workspace=sora-scanner",
     "test": "npm run test --workspace=backend",
-    "ci": "npm run test --workspace=backend && npm run build --workspace=backend && npm run build --workspace=frontend"
+    "ci": "npm run test --workspace=backend && npm run build --workspace=backend && npm run build --workspace=frontend && npm run typecheck:scanner"
   },
   "devDependencies": {
     "concurrently": "^10.0.3",
-    "shx": "^0.4.0"
+    "shx": "^0.4.0",
+    "uuid": "11.1.1"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

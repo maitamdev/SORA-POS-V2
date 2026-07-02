@@ -226,7 +226,7 @@ Khi bao ve:
 | `StaffPage.tsx` | Quan ly nhan vien | `staff.api` |
 | `SettingsPage.tsx` | Cau hinh he thong | `settings.api` |
 | `AuditLogsPage.tsx` | Xem audit log | `audit.api` |
-| `ScannerPage.tsx` | Trang scanner web/mobile pairing | Supabase realtime |
+| `sora-scanner/` | Ung dung mobile scanner rieng, ghep doi bang QR | Expo + Supabase realtime |
 | `NotFoundPage.tsx` | Trang 404 | React Router |
 
 ---
@@ -371,4 +371,3 @@ Tra loi:
 Tra loi:
 
 > AI nam o `backend/src/services/ai.service.ts` cho goi y nhap hang/san pham, va `backend/src/services/report.service.ts` cho phan tich doanh thu. Ket qua phan tich doanh thu AI duoc luu vao bang `ai_revenue_analyses`.
-

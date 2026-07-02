@@ -25,7 +25,6 @@ const AuditLogsPage = lazy(() => import('./pages/audit/AuditLogsPage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 const StaffPage = lazy(() => import('./pages/staff/StaffPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
-const ScannerPage = lazy(() => import('./pages/ScannerPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -82,7 +81,6 @@ function App() {
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-          <Route path="/scanner" element={<ScannerPage />} />
           <Route
             element={
               <ProtectedRoute>

@@ -24,13 +24,23 @@ router.post('/create', authMiddleware, roleMiddleware('admin', 'manager', 'cashi
       return res.status(400).json({ success: false, message: 'Số tiền không hợp lệ' });
     }
 
-    // Tạo orderCode unique dựa trên timestamp
-    const orderCode = Number(String(Date.now()).slice(-8));
+    const orderCode = PayOSService.generateOrderCode();
+    const safeDescription = description || 'SORA POS';
 
     const result = await PayOSService.createPaymentLink({
       orderCode,
       amount: Math.round(amount),
-      description: description || 'SORA POS',
+      description: safeDescription,
+    });
+
+    await PayOSService.savePaymentIntent({
+      orderCode,
+      amount,
+      description: safeDescription,
+      paymentLinkId: result.paymentLinkId,
+      checkoutUrl: result.checkoutUrl,
+      qrCode: result.qrCode,
+      createdBy: req.user?.userId || null,
     });
 
     return res.json({
@@ -92,11 +102,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
   try {
     console.log('[PayOS Webhook] Nhận webhook:', JSON.stringify(req.body));
 
-    const webhookData = PayOSService.verifyWebhook(req.body);
+    const webhookData = await PayOSService.verifyWebhook(req.body);
     console.log('[PayOS Webhook] Verified:', JSON.stringify(webhookData));
 
-    // PayOS gửi webhook khi thanh toán thành công
-    // Frontend sẽ polling /status/:orderCode để biết trạng thái
+    await PayOSService.updatePaymentIntentFromWebhook(webhookData);
 
     return res.json({ success: true });
   } catch (error: any) {

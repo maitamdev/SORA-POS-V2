@@ -17,6 +17,7 @@ export const env = {
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  supabaseWebhookSecret: process.env.SUPABASE_WEBHOOK_SECRET || '',
   groqApiKey: process.env.GROQ_API_KEY || '',
   corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:5173')
     .split(',')

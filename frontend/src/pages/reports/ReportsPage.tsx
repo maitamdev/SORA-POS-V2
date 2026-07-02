@@ -33,7 +33,7 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import * as XLSX from 'xlsx';
+import { downloadCsv } from '../../utils/exportCsv';
 
 // Format money to VND (round to integer, no decimals)
 const money = (value: number) => {
@@ -277,8 +277,7 @@ const ReportsPage = () => {
     return totalOrders ? totalRevenue / totalOrders : 0;
   }, [totalRevenue, totalOrders]);
 
-  // Excel exporter
-  const handleExportToExcel = () => {
+  const handleExportToCsv = () => {
     if (revenue.length === 0) {
       toast.error('Không có dữ liệu để xuất');
       return;
@@ -293,12 +292,8 @@ const ReportsPage = () => {
       'Tỉ suất lợi nhuận (%)': item.revenue > 0 ? (((item.profit || 0) / item.revenue) * 100).toFixed(1) : '0'
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Báo cáo doanh thu');
-
-    XLSX.writeFile(workbook, `Bao_cao_SoraPOS_${days}_ngay.xlsx`);
-    toast.success('Xuất file Excel thành công!');
+    downloadCsv(`Bao_cao_SoraPOS_${days}_ngay.csv`, exportData);
+    toast.success('Xuất file CSV thành công!');
   };
 
   const handleExportAiPdf = useCallback(() => {
@@ -527,11 +522,11 @@ const ReportsPage = () => {
 
           {/* Export button */}
           <button
-            onClick={handleExportToExcel}
+            onClick={handleExportToCsv}
             className="flex items-center gap-2 h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/10 transition-all active:scale-[0.98]"
           >
             <HiOutlineDownload className="w-4 h-4" />
-            <span>Xuất Excel</span>
+            <span>Xuất CSV</span>
           </button>
         </div>
       </header>

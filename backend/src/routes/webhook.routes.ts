@@ -11,10 +11,22 @@ const router = Router();
  */
 router.post('/supabase-audit', asyncHandler(async (req: Request, res: Response) => {
   const { record, type, table } = req.body;
-  const webhookToken = req.query.token;
+  const authorization = req.header('Authorization') || '';
+  const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : '';
+  const webhookToken =
+    bearerToken ||
+    req.header('X-Sora-Webhook-Secret') ||
+    req.header('X-Webhook-Secret');
 
-  // Xác thực token bảo mật đơn giản để tránh người lạ gọi API spam Telegram
-  const expectedToken = env.jwtSecret; // Dùng tạm JWT_SECRET làm token bảo mật
+  const expectedToken = env.supabaseWebhookSecret;
+  if (!expectedToken) {
+    res.status(503).json({
+      success: false,
+      message: 'SUPABASE_WEBHOOK_SECRET is not configured',
+    });
+    return;
+  }
+
   if (webhookToken !== expectedToken) {
     console.warn('[Webhook] Unauthorized webhook call attempt.');
     res.status(401).json({ success: false, message: 'Unauthorized' });

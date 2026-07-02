@@ -56,7 +56,7 @@ export default defineConfig({
             if (id.includes('recharts') || id.includes('d3-')) return 'chart-vendor';
             if (id.includes('react-icons') || id.includes('react-hot-toast')) return 'ui-vendor';
             if (id.includes('axios') || id.includes('zustand') || id.includes('dexie') || id.includes('@supabase')) return 'data-vendor';
-            if (id.includes('xlsx') || id.includes('zod') || id.includes('qrcode') || id.includes('html2canvas')) return 'utility-vendor';
+            if (id.includes('zod') || id.includes('qrcode') || id.includes('html2canvas')) return 'utility-vendor';
           }
         },
       },

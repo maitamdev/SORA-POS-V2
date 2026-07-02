@@ -297,7 +297,28 @@ CREATE TABLE IF NOT EXISTS ai_revenue_analyses (
 );
 
 -- ============================================
--- 18. AUDIT LOGS (Nhật ký kiểm toán)
+-- 18. PAYMENT INTENTS (External payment provider state)
+-- ============================================
+CREATE TABLE IF NOT EXISTS payment_intents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_code BIGINT UNIQUE NOT NULL,
+  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  amount DECIMAL(15, 2) NOT NULL CHECK (amount > 0),
+  description TEXT,
+  provider TEXT NOT NULL DEFAULT 'payos',
+  payment_link_id TEXT,
+  checkout_url TEXT,
+  qr_code TEXT,
+  status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+  webhook_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- 19. AUDIT LOGS (Nhật ký kiểm toán)
 -- ============================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -346,6 +367,8 @@ CREATE INDEX IF NOT EXISTS idx_ai_recommendations_product_id ON ai_recommendatio
 CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_generated_at ON ai_revenue_analyses(generated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_period ON ai_revenue_analyses(period_start, period_end);
 CREATE INDEX IF NOT EXISTS idx_ai_revenue_analyses_generated_by ON ai_revenue_analyses(generated_by);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_status ON payment_intents(status);
+CREATE INDEX IF NOT EXISTS idx_payment_intents_created_at ON payment_intents(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_id ON audit_logs(actor_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
@@ -373,3 +396,4 @@ CREATE TRIGGER update_stock_alerts_updated_at BEFORE UPDATE ON stock_alerts FOR 
 CREATE TRIGGER update_ai_recommendations_updated_at BEFORE UPDATE ON ai_recommendations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_ai_revenue_analyses_updated_at BEFORE UPDATE ON ai_revenue_analyses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_goods_receipts_updated_at BEFORE UPDATE ON goods_receipts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_payment_intents_updated_at BEFORE UPDATE ON payment_intents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

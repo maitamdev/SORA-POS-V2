@@ -54,8 +54,13 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
   const autoCheckoutRef = useRef(false);
   const payosCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  const hasBankConfig = Boolean(
+    operationSettings.bankBin &&
+    operationSettings.bankAccountNumber &&
+    operationSettings.bankAccountName
+  );
   const activeBank = getActiveBank(operationSettings.bankBin || '');
-  const bankLogoUrl = getBankLogoUrl(operationSettings.bankBin || '970422');
+  const bankLogoUrl = operationSettings.bankBin ? getBankLogoUrl(operationSettings.bankBin) : '';
 
   useEffect(() => {
     setLogoError(false);
@@ -162,10 +167,10 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
 
   // ─── Fallback: Draw QR VietQR tĩnh khi PayOS không khả dụng ───
   useEffect(() => {
-    if (showTransferPayment && !usePayos && qrCanvasRef.current) {
+    if (showTransferPayment && !usePayos && qrCanvasRef.current && hasBankConfig) {
       const qrString = buildVietQR({
-        bankBin: operationSettings.bankBin || '970416',
-        bankNumber: operationSettings.bankAccountNumber || '257678859',
+        bankBin: operationSettings.bankBin,
+        bankNumber: operationSettings.bankAccountNumber,
         amount: String(finalAmount),
         purpose: transferMemo,
       });
@@ -189,7 +194,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
         );
       });
     }
-  }, [showTransferPayment, usePayos, operationSettings, finalAmount, transferMemo]);
+  }, [showTransferPayment, usePayos, hasBankConfig, operationSettings, finalAmount, transferMemo]);
 
   if (!showTransferPayment) return null;
 
@@ -233,23 +238,30 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                   <div className={`absolute -top-3 ${usePayos ? 'bg-emerald-600' : 'bg-[#e11d48]'} text-white px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-sm border border-white`}>
                     {usePayos ? '✦ PAYOS AUTO' : 'VIETQR'}
                   </div>
-                  <div className="relative p-3">
-                    <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-blue-600 rounded-tl-md"></div>
-                    <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-blue-600 rounded-tr-md"></div>
-                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-blue-600 rounded-bl-md"></div>
-                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-blue-600 rounded-br-md"></div>
-                    
-                    {/* PayOS QR (canvas) hoặc VietQR (canvas) */}
-                    {usePayos && payosQrString ? (
-                      <canvas ref={payosCanvasRef} className="w-[180px] h-[180px]" />
-                    ) : (
-                      <canvas ref={qrCanvasRef} className="w-[180px] h-[180px]" />
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                    <QrScanIcon className="w-4 h-4 text-slate-350" />
-                    <span>Quét mã để thanh toán</span>
-                  </div>
+                  {!usePayos && !hasBankConfig ? (
+                    <div className="w-[180px] h-[180px] flex items-center justify-center text-center text-xs font-bold text-amber-700 leading-relaxed px-4">
+                      Chưa cấu hình tài khoản ngân hàng
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative p-3">
+                        <div className="absolute top-0 left-0 w-5 h-5 border-t-[3px] border-l-[3px] border-blue-600 rounded-tl-md"></div>
+                        <div className="absolute top-0 right-0 w-5 h-5 border-t-[3px] border-r-[3px] border-blue-600 rounded-tr-md"></div>
+                        <div className="absolute bottom-0 left-0 w-5 h-5 border-b-[3px] border-l-[3px] border-blue-600 rounded-bl-md"></div>
+                        <div className="absolute bottom-0 right-0 w-5 h-5 border-b-[3px] border-r-[3px] border-blue-600 rounded-br-md"></div>
+
+                        {usePayos && payosQrString ? (
+                          <canvas ref={payosCanvasRef} className="w-[180px] h-[180px]" />
+                        ) : (
+                          <canvas ref={qrCanvasRef} className="w-[180px] h-[180px]" />
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
+                        <QrScanIcon className="w-4 h-4 text-slate-350" />
+                        <span>Quét mã để thanh toán</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -304,7 +316,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Ngân hàng thụ hưởng</p>
                   <span className="font-extrabold text-slate-800 text-sm mt-0.5 block">
-                    {activeBank ? `${activeBank.shortName} - ${activeBank.name}` : 'MB Bank - Ngân hàng TMCP Quân đội'}
+                    {activeBank ? `${activeBank.shortName} - ${activeBank.name}` : 'Chưa cấu hình ngân hàng'}
                   </span>
                 </div>
               </div>
@@ -320,12 +332,13 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                     <div>
                       <p className="text-[11px] font-semibold text-slate-400">Số tài khoản</p>
                       <p className="font-mono font-black text-slate-800 text-sm mt-0.5">
-                        {operationSettings.bankAccountNumber || '0877724374'}
+                        {operationSettings.bankAccountNumber || 'Chưa cấu hình'}
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleCopy(operationSettings.bankAccountNumber || '0877724374', 'Số tài khoản')}
+                    onClick={() => operationSettings.bankAccountNumber && handleCopy(operationSettings.bankAccountNumber, 'Số tài khoản')}
+                    disabled={!operationSettings.bankAccountNumber}
                     className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
                     title="Sao chép số tài khoản"
                   >
@@ -342,12 +355,13 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                     <div>
                       <p className="text-[11px] font-semibold text-slate-400">Chủ tài khoản</p>
                       <p className="font-black text-slate-800 uppercase text-sm mt-0.5">
-                        {operationSettings.bankAccountName || 'MAI TRAN THIEN TAM'}
+                        {operationSettings.bankAccountName || 'Chưa cấu hình'}
                       </p>
                     </div>
                   </div>
                   <button
-                    onClick={() => handleCopy(operationSettings.bankAccountName || 'MAI TRAN THIEN TAM', 'Tên chủ tài khoản')}
+                    onClick={() => operationSettings.bankAccountName && handleCopy(operationSettings.bankAccountName, 'Tên chủ tài khoản')}
+                    disabled={!operationSettings.bankAccountName}
                     className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition"
                   >
                     <HiOutlineDuplicate className="w-5 h-5" />
@@ -417,7 +431,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
           </button>
           <button
             onClick={() => onCheckout(true, true)}
-            disabled={loading || paymentStatus === 'paid'}
+            disabled={loading || paymentStatus === 'paid' || (!usePayos && !hasBankConfig)}
             className={`flex-1 sm:flex-[1.8] flex flex-col items-center justify-center py-2.5 rounded-2xl shadow-md transition disabled:opacity-50 ${
               paymentStatus === 'paid'
                 ? 'bg-emerald-600 text-white shadow-emerald-500/20'

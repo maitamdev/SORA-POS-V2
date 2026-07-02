@@ -11,6 +11,7 @@ import { aiAPI } from '../../services/ai.api';
 import { Product, StockAlert, StockTransaction, AIRecommendation, RestockAnalysis, ProductBatch } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
 import ReceiptListPage from './ReceiptListPage';
+import { downloadCsv } from '../../utils/exportCsv';
 
 const priorityClass = {
   high: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -397,10 +398,8 @@ const StockPage = () => {
     });
   }, [inventory, searchTerm, selectedCategory, stockFilter]);
 
-  // Excel export handler — lazy import xlsx chỉ khi cần
-  const handleExportExcel = useCallback(async () => {
+  const handleExportCsv = useCallback(() => {
     try {
-      const XLSX = await import('xlsx');
       const exportData = filteredInventory.map((item, idx) => ({
         'STT': idx + 1,
         'Mã SKU': item.sku,
@@ -412,13 +411,10 @@ const StockPage = () => {
         'Trạng thái': item.stock_quantity <= 0 ? 'Hết hàng' : item.stock_quantity <= item.min_stock_level ? 'Tồn thấp' : 'An toàn',
         'Đơn vị': item.unit || '',
       }));
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Tồn kho');
-      XLSX.writeFile(wb, `ton-kho_${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast.success(`Đã xuất ${exportData.length} sản phẩm ra file Excel`);
+      downloadCsv(`ton-kho_${new Date().toISOString().split('T')[0]}.csv`, exportData);
+      toast.success(`Đã xuất ${exportData.length} sản phẩm ra file CSV`);
     } catch {
-      toast.error('Không thể xuất file Excel');
+      toast.error('Không thể xuất file CSV');
     }
   }, [filteredInventory]);
 
@@ -543,12 +539,12 @@ const StockPage = () => {
           )}
           {activeTab === 'inventory' && (
             <button
-              onClick={handleExportExcel}
+              onClick={handleExportCsv}
               className="rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 px-3 py-2.5 text-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md text-xs font-extrabold"
-              title="Xuất file Excel tồn kho"
+              title="Xuất file CSV tồn kho"
             >
               <FiDownload size={14} />
-              <span className="hidden sm:inline">Xuất Excel</span>
+              <span className="hidden sm:inline">Xuất CSV</span>
             </button>
           )}
           <button

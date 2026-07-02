@@ -99,6 +99,17 @@ BEGIN
         AND average_order_value >= 0
       ) NOT VALID;
   END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'payment_intents')
+     AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payment_intents_status_check') THEN
+    ALTER TABLE payment_intents
+      ADD CONSTRAINT payment_intents_status_check
+      CHECK (
+        amount > 0
+        AND provider IN ('payos')
+        AND status IN ('PENDING', 'PROCESSING', 'PAID', 'CANCELLED', 'UPDATED')
+      ) NOT VALID;
+  END IF;
 END $$;
 
 -- ============================================
@@ -121,4 +132,5 @@ ALTER TABLE public.ai_revenue_analyses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goods_receipts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.goods_receipt_details ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cash_drawer_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_intents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
