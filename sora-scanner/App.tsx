@@ -13,7 +13,15 @@ import {
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initSupabase, getSupabase, SCANNER_EVENT } from './src/supabase';
+import { initSupabase, getSupabase, SCANNER_ACK_EVENT, SCANNER_EVENT } from './src/supabase';
+import {
+  createScanId,
+  enqueueScan,
+  getQueuedScanCount,
+  listQueuedScans,
+  markQueuedScanFailed,
+  removeQueuedScan,
+} from './src/offlineQueue';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,6 +33,12 @@ interface PairingInfo {
   pairingCode: string;
 }
 
+type AckWaiter = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isScanning, setIsScanning] = useState(true);
@@ -34,12 +48,16 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [facing, setFacing] = useState<'front' | 'back'>('back');
+  const [pendingScanCount, setPendingScanCount] = useState(0);
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false);
   
   // Pairing states
   const [pairingInfo, setPairingInfo] = useState<PairingInfo | null>(null);
   const [loadingPairing, setLoadingPairing] = useState(true);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const ackWaitersRef = useRef<Map<string, AckWaiter>>(new Map());
+  const isFlushingQueueRef = useRef(false);
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const flashAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -86,6 +104,11 @@ export default function App() {
     return () => animation.stop();
   }, []);
 
+  const refreshPendingScanCount = async (pairingCode = pairingInfo?.pairingCode) => {
+    const count = await getQueuedScanCount(pairingCode);
+    setPendingScanCount(count);
+  };
+
   // Load pairing info from storage on startup
   useEffect(() => {
     const loadPairing = async () => {
@@ -94,6 +117,7 @@ export default function App() {
         if (stored) {
           const parsed = JSON.parse(stored) as PairingInfo;
           setPairingInfo(parsed);
+          await refreshPendingScanCount(parsed.pairingCode);
           setupRealtime(parsed);
         }
       } catch (e) {
@@ -118,6 +142,14 @@ export default function App() {
       const client = initSupabase(info.url, info.key);
       const channelName = `scanner-events:${info.pairingCode}`;
       const channel = client.channel(channelName);
+
+      channel.on('broadcast', { event: SCANNER_ACK_EVENT }, (payload) => {
+        const scanId = payload.payload?.scanId;
+        if (!scanId) return;
+
+        const waiter = ackWaitersRef.current.get(scanId);
+        if (waiter) waiter.resolve();
+      });
 
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -149,6 +181,127 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start(() => setFlashMessage(null));
+  };
+
+  const waitForAck = (scanId: string, timeoutMs = 5000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        ackWaitersRef.current.delete(scanId);
+        reject(new Error('POS did not confirm receipt'));
+      }, timeoutMs);
+
+      ackWaitersRef.current.set(scanId, {
+        timeout,
+        resolve: () => {
+          clearTimeout(timeout);
+          ackWaitersRef.current.delete(scanId);
+          resolve();
+        },
+        reject: (error: Error) => {
+          clearTimeout(timeout);
+          ackWaitersRef.current.delete(scanId);
+          reject(error);
+        },
+      });
+    });
+  };
+
+  const sendScanToPOS = async (
+    barcode: string,
+    scanId: string,
+    scannedAt: number,
+    queued = false
+  ): Promise<void> => {
+    const channel = channelRef.current;
+    if (!channel || !isConnected) {
+      throw new Error('Scanner channel is offline');
+    }
+
+    const ackPromise = waitForAck(scanId);
+
+    try {
+      const result = await channel.send({
+        type: 'broadcast',
+        event: SCANNER_EVENT,
+        payload: {
+          id: scanId,
+          scanId,
+          barcode,
+          timestamp: scannedAt,
+          queued,
+          source: 'sora-scanner',
+        },
+      });
+
+      if (result !== 'ok') {
+        throw new Error(`Realtime send failed: ${result}`);
+      }
+
+      await ackPromise;
+    } catch (error) {
+      const waiter = ackWaitersRef.current.get(scanId);
+      if (waiter) {
+        waiter.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      throw error;
+    }
+  };
+
+  const queueScan = async (
+    barcode: string,
+    scanId: string,
+    scannedAt: number,
+    error?: unknown
+  ) => {
+    if (!pairingInfo) return;
+
+    await enqueueScan({
+      id: scanId,
+      barcode,
+      scannedAt,
+      pairingCode: pairingInfo.pairingCode,
+    });
+    await refreshPendingScanCount(pairingInfo.pairingCode);
+    console.warn('[ScannerQueue] Queued scan:', error);
+  };
+
+  const flushQueuedScans = async (pairingCode = pairingInfo?.pairingCode) => {
+    if (!pairingCode || !isConnected || isFlushingQueueRef.current) return;
+
+    isFlushingQueueRef.current = true;
+    setIsFlushingQueue(true);
+
+    let synced = 0;
+    let failed = 0;
+
+    try {
+      const scans = await listQueuedScans(pairingCode);
+      for (const scan of scans) {
+        try {
+          await sendScanToPOS(scan.barcode, scan.id, scan.scannedAt, true);
+          await removeQueuedScan(scan.id);
+          synced++;
+          await refreshPendingScanCount(pairingCode);
+        } catch (error: any) {
+          failed++;
+          await markQueuedScanFailed(
+            scan.id,
+            error?.message || 'Unable to sync scanner queue'
+          );
+          break;
+        }
+      }
+
+      if (synced > 0) {
+        showFlash(`Da dong bo ${synced} ma offline`);
+      } else if (failed > 0) {
+        showFlash('Chua dong bo duoc queue offline');
+      }
+    } finally {
+      await refreshPendingScanCount(pairingCode);
+      isFlushingQueueRef.current = false;
+      setIsFlushingQueue(false);
+    }
   };
 
   const handleBarCodeScanned = async (result: BarcodeScanningResult) => {
@@ -197,27 +350,56 @@ export default function App() {
     setLastScanned(decodedText);
     setScanCount((prev) => prev + 1);
 
+    const scanId = createScanId();
+    const scannedAt = Date.now();
+
     try {
-      if (channelRef.current && isConnected) {
-        await channelRef.current.send({
-          type: 'broadcast',
-          event: SCANNER_EVENT,
-          payload: { barcode: decodedText, timestamp: Date.now() },
-        });
-        showFlash('✅ Đã gửi lên máy tính!');
-      } else {
-        showFlash('❌ Mất kết nối mạng hoặc POS');
-      }
+      await sendScanToPOS(decodedText, scanId, scannedAt);
+      showFlash('Da gui len POS');
     } catch (error) {
-      showFlash('❌ Lỗi gửi dữ liệu');
-      console.error(error);
+      await queueScan(decodedText, scanId, scannedAt, error);
+      showFlash('Mat ket noi - da luu vao queue');
     }
+
 
     // Cooldown to prevent duplicate scans
     setTimeout(() => {
       setIsProcessing(false);
     }, 1500);
   };
+
+  useEffect(() => {
+    const pairingCode = pairingInfo?.pairingCode;
+    if (!pairingCode) {
+      setPendingScanCount(0);
+      return;
+    }
+
+    refreshPendingScanCount(pairingCode).catch((err) => {
+      console.error('Failed to load scanner queue count:', err);
+    });
+
+    if (!isConnected) return;
+
+    flushQueuedScans(pairingCode).catch((err) => {
+      console.error('Failed to sync scanner queue:', err);
+    });
+
+    const interval = setInterval(() => {
+      flushQueuedScans(pairingCode).catch((err) => {
+        console.error('Failed to sync scanner queue:', err);
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [isConnected, pairingInfo?.pairingCode]);
+
+  useEffect(() => {
+    return () => {
+      ackWaitersRef.current.forEach((waiter) => clearTimeout(waiter.timeout));
+      ackWaitersRef.current.clear();
+    };
+  }, []);
 
   const handleUnpair = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -234,6 +416,7 @@ export default function App() {
       setIsConnected(false);
       setLastScanned(null);
       setScanCount(0);
+      setPendingScanCount(0);
       showFlash('🔌 Đã hủy ghép đôi POS');
     } catch (err) {
       console.error('Failed to clear pairing info:', err);
@@ -301,6 +484,13 @@ export default function App() {
             {isConnected ? 'Online' : 'Offline'}
           </Text>
         </View>
+        {pendingScanCount > 0 && (
+          <View style={styles.queueBadge}>
+            <Text style={styles.queueBadgeText}>
+              {isFlushingQueue ? 'Sync...' : `Queue ${pendingScanCount}`}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Camera View */}
@@ -554,6 +744,17 @@ const styles = StyleSheet.create({
   connectionText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  queueBadge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  queueBadgeText: {
+    color: '#111827',
+    fontSize: 12,
+    fontWeight: '800',
   },
 
   // Camera

@@ -116,10 +116,24 @@ export const useBarcodeScanner = () => {
         .on('broadcast', { event: 'barcode_scanned' }, (payload) => {
           try {
             const barcode = payload.payload?.barcode;
+            const scanId = payload.payload?.scanId || payload.payload?.id;
             if (barcode) {
               const listeners = channelScanListeners.get(channelName);
               if (listeners) {
                 listeners.forEach((cb) => cb(barcode));
+              }
+
+              if (scanId) {
+                channel?.send({
+                  type: 'broadcast',
+                  event: 'barcode_ack',
+                  payload: {
+                    scanId,
+                    receivedAt: Date.now(),
+                  },
+                }).catch((error) => {
+                  console.error('Error sending scanner ACK:', error);
+                });
               }
             }
           } catch (error) {

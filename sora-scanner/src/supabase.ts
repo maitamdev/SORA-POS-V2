@@ -22,3 +22,4 @@ export const getSupabase = (): SupabaseClient | null => {
 };
 
 export const SCANNER_EVENT = 'barcode_scanned';
+export const SCANNER_ACK_EVENT = 'barcode_ack';
