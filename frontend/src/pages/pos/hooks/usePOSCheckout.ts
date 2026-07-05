@@ -427,10 +427,8 @@ function _computeDiscountAmount(s: ReturnType<typeof usePOSStore.getState>) {
   const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
   const safeValue =
     s.discountType === 'percent' ? Math.min(s.discountValue, maxPercent) : s.discountValue;
-  if (s.discountType === 'percent') {
-    return Math.floor((total * safeValue) / 100);
-  }
-  return safeValue;
+  const manualDiscount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
+  return manualDiscount + (s.autoPromoDiscount || 0) + (s.voucherDiscount || 0);
 }
 
 function _computeFinalAmount(s: ReturnType<typeof usePOSStore.getState>) {

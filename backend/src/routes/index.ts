@@ -18,6 +18,7 @@ import goodsReceiptRoutes from './goodsReceipt.routes';
 import payosRoutes from './payos.routes';
 import webhookRoutes from './webhook.routes';
 import telegramRoutes from './telegram.routes';
+import { promotionRoutes } from './promotion.routes';
 
 const router = Router();
 
@@ -45,6 +46,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/audit-logs',
       '/api/payos',
       '/api/webhooks',
+      '/api/promotions',
     ],
   });
 });
@@ -75,5 +77,6 @@ router.use('/audit-logs', auditRoutes);
 router.use('/payos', payosRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/webhooks', telegramRoutes);
+router.use('/promotions', promotionRoutes);
 
 export default router;

@@ -10,7 +10,7 @@ import { syncAllDataToLocal } from './services/offlineSync';
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
 const POSPage = lazy(() => import('./pages/pos/POSPage'));
-const ProductsPage = lazy(() => import('./pages/products/ProductsPage'));
+const ProductsPage = lazy(() => import('./pages/products/ProductsWithTabs'));
 const CategoriesPage = lazy(() => import('./pages/categories/CategoriesPage'));
 const OrdersPage = lazy(() => import('./pages/orders/OrdersPage'));
 const StockPage = lazy(() => import('./pages/stock/StockPage'));

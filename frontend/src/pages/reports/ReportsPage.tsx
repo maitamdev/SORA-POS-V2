@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { 
   HiOutlineTrendingUp as HiTrendUp, 
@@ -144,6 +144,7 @@ const ReportsPage = () => {
   const [stockAnalysis, setStockAnalysis] = useState<RestockAnalysis | null>(null);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
+  const lastAutoOpenKey = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -167,7 +168,7 @@ const ReportsPage = () => {
       const res = await reportAPI.aiAnalysisHistory({ page: 1, limit: 8 });
       setAiHistory(res.data.data.items);
     } catch {
-      toast.error('Không tải được lịch sử phân tích AI');
+      toast.error('Không tải được lịch sử phân tích');
     } finally {
       setHistoryLoading(false);
     }
@@ -180,16 +181,16 @@ const ReportsPage = () => {
       const report = res.data.data;
       setAiAnalysisData(report.analysis);
       setActiveAiReport(report);
-      toast.success('Đã mở lại bản phân tích đã lưu');
+      toast.success('Đã khôi phục bản phân tích');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Không mở được bản phân tích đã lưu');
+      toast.error(err.response?.data?.message || 'Không thể khôi phục bản phân tích');
     } finally {
       setSelectedHistoryId(null);
     }
   }, []);
 
   const handleDeleteSavedAnalysis = useCallback(async (id: string) => {
-    if (!window.confirm('Xóa bản phân tích doanh thu đã lưu này?')) return;
+    if (!window.confirm('Xác nhận xóa bản phân tích này khỏi lịch sử?')) return;
     try {
       await reportAPI.deleteAiAnalysis(id);
       setAiHistory((items) => items.filter((item) => item.id !== id));
@@ -197,9 +198,9 @@ const ReportsPage = () => {
       setActiveAiReport(null);
       setAiAnalysisData(null);
     }
-      toast.success('Đã xóa bản phân tích đã lưu');
+      toast.success('Đã xóa bản phân tích');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Không xóa được bản phân tích');
+      toast.error(err.response?.data?.message || 'Không thể xóa bản phân tích');
     }
   }, [activeAiReport?.id]);
 
@@ -253,6 +254,11 @@ const ReportsPage = () => {
   // Auto-open saved AI analysis first; generate a new one only when no saved report exists for the range.
   useEffect(() => {
     if (revenue.length === 0 || aiAnalysisData || aiLoading || historyLoading) return;
+
+    // Guard against multiple concurrent triggers for the same data state
+    const currentKey = `${days}:${revenue.length}:${aiHistory.length}`;
+    if (lastAutoOpenKey.current === currentKey) return;
+    lastAutoOpenKey.current = currentKey;
 
     const savedForCurrentRange = aiHistory.find((item) => item.days === days);
     if (savedForCurrentRange) {
@@ -465,7 +471,7 @@ const ReportsPage = () => {
             </section>
 
             <div class="footer">
-              Báo cáo được tạo từ dữ liệu doanh thu, giá vốn, lợi nhuận và kết quả phân tích AI đã lưu trong CSDL Sora POS.
+              Báo cáo được tạo từ dữ liệu doanh thu, giá vốn, lợi nhuận và kết quả phân tích đã lưu trong hệ thống Sora POS.
               Khi nộp file, chọn Print / Save as PDF để lưu thành tệp PDF.
             </div>
           </main>
@@ -635,7 +641,7 @@ const ReportsPage = () => {
             <div>
               <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-blue-800">
                 <HiClock className="h-4 w-4" />
-                Bản phân tích đã lưu trong CSDL
+                Lịch sử phân tích doanh thu
               </h3>
               {activeAiReport ? (
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">
@@ -643,7 +649,7 @@ const ReportsPage = () => {
                 </p>
               ) : (
                 <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                  Mỗi lần phân tích AI thành công sẽ được lưu thành một bản ghi riêng.
+                  Mỗi lần phân tích thành công sẽ được lưu lại để tra cứu sau.
                 </p>
               )}
             </div>
@@ -660,11 +666,11 @@ const ReportsPage = () => {
           <div className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
             {historyLoading && aiHistory.length === 0 ? (
               <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
-                Đang tải lịch sử phân tích...
+                Đang tải lịch sử...
               </div>
             ) : aiHistory.length === 0 ? (
               <div className="rounded-lg border border-blue-100 bg-white px-3 py-4 text-center text-[11px] font-bold text-slate-400 lg:col-span-2">
-                Chưa có bản phân tích nào được lưu.
+                Chưa có lịch sử phân tích nào.
               </div>
             ) : (
               aiHistory.map((item) => (
@@ -692,7 +698,7 @@ const ReportsPage = () => {
                         type="button"
                         onClick={() => handleOpenSavedAnalysis(item.id)}
                         disabled={selectedHistoryId === item.id}
-                        title="Mở bản phân tích"
+                        title="Xem chi tiết"
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:border-blue-300 hover:text-blue-700 disabled:opacity-50"
                       >
                         <HiOutlineEye className="h-4 w-4" />
@@ -700,7 +706,7 @@ const ReportsPage = () => {
                       <button
                         type="button"
                         onClick={() => handleDeleteSavedAnalysis(item.id)}
-                        title="Xóa bản phân tích"
+                        title="Xóa khỏi lịch sử"
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-300 hover:text-red-600"
                       >
                         <HiOutlineTrash className="h-4 w-4" />
@@ -1093,7 +1099,7 @@ const ReportsPage = () => {
               <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-slate-800 animate-spin" />
               <div className="absolute inset-1.5 rounded-full border-4 border-slate-100 border-b-blue-600 animate-spin [animation-duration:1.5s]" />
             </div>
-            <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp dữ liệu tồn kho và phân tích AI...</span>
+            <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp dữ liệu tồn kho và phân tích...</span>
           </div>
         ) : (
           <div className="space-y-0 divide-y divide-slate-100">

@@ -26,6 +26,8 @@ interface POSState {
   discountType: 'percent' | 'value';
   discountValue: number;
   voucherCode: string;
+  autoPromoDiscount: number;
+  voucherDiscount: number;
 
   // Customer
   customerId: string;
@@ -80,6 +82,8 @@ interface POSState {
   setDiscountType: (type: 'percent' | 'value') => void;
   setDiscountValue: (value: number) => void;
   setVoucherCode: (code: string) => void;
+  setAutoPromoDiscount: (value: number) => void;
+  setVoucherDiscount: (value: number) => void;
 
   // Actions — Customer
   setCustomerId: (id: string) => void;
@@ -140,6 +144,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   discountType: 'value',
   discountValue: 0,
   voucherCode: '',
+  autoPromoDiscount: 0,
+  voucherDiscount: 0,
 
   // Customer
   customerId: '',
@@ -244,6 +250,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
       cart: [],
       discountValue: 0,
       voucherCode: '',
+      autoPromoDiscount: 0,
+      voucherDiscount: 0,
       receivedAmount: 0,
       showCashPayment: false,
       showClearCartConfirm: false,
@@ -252,6 +260,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   setDiscountType: (type) => set({ discountType: type }),
   setDiscountValue: (value) => set({ discountValue: value }),
   setVoucherCode: (code) => set({ voucherCode: code }),
+  setAutoPromoDiscount: (value) => set({ autoPromoDiscount: value }),
+  setVoucherDiscount: (value) => set({ voucherDiscount: value }),
 
   // ── Actions — Customer ──
   setCustomerId: (id) => set({ customerId: id }),
@@ -298,6 +308,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
       showTransferPayment: false,
       discountValue: 0,
       voucherCode: '',
+      autoPromoDiscount: 0,
+      voucherDiscount: 0,
       customerPhone: '',
       matchedCustomer: null,
       newCustName: '',
@@ -318,7 +330,11 @@ function computePOS(s: POSState) {
     s.discountType === 'percent'
       ? Math.min(s.discountValue, maxPercent)
       : s.discountValue;
-  const discount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
+  const manualDiscount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
+  
+  // Total discount is the sum of manual discount + auto-matched promotions + voucher discount
+  const discount = manualDiscount + (s.autoPromoDiscount || 0) + (s.voucherDiscount || 0);
+  
   const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
   const finalAmount = Math.max(total - discount - pointsDiscount, 0);
   return { total, discount, pointsDiscount, finalAmount };

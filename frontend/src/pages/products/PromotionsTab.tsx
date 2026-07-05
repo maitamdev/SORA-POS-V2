@@ -1,0 +1,909 @@
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import {
+  HiOutlineTag, HiOutlinePlus, HiOutlinePencil, HiOutlineTrash,
+  HiOutlineSearch, HiOutlineClock, HiOutlineX,
+  HiOutlineCheck, HiOutlineExclamationCircle, HiOutlineLightBulb,
+  HiOutlineShoppingCart, HiOutlineFolder, HiOutlineCube,
+  HiOutlineLightningBolt, HiOutlineSparkles,
+} from 'react-icons/hi';
+import { FiGift, FiPercent, FiDollarSign, FiHash, FiPackage, FiClock, FiLink } from 'react-icons/fi';
+import { promotionAPI } from '../../services/promotion.api';
+import { catalogAPI } from '../../services/catalog.api';
+import { Promotion, Category, Product } from '../../types/domain.type';
+import { useAuthStore } from '../../stores/auth.store';
+import { parsePromotionIntent, PROMO_EXAMPLES, type DiscountType } from '../../utils/promoIntentParser';
+
+const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+
+const DISCOUNT_TYPE_CONFIG: Record<DiscountType, { label: string; color: string; bg: string; border: string }> = {
+  percent:            { label: 'Giảm %',        color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200' },
+  fixed_amount:       { label: 'Giảm tiền',     color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200' },
+  buy_x_get_y:        { label: 'Mua X tặng Y',  color: 'text-pink-700',   bg: 'bg-pink-50',    border: 'border-pink-200' },
+  fixed_price:        { label: 'Giá combo',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200' },
+  nth_item_discount:  { label: 'SP thứ N giảm', color: 'text-teal-700',   bg: 'bg-teal-50',    border: 'border-teal-200' },
+  happy_hour:         { label: 'Happy Hour',    color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200' },
+  bundle:             { label: 'Bundle combo',  color: 'text-rose-700',   bg: 'bg-rose-50',    border: 'border-rose-200' },
+};
+
+const DiscountTypeIcon = ({ type, className = 'w-4 h-4' }: { type: DiscountType; className?: string }) => {
+  switch (type) {
+    case 'percent': return <FiPercent className={className} />;
+    case 'fixed_amount': return <FiDollarSign className={className} />;
+    case 'buy_x_get_y': return <FiGift className={className} />;
+    case 'fixed_price': return <FiPackage className={className} />;
+    case 'nth_item_discount': return <HiOutlineLightningBolt className={className} />;
+    case 'happy_hour': return <FiClock className={className} />;
+    case 'bundle': return <FiLink className={className} />;
+  }
+};
+
+const getPromoStatus = (promo: Promotion) => {
+  const now = new Date();
+  const start = new Date(promo.start_date);
+  const end = promo.end_date ? new Date(promo.end_date) : null;
+
+  if (!promo.is_active) return { label: 'Đã tắt', className: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
+  if (now < start) return { label: 'Chưa bắt đầu', className: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' };
+  if (end && now > end) return { label: 'Hết hạn', className: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' };
+  if (promo.usage_limit && promo.usage_count >= promo.usage_limit) return { label: 'Hết lượt', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' };
+  return { label: 'Đang chạy', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500 animate-pulse' };
+};
+
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const getDiscountDisplay = (promo: Promotion) => {
+  const cfg = DISCOUNT_TYPE_CONFIG[promo.discount_type] || DISCOUNT_TYPE_CONFIG.percent;
+  if (promo.discount_type === 'percent') return `${promo.discount_value}%`;
+  if (promo.discount_type === 'fixed_amount') return money(promo.discount_value);
+  if (promo.discount_type === 'buy_x_get_y') return `Mua ${promo.buy_quantity || 0} tặng ${promo.get_quantity || 0}`;
+  if (promo.discount_type === 'fixed_price') return `${promo.combo_quantity || 0} SP = ${money(promo.discount_value)}`;
+  if (promo.discount_type === 'nth_item_discount') return `SP thứ ${promo.nth_item || 2} giảm ${promo.discount_value}%`;
+  if (promo.discount_type === 'happy_hour') return `${promo.happy_hour_start || '?'}-${promo.happy_hour_end || '?'} giảm ${promo.discount_value}%`;
+  if (promo.discount_type === 'bundle') return `${(promo.bundle_product_ids || []).length} SP = ${money(promo.discount_value)}`;
+  return cfg.label;
+};
+
+interface PromotionsTabProps {
+  categories: Category[];
+}
+
+const PromotionsTab = ({ categories }: PromotionsTabProps) => {
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'admin' || user?.role === 'manager';
+
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
+
+  // Modal
+  const [showModal, setShowModal] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Smart Input
+  const [smartInput, setSmartInput] = useState('');
+  const [smartParsed, setSmartParsed] = useState<ReturnType<typeof parsePromotionIntent>>(null);
+
+  // Form
+  const [formName, setFormName] = useState('');
+  const [formCode, setFormCode] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formDiscountType, setFormDiscountType] = useState<DiscountType>('percent');
+  const [formDiscountValue, setFormDiscountValue] = useState<number>(0);
+  const [formMaxDiscount, setFormMaxDiscount] = useState<number | ''>('');
+  const [formMinOrder, setFormMinOrder] = useState<number>(0);
+  const [formBuyQty, setFormBuyQty] = useState<number>(2);
+  const [formGetQty, setFormGetQty] = useState<number>(1);
+  const [formComboQty, setFormComboQty] = useState<number>(3);
+  const [formNthItem, setFormNthItem] = useState<number>(2);
+  const [formHappyStart, setFormHappyStart] = useState('14:00');
+  const [formHappyEnd, setFormHappyEnd] = useState('17:00');
+  const [formBundleProductIds, setFormBundleProductIds] = useState<string[]>([]);
+  const [formApplyTo, setFormApplyTo] = useState<'all' | 'category' | 'product'>('all');
+  const [formApplyToIds, setFormApplyToIds] = useState<string[]>([]);
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formUsageLimit, setFormUsageLimit] = useState<number | ''>('');
+  const [formIsActive, setFormIsActive] = useState(true);
+
+  // Products for product-scope/bundle selection
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState('');
+
+  const loadPromotions = async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, unknown> = { limit: 500 };
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (search.trim()) params.search = search.trim();
+      const res = await promotionAPI.list(params);
+      setPromotions(res.data.data.items);
+    } catch {
+      toast.error('Không tải được danh sách khuyến mãi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadPromotions(); }, [statusFilter, search]);
+
+  useEffect(() => {
+    if ((formApplyTo === 'product' || formDiscountType === 'bundle') && allProducts.length === 0) {
+      catalogAPI.products.list({ limit: 500, is_active: true })
+        .then((res) => setAllProducts(res.data.data.items))
+        .catch(() => {});
+    }
+  }, [formApplyTo, formDiscountType]);
+
+  // ═══ Smart Input — parse on each keystroke ═══
+  useEffect(() => {
+    if (smartInput.trim().length >= 3) {
+      const result = parsePromotionIntent(smartInput);
+      setSmartParsed(result);
+    } else {
+      setSmartParsed(null);
+    }
+  }, [smartInput]);
+
+  const applySmartResult = () => {
+    if (!smartParsed) return;
+    setFormDiscountType(smartParsed.discount_type);
+    setFormDiscountValue(smartParsed.discount_value);
+    setFormName(smartParsed.name || smartInput);
+    if (smartParsed.max_discount) setFormMaxDiscount(smartParsed.max_discount);
+    if (smartParsed.buy_quantity) setFormBuyQty(smartParsed.buy_quantity);
+    if (smartParsed.get_quantity) setFormGetQty(smartParsed.get_quantity);
+    if (smartParsed.combo_quantity) setFormComboQty(smartParsed.combo_quantity);
+    if (smartParsed.nth_item) setFormNthItem(smartParsed.nth_item);
+    if (smartParsed.happy_hour_start) setFormHappyStart(smartParsed.happy_hour_start);
+    if (smartParsed.happy_hour_end) setFormHappyEnd(smartParsed.happy_hour_end);
+    setSmartInput('');
+    setSmartParsed(null);
+    toast.success(`Đã nhận diện: ${DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].label}`);
+  };
+
+  const resetForm = () => {
+    setFormName(''); setFormCode(''); setFormDescription('');
+    setFormDiscountType('percent'); setFormDiscountValue(0);
+    setFormMaxDiscount(''); setFormMinOrder(0);
+    setFormBuyQty(2); setFormGetQty(1); setFormComboQty(3);
+    setFormNthItem(2); setFormHappyStart('14:00'); setFormHappyEnd('17:00');
+    setFormBundleProductIds([]);
+    setFormApplyTo('all'); setFormApplyToIds([]);
+    setFormStartDate(''); setFormEndDate('');
+    setFormUsageLimit(''); setFormIsActive(true);
+    setEditId(null); setProductSearch('');
+    setSmartInput(''); setSmartParsed(null);
+  };
+
+  const openCreate = () => {
+    if (!canManage) { toast.error('Bạn không có quyền tạo khuyến mãi'); return; }
+    resetForm();
+    setFormStartDate(new Date().toISOString().slice(0, 16));
+    setShowModal(true);
+  };
+
+  const openEdit = (promo: Promotion) => {
+    if (!canManage) { toast.error('Bạn không có quyền chỉnh sửa'); return; }
+    setEditId(promo.id);
+    setFormName(promo.name);
+    setFormCode(promo.code || '');
+    setFormDescription(promo.description || '');
+    setFormDiscountType(promo.discount_type);
+    setFormDiscountValue(promo.discount_value);
+    setFormMaxDiscount(promo.max_discount || '');
+    setFormMinOrder(promo.min_order_amount);
+    setFormBuyQty(promo.buy_quantity || 2);
+    setFormGetQty(promo.get_quantity || 1);
+    setFormComboQty(promo.combo_quantity || 3);
+    setFormNthItem(promo.nth_item || 2);
+    setFormHappyStart(promo.happy_hour_start || '14:00');
+    setFormHappyEnd(promo.happy_hour_end || '17:00');
+    setFormBundleProductIds(promo.bundle_product_ids || []);
+    setFormApplyTo(promo.apply_to);
+    setFormApplyToIds(promo.apply_to_ids || []);
+    setFormStartDate(promo.start_date ? new Date(promo.start_date).toISOString().slice(0, 16) : '');
+    setFormEndDate(promo.end_date ? new Date(promo.end_date).toISOString().slice(0, 16) : '');
+    setFormUsageLimit(promo.usage_limit || '');
+    setFormIsActive(promo.is_active);
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim()) { toast.error('Tên khuyến mãi không được để trống'); return; }
+
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        name: formName.trim(),
+        code: formCode.trim() || null,
+        description: formDescription.trim() || null,
+        discount_type: formDiscountType,
+        discount_value: formDiscountType === 'buy_x_get_y' ? 0 : formDiscountValue,
+        max_discount: formMaxDiscount || null,
+        min_order_amount: formMinOrder,
+        buy_quantity: formDiscountType === 'buy_x_get_y' ? formBuyQty : 0,
+        get_quantity: formDiscountType === 'buy_x_get_y' ? formGetQty : 0,
+        get_product_ids: [],
+        combo_quantity: formDiscountType === 'fixed_price' ? formComboQty : 0,
+        nth_item: formDiscountType === 'nth_item_discount' ? formNthItem : 2,
+        happy_hour_start: formDiscountType === 'happy_hour' ? formHappyStart : null,
+        happy_hour_end: formDiscountType === 'happy_hour' ? formHappyEnd : null,
+        bundle_product_ids: formDiscountType === 'bundle' ? formBundleProductIds : [],
+        apply_to: formApplyTo,
+        apply_to_ids: formApplyTo !== 'all' ? formApplyToIds : [],
+        start_date: formStartDate || new Date().toISOString(),
+        end_date: formEndDate || null,
+        usage_limit: formUsageLimit || null,
+        is_active: formIsActive,
+      };
+
+      if (editId) {
+        await promotionAPI.update(editId, payload as Partial<Promotion>);
+        toast.success('Đã cập nhật khuyến mãi');
+      } else {
+        await promotionAPI.create(payload as Partial<Promotion>);
+        toast.success('Đã tạo khuyến mãi mới');
+      }
+      setShowModal(false);
+      resetForm();
+      await loadPromotions();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Lỗi khi lưu khuyến mãi');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await promotionAPI.remove(id);
+      toast.success('Đã xóa khuyến mãi');
+      setConfirmDeleteId(null);
+      await loadPromotions();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không xóa được');
+    }
+  };
+
+  const handleToggleActive = async (promo: Promotion) => {
+    try {
+      await promotionAPI.update(promo.id, { is_active: !promo.is_active } as Partial<Promotion>);
+      toast.success(promo.is_active ? 'Đã tắt khuyến mãi' : 'Đã kích hoạt khuyến mãi');
+      await loadPromotions();
+    } catch {
+      toast.error('Lỗi khi cập nhật trạng thái');
+    }
+  };
+
+  // Stats
+  const stats = useMemo(() => {
+    const now = new Date();
+    let active = 0, expired = 0, totalUsage = 0;
+    promotions.forEach((p) => {
+      const end = p.end_date ? new Date(p.end_date) : null;
+      const isExpired = !p.is_active || (end && now > end) || (p.usage_limit && p.usage_count >= p.usage_limit);
+      if (isExpired) expired++;
+      else active++;
+      totalUsage += p.usage_count;
+    });
+    return { total: promotions.length, active, expired, totalUsage };
+  }, [promotions]);
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return allProducts.slice(0, 50);
+    const q = productSearch.toLowerCase();
+    return allProducts.filter(p =>
+      p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    ).slice(0, 50);
+  }, [allProducts, productSearch]);
+
+  const toggleApplyId = (id: string) => {
+    setFormApplyToIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleBundleId = (id: string) => {
+    setFormBundleProductIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
+          <div className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0">
+            <FiGift className="w-6 h-6" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng khuyến mãi</p>
+            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.total}</h2>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
+            <HiOutlineLightBulb className="w-6 h-6" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đang hoạt động</p>
+            <h2 className="text-2xl font-black text-emerald-700 mt-1">{stats.active}</h2>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
+          <div className="w-11 h-11 rounded-xl bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
+            <HiOutlineClock className="w-6 h-6" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hết hạn / Tắt</p>
+            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.expired}</h2>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
+          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+            <FiHash className="w-6 h-6" />
+          </div>
+          <div className="leading-tight">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng lượt sử dụng</p>
+            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.totalUsage}</h2>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 max-w-xs">
+            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm kiếm theo tên hoặc mã..."
+              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition" />
+          </div>
+          <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
+            {(['all', 'active', 'expired'] as const).map((s) => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition ${statusFilter === s ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                {s === 'all' ? 'Tất cả' : s === 'active' ? 'Đang chạy' : 'Hết hạn'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {canManage && (
+          <button onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-4 py-2.5 text-xs font-extrabold text-white transition-all shadow-md shadow-violet-500/20 hover:shadow-lg hover:-translate-y-0.5">
+            <HiOutlinePlus className="w-4 h-4 stroke-2" />
+            Tạo khuyến mãi
+          </button>
+        )}
+      </div>
+
+      {/* Promotions Table */}
+      <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+            <span className="ml-3 text-xs font-bold text-slate-500">Đang tải...</span>
+          </div>
+        ) : promotions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-400 mb-3">
+              <FiGift className="w-7 h-7" />
+            </div>
+            <p className="text-sm font-black text-slate-600">Chưa có khuyến mãi nào</p>
+            <p className="text-xs text-slate-400 mt-1">Tạo chương trình khuyến mãi đầu tiên cho cửa hàng</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200/60">
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Tên chương trình</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Loại / Giảm giá</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Phạm vi</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Thời hạn</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Đã dùng</th>
+                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</th>
+                  {canManage && (
+                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">Thao tác</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {promotions.map((promo) => {
+                  const status = getPromoStatus(promo);
+                  const typeInfo = DISCOUNT_TYPE_CONFIG[promo.discount_type] || DISCOUNT_TYPE_CONFIG.percent;
+                  return (
+                    <tr key={promo.id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-xl ${typeInfo.bg} ${typeInfo.border} border flex items-center justify-center flex-shrink-0 ${typeInfo.color}`}>
+                            <DiscountTypeIcon type={promo.discount_type} className="w-4.5 h-4.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-slate-800 truncate max-w-[200px]" title={promo.name}>{promo.name}</p>
+                            {promo.description && <p className="text-[10px] text-slate-400 truncate max-w-[200px]" title={promo.description}>{promo.description}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {promo.code ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-xs font-black text-slate-700 tracking-wide border border-slate-200">
+                            <HiOutlineTag className="w-3 h-3" />{promo.code}
+                          </span>
+                        ) : <span className="text-[10px] font-bold text-slate-400 italic">Tự động</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="space-y-0.5">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${typeInfo.bg} ${typeInfo.color}`}>
+                            <DiscountTypeIcon type={promo.discount_type} className="w-3 h-3" />{typeInfo.label}
+                          </span>
+                          <p className={`text-xs font-black ${typeInfo.color}`}>{getDiscountDisplay(promo)}</p>
+                          {promo.max_discount ? <p className="text-[10px] text-slate-400 font-bold">Tối đa: {money(promo.max_discount)}</p> : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          promo.apply_to === 'all' ? 'bg-blue-50 text-blue-600' : promo.apply_to === 'category' ? 'bg-amber-50 text-amber-600' : 'bg-pink-50 text-pink-600'
+                        }`}>
+                          {promo.apply_to === 'all' ? 'Toàn đơn' : promo.apply_to === 'category' ? 'Danh mục' : 'Sản phẩm'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-[11px] font-bold text-slate-600">{formatDate(promo.start_date)}</p>
+                        <p className="text-[10px] text-slate-400 font-bold">→ {promo.end_date ? formatDate(promo.end_date) : 'Vô thời hạn'}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-black text-slate-700">
+                          {promo.usage_count}{promo.usage_limit ? <span className="text-slate-400 font-bold">/{promo.usage_limit}</span> : ''}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-lg border ${status.className}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />{status.label}
+                        </span>
+                      </td>
+                      {canManage && (
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleToggleActive(promo)}
+                              className={`p-1.5 rounded-lg text-xs transition ${promo.is_active ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                              title={promo.is_active ? 'Tắt' : 'Bật'}>
+                              {promo.is_active ? <HiOutlineExclamationCircle className="w-4 h-4" /> : <HiOutlineCheck className="w-4 h-4" />}
+                            </button>
+                            <button onClick={() => openEdit(promo)} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition" title="Sửa">
+                              <HiOutlinePencil className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => setConfirmDeleteId(promo.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="Xóa">
+                              <HiOutlineTrash className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Confirm */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmDeleteId(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600"><HiOutlineTrash className="w-5 h-5" /></div>
+              <div><h3 className="text-sm font-black text-slate-800">Xóa khuyến mãi?</h3><p className="text-xs text-slate-500 mt-0.5">Thao tác này không thể hoàn tác</p></div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDeleteId(null)} className="flex-1 py-2 rounded-xl border border-slate-200 text-xs font-extrabold text-slate-700 hover:bg-slate-50 transition">Hủy</button>
+              <button onClick={() => handleDelete(confirmDeleteId)} className="flex-1 py-2 rounded-xl bg-red-600 text-white text-xs font-extrabold hover:bg-red-700 transition shadow-md">Xác nhận xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════ */}
+      {/* CREATE/EDIT MODAL with SMART INPUT          */}
+      {/* ═══════════════════════════════════════════ */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto pt-6 pb-6" onClick={() => { setShowModal(false); resetForm(); }}>
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl mx-4 my-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600"><FiGift className="w-5 h-5" /></div>
+                <h3 className="text-sm font-black text-slate-800">{editId ? 'Chỉnh sửa khuyến mãi' : 'Tạo khuyến mãi mới'}</h3>
+              </div>
+              <button onClick={() => { setShowModal(false); resetForm(); }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition"><HiOutlineX className="w-5 h-5" /></button>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[72vh] overflow-y-auto">
+
+              {/* ═══ SMART INPUT ═══ */}
+              {!editId && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-1.5 text-[10px] font-black text-violet-600 uppercase tracking-wider">
+                    <HiOutlineSparkles className="w-3.5 h-3.5" /> Nhập nhanh bằng mô tả
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text" value={smartInput}
+                      onChange={(e) => setSmartInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && smartParsed) { e.preventDefault(); applySmartResult(); } }}
+                      placeholder='VD: "SP thứ 2 giảm 50%" hoặc "Mua 2 tặng 1"'
+                      className="w-full border border-violet-200 bg-violet-50/30 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition pr-20"
+                    />
+                    {smartParsed && (
+                      <button type="button" onClick={applySmartResult}
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-violet-600 text-white text-[10px] font-black rounded-lg hover:bg-violet-700 transition">
+                        Áp dụng
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Smart parse preview */}
+                  {smartParsed && (
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].bg} ${DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].border}`}>
+                      <DiscountTypeIcon type={smartParsed.discount_type} className={`w-4 h-4 ${DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].color}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[11px] font-black ${DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].color}`}>
+                          {DISCOUNT_TYPE_CONFIG[smartParsed.discount_type].label}: {smartParsed.name}
+                        </p>
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400">{Math.round(smartParsed.confidence * 100)}%</span>
+                    </div>
+                  )}
+
+                  {/* Example chips */}
+                  {!smartInput && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {PROMO_EXAMPLES.slice(0, 4).map((ex) => (
+                        <button key={ex} type="button" onClick={() => setSmartInput(ex)}
+                          className="px-2 py-1 text-[9px] font-bold text-violet-600 bg-violet-50 border border-violet-100 rounded-lg hover:bg-violet-100 transition">
+                          {ex}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Divider */}
+              {!editId && <div className="border-t border-slate-100 pt-2"><p className="text-[9px] font-bold text-slate-400 text-center uppercase">hoặc cấu hình thủ công bên dưới</p></div>}
+
+              {/* Name */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tên chương trình *</label>
+                <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
+                  placeholder="VD: Giảm 20% cuối tuần / SP thứ 2 nửa giá"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition" required />
+              </div>
+
+              {/* Code + Description */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã KM</label>
+                  <input type="text" value={formCode} onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                    placeholder="VD: SALE20"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition uppercase" />
+                  <p className="text-[9px] text-slate-400">Bỏ trống → tự động áp dụng</p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mô tả</label>
+                  <input type="text" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
+                    placeholder="Ghi chú..." className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                </div>
+              </div>
+
+              {/* ═══ TYPE SELECTOR ═══ */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Loại khuyến mãi *</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {(Object.entries(DISCOUNT_TYPE_CONFIG) as [DiscountType, typeof DISCOUNT_TYPE_CONFIG['percent']][]).map(([key, info]) => (
+                    <button key={key} type="button" onClick={() => setFormDiscountType(key)}
+                      className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[10px] font-black border transition-all ${
+                        formDiscountType === key ? 'border-violet-500 bg-violet-50 text-violet-700 ring-1 ring-violet-500/20' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}>
+                      <DiscountTypeIcon type={key} className="w-3.5 h-3.5" />{info.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ═══ DYNAMIC FIELDS ═══ */}
+
+              {/* Percent */}
+              {formDiscountType === 'percent' && (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-orange-50/50 rounded-xl border border-orange-100">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-orange-600 uppercase tracking-wider">Phần trăm giảm (%)*</label>
+                    <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                      placeholder="VD: 20" min={1} max={100} className="w-full border border-orange-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 transition" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-orange-600 uppercase tracking-wider">Giảm tối đa (đ)</label>
+                    <input type="number" value={formMaxDiscount} onChange={(e) => setFormMaxDiscount(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="Không giới hạn" min={0} className="w-full border border-orange-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-orange-500 transition" />
+                  </div>
+                </div>
+              )}
+
+              {/* Fixed Amount */}
+              {formDiscountType === 'fixed_amount' && (
+                <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-1">
+                  <label className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Số tiền giảm (đ) *</label>
+                  <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                    placeholder="VD: 50000" min={1} className="w-full border border-blue-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" required />
+                </div>
+              )}
+
+              {/* Buy X Get Y */}
+              {formDiscountType === 'buy_x_get_y' && (
+                <div className="p-3 bg-pink-50/50 rounded-xl border border-pink-100 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-pink-600 uppercase tracking-wider">Mua (số lượng) *</label>
+                      <input type="number" value={formBuyQty} onChange={(e) => setFormBuyQty(Number(e.target.value))} min={1}
+                        className="w-full border border-pink-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-pink-500 transition" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-pink-600 uppercase tracking-wider">Tặng (số lượng) *</label>
+                      <input type="number" value={formGetQty} onChange={(e) => setFormGetQty(Number(e.target.value))} min={1}
+                        className="w-full border border-pink-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-pink-500 transition" required />
+                    </div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-2 border border-pink-200/50">
+                    <p className="text-[10px] font-bold text-pink-600 flex items-center gap-1">
+                      <FiGift className="w-3 h-3 flex-shrink-0" /> Khách mua <span className="font-black">{formBuyQty}</span> SP, tặng thêm <span className="font-black">{formGetQty}</span> SP (giá thấp nhất miễn phí)
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Fixed Price Combo */}
+              {formDiscountType === 'fixed_price' && (
+                <div className="p-3 bg-violet-50/50 rounded-xl border border-violet-100 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-violet-600 uppercase tracking-wider">Số SP trong combo *</label>
+                      <input type="number" value={formComboQty} onChange={(e) => setFormComboQty(Number(e.target.value))} min={2}
+                        className="w-full border border-violet-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-violet-600 uppercase tracking-wider">Giá combo (đ) *</label>
+                      <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                        placeholder="VD: 99000" min={1} className="w-full border border-violet-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" required />
+                    </div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-2 border border-violet-200/50">
+                    <p className="text-[10px] font-bold text-violet-600 flex items-center gap-1">
+                      <FiPackage className="w-3 h-3 flex-shrink-0" /> Mua <span className="font-black">{formComboQty}</span> SP bất kỳ = <span className="font-black">{formDiscountValue ? money(formDiscountValue) : '___'}</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ NEW: Nth Item Discount ═══ */}
+              {formDiscountType === 'nth_item_discount' && (
+                <div className="p-3 bg-teal-50/50 rounded-xl border border-teal-100 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-teal-600 uppercase tracking-wider">SP thứ mấy được giảm *</label>
+                      <input type="number" value={formNthItem} onChange={(e) => setFormNthItem(Number(e.target.value))} min={2}
+                        className="w-full border border-teal-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-teal-500 transition" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-teal-600 uppercase tracking-wider">Giảm bao nhiêu (%) *</label>
+                      <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                        placeholder="VD: 50" min={1} max={100}
+                        className="w-full border border-teal-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-teal-500 transition" required />
+                    </div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-2 border border-teal-200/50">
+                    <p className="text-[10px] font-bold text-teal-600 flex items-center gap-1">
+                      <HiOutlineLightningBolt className="w-3 h-3 flex-shrink-0" /> SP thứ <span className="font-black">{formNthItem}</span> được giảm <span className="font-black">{formDiscountValue || '___'}%</span>
+                      {formNthItem === 2 && formDiscountValue === 50 && <span className="ml-1 text-[9px] text-teal-500">(nửa giá — như CK)</span>}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ NEW: Happy Hour ═══ */}
+              {formDiscountType === 'happy_hour' && (
+                <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Từ lúc *</label>
+                      <input type="time" value={formHappyStart} onChange={(e) => setFormHappyStart(e.target.value)}
+                        className="w-full border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-amber-500 transition" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Đến lúc *</label>
+                      <input type="time" value={formHappyEnd} onChange={(e) => setFormHappyEnd(e.target.value)}
+                        className="w-full border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-amber-500 transition" required />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Giảm (%) *</label>
+                      <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                        placeholder="30" min={1} max={100}
+                        className="w-full border border-amber-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-amber-500 transition" required />
+                    </div>
+                  </div>
+                  <div className="bg-white/80 rounded-lg p-2 border border-amber-200/50">
+                    <p className="text-[10px] font-bold text-amber-600 flex items-center gap-1">
+                      <FiClock className="w-3 h-3 flex-shrink-0" /> Mỗi ngày từ <span className="font-black">{formHappyStart}</span> đến <span className="font-black">{formHappyEnd}</span> giảm <span className="font-black">{formDiscountValue || '___'}%</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ═══ NEW: Bundle ═══ */}
+              {formDiscountType === 'bundle' && (
+                <div className="p-3 bg-rose-50/50 rounded-xl border border-rose-100 space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Giá bundle (đ) *</label>
+                    <input type="number" value={formDiscountValue || ''} onChange={(e) => setFormDiscountValue(Number(e.target.value))}
+                      placeholder="VD: 35000" min={1}
+                      className="w-full border border-rose-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-rose-500 transition" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-rose-600 uppercase tracking-wider">Chọn SP trong bundle ({formBundleProductIds.length} đã chọn)</label>
+                    <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Tìm sản phẩm..."
+                      className="w-full border border-rose-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-rose-500 transition" />
+                    <div className="max-h-32 overflow-y-auto space-y-0.5 mt-1">
+                      {filteredProducts.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition">
+                          <input type="checkbox" checked={formBundleProductIds.includes(p.id)} onChange={() => toggleBundleId(p.id)}
+                            className="rounded border-slate-300 text-rose-600 focus:ring-rose-500/20" />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-semibold text-slate-700 truncate block">{p.name}</span>
+                            <span className="text-[10px] text-slate-400 font-bold">{money(p.sell_price)}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  {formBundleProductIds.length >= 2 && (
+                    <div className="bg-white/80 rounded-lg p-2 border border-rose-200/50">
+                      <p className="text-[10px] font-bold text-rose-600 flex items-center gap-1">
+                        <FiLink className="w-3 h-3 flex-shrink-0" /> {formBundleProductIds.length} SP cùng nhau = <span className="font-black">{formDiscountValue ? money(formDiscountValue) : '___'}</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Min Order */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Đơn hàng tối thiểu (đ)</label>
+                <input type="number" value={formMinOrder || ''} onChange={(e) => setFormMinOrder(Number(e.target.value))}
+                  placeholder="0 = không yêu cầu" min={0}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+              </div>
+
+              {/* Apply To (skip for bundle) */}
+              {formDiscountType !== 'bundle' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Phạm vi áp dụng</label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'all' as const, label: 'Toàn đơn hàng', Icon: HiOutlineShoppingCart },
+                      { value: 'category' as const, label: 'Theo danh mục', Icon: HiOutlineFolder },
+                      { value: 'product' as const, label: 'Theo sản phẩm', Icon: HiOutlineCube },
+                    ]).map((opt) => (
+                      <button key={opt.value} type="button" onClick={() => { setFormApplyTo(opt.value); setFormApplyToIds([]); }}
+                        className={`flex-1 flex items-center gap-1.5 justify-center py-2 rounded-xl text-[10px] font-black border transition ${
+                          formApplyTo === opt.value ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}>
+                        <opt.Icon className="w-3.5 h-3.5" />{opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {formApplyTo === 'category' && (
+                    <div className="border border-slate-200 rounded-xl p-3 max-h-36 overflow-y-auto space-y-1 bg-slate-50/50">
+                      {categories.length === 0 ? <p className="text-[10px] text-slate-400 text-center py-2">Chưa có danh mục nào</p> :
+                        categories.map((cat) => (
+                          <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition">
+                            <input type="checkbox" checked={formApplyToIds.includes(cat.id)} onChange={() => toggleApplyId(cat.id)}
+                              className="rounded border-slate-300 text-violet-600 focus:ring-violet-500/20" />
+                            <span className="text-xs font-semibold text-slate-700">{cat.name}</span>
+                          </label>
+                        ))
+                      }
+                    </div>
+                  )}
+
+                  {formApplyTo === 'product' && (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                      <div className="px-3 py-2 border-b border-slate-200">
+                        <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+                          placeholder="Tìm sản phẩm..." className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                        {formApplyToIds.length > 0 && <p className="text-[10px] font-bold text-violet-600 mt-1">Đã chọn {formApplyToIds.length} sản phẩm</p>}
+                      </div>
+                      <div className="max-h-36 overflow-y-auto p-2 space-y-0.5">
+                        {filteredProducts.map((p) => (
+                          <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition">
+                            <input type="checkbox" checked={formApplyToIds.includes(p.id)} onChange={() => toggleApplyId(p.id)}
+                              className="rounded border-slate-300 text-violet-600 focus:ring-violet-500/20" />
+                            <div className="min-w-0">
+                              <span className="text-xs font-semibold text-slate-700 truncate block">{p.name}</span>
+                              <span className="text-[10px] text-slate-400 font-bold">{p.sku}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ngày bắt đầu</label>
+                  <input type="datetime-local" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ngày kết thúc</label>
+                  <input type="datetime-local" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                  <p className="text-[9px] text-slate-400">Bỏ trống → vô thời hạn</p>
+                </div>
+              </div>
+
+              {/* Usage Limit + Active */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Giới hạn lượt</label>
+                  <input type="number" value={formUsageLimit} onChange={(e) => setFormUsageLimit(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="Không giới hạn" min={1}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</label>
+                  <button type="button" onClick={() => setFormIsActive(!formIsActive)}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-extrabold transition flex items-center justify-center gap-2 ${
+                      formIsActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'
+                    }`}>
+                    {formIsActive ? <HiOutlineCheck className="w-4 h-4" /> : <HiOutlineX className="w-4 h-4" />}
+                    {formIsActive ? 'Đang kích hoạt' : 'Đã tắt'}
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Footer */}
+            <div className="flex gap-2 px-6 py-4 border-t border-slate-100">
+              <button type="button" onClick={() => { setShowModal(false); resetForm(); }}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-extrabold text-slate-700 hover:bg-slate-50 transition">
+                Hủy bỏ
+              </button>
+              <button onClick={handleSubmit} disabled={saving}
+                className="flex-1 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-extrabold hover:bg-violet-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                {saving ? 'Đang lưu...' : editId ? 'Cập nhật' : 'Tạo khuyến mãi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PromotionsTab;

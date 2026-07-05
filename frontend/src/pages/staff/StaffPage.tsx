@@ -223,6 +223,22 @@ const StaffPage = () => {
     }
   };
 
+  const activate = async (item: StaffUser) => {
+    if (!canManageStaff) {
+      toast.error('Chỉ admin mới có quyền mở khóa tài khoản nhân viên');
+      return;
+    }
+    try {
+      await staffAPI.update(item.id, { is_active: true });
+      toast.success('Đã mở khóa tài khoản');
+      await loadStaff();
+      if (editing?.id === item.id) resetForm();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Mở khóa thất bại');
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn pb-10">
       {/* 1. Page Header */}
@@ -470,10 +486,15 @@ const StaffPage = () => {
                                 <HiOutlinePencil className="h-4 w-4" />
                                 Sửa
                               </button>
-                              {item.is_active && (
-                                <button onClick={() => deactivate(item)} className="inline-flex items-center gap-1 text-xs font-bold text-red-600">
+                              {item.is_active ? (
+                                <button onClick={() => deactivate(item)} className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-800 transition">
                                   <HiOutlineXCircle className="h-4 w-4" />
                                   Khóa
+                                </button>
+                              ) : (
+                                <button onClick={() => activate(item)} className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 transition">
+                                  <HiOutlineCheckCircle className="h-4 w-4" />
+                                  Mở khóa
                                 </button>
                               )}
                             </td>

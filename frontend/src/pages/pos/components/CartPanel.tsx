@@ -1,11 +1,40 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   HiOutlineShoppingCart,
   HiOutlineTrash,
   HiOutlinePhone,
   HiOutlineTag,
+  HiOutlineCheck,
+  HiOutlineX,
 } from 'react-icons/hi';
-import { usePOSStore, usePOSFinalAmount } from '../../../stores/pos.store';
+import { FiLoader, FiGift, FiPercent, FiDollarSign, FiPackage } from 'react-icons/fi';
+import { usePOSStore, usePOSFinalAmount, usePOSTotal } from '../../../stores/pos.store';
 import { money, getProductImage } from '../utils/posHelpers';
+import { promotionAPI } from '../../../services/promotion.api';
+
+interface AutoPromoResult {
+  promotion: {
+    id: string;
+    name: string;
+    discount_type: string;
+    discount_value: number;
+    buy_quantity?: number;
+    get_quantity?: number;
+    combo_quantity?: number;
+  };
+  discount_amount: number;
+  description?: string;
+}
+
+const PromoTypeIcon = ({ type }: { type: string }) => {
+  switch (type) {
+    case 'percent': return <FiPercent className="w-3.5 h-3.5" />;
+    case 'fixed_amount': return <FiDollarSign className="w-3.5 h-3.5" />;
+    case 'buy_x_get_y': return <FiGift className="w-3.5 h-3.5" />;
+    case 'fixed_price': return <FiPackage className="w-3.5 h-3.5" />;
+    default: return <FiGift className="w-3.5 h-3.5" />;
+  }
+};
 
 interface CartPanelProps {
   onClearCart: () => void;
@@ -27,8 +56,135 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
   const setDiscountValue = usePOSStore((s) => s.setDiscountValue);
   const setVoucherCode = usePOSStore((s) => s.setVoucherCode);
   const setNewCustName = usePOSStore((s) => s.setNewCustName);
+  const setAutoPromoDiscount = usePOSStore((s) => s.setAutoPromoDiscount);
+  const setVoucherDiscount = usePOSStore((s) => s.setVoucherDiscount);
 
   const finalAmount = usePOSFinalAmount();
+  const total = usePOSTotal();
+
+  // ══════════════════════════════════════════════
+  // AUTO PROMOTIONS — detect when cart changes
+  // ══════════════════════════════════════════════
+  const [autoPromos, setAutoPromos] = useState<AutoPromoResult[]>([]);
+  const [autoPromoLoading, setAutoPromoLoading] = useState(false);
+
+  // Build cart fingerprint for debounced detection
+  const cartFingerprint = useMemo(() => {
+    return cart.map(i => `${i.product.id}:${i.quantity}`).sort().join('|');
+  }, [cart]);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setAutoPromos([]);
+      setAutoPromoDiscount(0);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const items = cart.map((item) => ({
+        product_id: item.product.id,
+        category_id: item.product.category_id || undefined,
+        quantity: item.quantity,
+        unit_price: Number(item.product.sell_price),
+      }));
+
+      setAutoPromoLoading(true);
+      try {
+        const res = await promotionAPI.getAutoPromotions({ order_total: total, items });
+        const data = res.data.data;
+        const arr = Array.isArray(data) ? data : [];
+        setAutoPromos(arr);
+        const sum = arr.reduce((acc, p) => acc + p.discount_amount, 0);
+        setAutoPromoDiscount(sum);
+      } catch {
+        setAutoPromos([]);
+        setAutoPromoDiscount(0);
+      } finally {
+        setAutoPromoLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [cartFingerprint, total, setAutoPromoDiscount]);
+
+  const totalAutoDiscount = useMemo(
+    () => autoPromos.reduce((sum, p) => sum + p.discount_amount, 0),
+    [autoPromos]
+  );
+
+  // ══════════════════════════════════════════════
+  // VOUCHER CODE validation (manual entry)
+  // ══════════════════════════════════════════════
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherResult, setVoucherResult] = useState<{
+    valid: boolean;
+    promoName: string;
+    discountAmount: number;
+    description: string;
+  } | null>(null);
+  const [voucherError, setVoucherError] = useState('');
+
+  const validateVoucher = useCallback(async (code: string) => {
+    if (!code.trim()) {
+      setVoucherResult(null);
+      setVoucherDiscount(0);
+      setVoucherError('');
+      return;
+    }
+
+    const items = cart.map((item) => ({
+      product_id: item.product.id,
+      category_id: item.product.category_id || undefined,
+      quantity: item.quantity,
+      unit_price: Number(item.product.sell_price),
+    }));
+
+    setVoucherLoading(true);
+    setVoucherError('');
+    try {
+      const res = await promotionAPI.validate({
+        code: code.trim(),
+        order_total: total,
+        items,
+      });
+      const disc = res.data.data.discount_amount;
+      setVoucherResult({
+        valid: true,
+        promoName: res.data.data.promotion.name,
+        discountAmount: disc,
+        description: (res.data.data as any).description || '',
+      });
+      setVoucherDiscount(disc);
+    } catch (err: any) {
+      setVoucherResult(null);
+      setVoucherDiscount(0);
+      setVoucherError(err.response?.data?.message || 'Mã không hợp lệ');
+    } finally {
+      setVoucherLoading(false);
+    }
+  }, [cart, total, setVoucherDiscount]);
+
+  // Debounce voucher validation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (voucherCode.trim().length >= 3) {
+        validateVoucher(voucherCode);
+      } else {
+        setVoucherResult(null);
+        setVoucherDiscount(0);
+        setVoucherError('');
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [voucherCode, total, cartFingerprint, validateVoucher, setVoucherDiscount]);
+
+  useEffect(() => {
+    if (cart.length === 0) {
+      setVoucherResult(null);
+      setVoucherDiscount(0);
+      setVoucherError('');
+    }
+  }, [cart.length, setVoucherDiscount]);
 
   return (
     <>
@@ -115,6 +271,56 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
             ))
           )}
         </div>
+
+        {/* ══════════════════════════════════════════════ */}
+        {/* AUTO PROMOTIONS — shows when cart qualifies   */}
+        {/* ══════════════════════════════════════════════ */}
+        {cart.length > 0 && (autoPromos.length > 0 || autoPromoLoading) && (
+          <div className="px-4 py-3 bg-emerald-50/60">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                <FiGift className="w-3.5 h-3.5" />
+                Khuyến mãi tự động
+              </h3>
+              {autoPromoLoading && (
+                <FiLoader className="w-3 h-3 text-emerald-500 animate-spin" />
+              )}
+            </div>
+
+            {autoPromos.length > 0 && (
+              <div className="space-y-1.5">
+                {autoPromos.map((ap) => (
+                  <div
+                    key={ap.promotion.id}
+                    className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-emerald-200/60 shadow-sm"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                        <PromoTypeIcon type={ap.promotion.discount_type} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-extrabold text-slate-800 truncate">{ap.promotion.name}</p>
+                        <p className="text-[9px] font-bold text-emerald-600">{ap.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className="text-xs font-black text-emerald-700">-{money(ap.discount_amount)}</span>
+                      <HiOutlineCheck className="w-3.5 h-3.5 text-emerald-500" />
+                    </div>
+                  </div>
+                ))}
+
+                {autoPromos.length > 1 && (
+                  <div className="flex justify-end pt-0.5">
+                    <span className="text-[10px] font-black text-emerald-700">
+                      Tổng KM: -{money(totalAutoDiscount)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Customer & Discount Panel */}
         <div className="p-4 bg-slate-50/50 space-y-3">
@@ -214,17 +420,45 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
             </div>
 
             <div className="space-y-1">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã giảm giá (Voucher)</label>
-              <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden w-full px-2">
-                <HiOutlineTag className="text-slate-400 w-4 h-4 flex-shrink-0" />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã khuyến mãi</label>
+              <div className={`flex items-center border rounded-lg bg-white overflow-hidden w-full px-2 transition ${
+                voucherResult?.valid
+                  ? 'border-emerald-400 ring-1 ring-emerald-400/20'
+                  : voucherError
+                  ? 'border-red-300 ring-1 ring-red-300/20'
+                  : 'border-slate-200'
+              }`}>
+                <HiOutlineTag className={`w-4 h-4 flex-shrink-0 ${
+                  voucherResult?.valid ? 'text-emerald-500' : voucherError ? 'text-red-400' : 'text-slate-400'
+                }`} />
                 <input
                   type="text"
                   value={voucherCode}
-                  onChange={(e) => setVoucherCode(e.target.value)}
-                  placeholder="Chọn hoặc nhập mã"
-                  className="flex-1 w-full px-1.5 py-1.5 text-xs font-semibold outline-none"
+                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                  placeholder="Nhập mã KM"
+                  className="flex-1 w-full px-1.5 py-1.5 text-xs font-semibold outline-none uppercase"
                 />
+                {voucherLoading && (
+                  <FiLoader className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />
+                )}
+                {!voucherLoading && voucherResult?.valid && (
+                  <HiOutlineCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                )}
+                {!voucherLoading && voucherError && voucherCode.trim() && (
+                  <HiOutlineX className="w-4 h-4 text-red-400 flex-shrink-0" />
+                )}
               </div>
+              {/* Voucher feedback */}
+              {voucherResult?.valid && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[9px] font-bold text-emerald-600">
+                    ✓ {voucherResult.promoName}: -{money(voucherResult.discountAmount)}
+                  </span>
+                </div>
+              )}
+              {voucherError && voucherCode.trim() && (
+                <p className="text-[9px] font-bold text-red-500 mt-0.5">{voucherError}</p>
+              )}
             </div>
           </div>
         </div>

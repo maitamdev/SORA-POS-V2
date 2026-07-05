@@ -308,3 +308,33 @@ export interface ProductBatch {
   updated_at: string;
   products?: Product;
 }
+
+export interface Promotion {
+  id: string;
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  discount_type: 'percent' | 'fixed_amount' | 'buy_x_get_y' | 'fixed_price' | 'nth_item_discount' | 'happy_hour' | 'bundle';
+  discount_value: number;
+  max_discount?: number | null;
+  min_order_amount: number;
+  buy_quantity?: number;
+  get_quantity?: number;
+  get_product_ids?: string[];
+  combo_quantity?: number;
+  nth_item?: number;
+  happy_hour_start?: string | null;
+  happy_hour_end?: string | null;
+  bundle_product_ids?: string[];
+  apply_to: 'all' | 'category' | 'product';
+  apply_to_ids: string[];
+  start_date: string;
+  end_date?: string | null;
+  usage_limit?: number | null;
+  usage_count: number;
+  is_active: boolean;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
