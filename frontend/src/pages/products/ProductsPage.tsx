@@ -416,17 +416,20 @@ const ProductsPage = () => {
   const handleBarcodeProductLookup = async (silent = false) => {
     const cleanBarcode = barcode.replace(/\D/g, '');
     if (cleanBarcode.length < 6) {
-      if (!silent) toast.error('Vui lòng nhập hoặc quét mã vạch hợp lệ');
+      if (!silent) toast.error('Vui lòng nhập hoặc quét mã vạch hợp lệ', { id: 'barcode-lookup' });
       return;
     }
 
     setProductLookupLoading(true);
+    // Hiển thị toast thông báo đang đọc (cả chế độ tự động và thủ công đều có phản hồi trực quan)
+    toast.loading('Đang tự động nhận diện sản phẩm...', { id: 'barcode-lookup' });
+
     try {
       const response = await aiAPI.identifyProductByBarcode(cleanBarcode);
       const suggestion = response.data.data;
 
       if (suggestion.exists && suggestion.raw) {
-        toast.error(`Sản phẩm đã tồn tại: ${suggestion.name}`, { id: 'duplicate-barcode-toast' });
+        toast.error(`Sản phẩm đã tồn tại: ${suggestion.name}`, { id: 'barcode-lookup' });
         if (window.confirm(`Sản phẩm "${suggestion.name}" đã tồn tại trong hệ thống.\n\nBạn có muốn chuyển sang chế độ CHỈNH SỬA sản phẩm này không?`)) {
           handleEditClick(suggestion.raw);
         }
@@ -442,11 +445,9 @@ const ProductsPage = () => {
       applySuggestedCategory(suggestion.category_name);
       lastLookupBarcodeRef.current = cleanBarcode;
 
-      toast.success(`AI đã nhận diện (${suggestion.source}): ${suggestion.name}`);
+      toast.success(`AI đã nhận diện (${suggestion.source}): ${suggestion.name}`, { id: 'barcode-lookup' });
     } catch (error: any) {
-      if (!silent) {
-        toast.error(error.response?.data?.message || 'Không nhận diện được sản phẩm từ mã vạch này');
-      }
+      toast.error(error.response?.data?.message || 'Không nhận diện được mã vạch này', { id: 'barcode-lookup' });
     } finally {
       setProductLookupLoading(false);
     }
@@ -458,9 +459,15 @@ const ProductsPage = () => {
     const cleanBarcode = barcode.replace(/\D/g, '');
     if (cleanBarcode.length < 8 || cleanBarcode === lastLookupBarcodeRef.current) return;
 
+    // Các chuẩn độ dài mã vạch phổ biến: EAN-8 (8 số), UPC-A (12 số), EAN-13 (13 số).
+    // Nếu quét bằng máy quét, độ dài chuẩn này sẽ đạt được ngay lập tức -> tự động tra cứu nhanh sau 150ms.
+    // Nếu gõ thủ công thì dùng độ trễ 450ms để chờ gõ xong.
+    const isStandardLength = [8, 12, 13].includes(cleanBarcode.length);
+    const delay = isStandardLength ? 150 : 450;
+
     const timer = window.setTimeout(() => {
       handleBarcodeProductLookup(true);
-    }, 600);
+    }, delay);
 
     return () => window.clearTimeout(timer);
   }, [barcode, showModal, isEditMode]);
