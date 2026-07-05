@@ -821,7 +821,13 @@ Sử dụng Markdown:
       const fullTitle = titleMatch[1].trim();
       const name = fullTitle.replace(/\s*\|\s*iCheck(\.vn)?/gi, '').trim();
 
-      if (!name || name === 'iCheck - Mạng xã hội sản phẩm, quét mã vạch và truy xuất nguồn gốc' || name.toLowerCase().includes('không tìm thấy')) {
+      if (
+        !name ||
+        name === 'iCheck - Mạng xã hội sản phẩm, quét mã vạch và truy xuất nguồn gốc' ||
+        name.toLowerCase().includes('không tìm thấy') ||
+        name.toLowerCase().includes('chưa được cập nhật') ||
+        name.toLowerCase().includes('chua duoc cap nhat')
+      ) {
         return null;
       }
 
@@ -850,6 +856,94 @@ Sử dụng Markdown:
       // ignore
     }
     return null;
+  }
+
+  private static async fetchFromSearchEngine(barcode: string): Promise<NormalizedProductInfo[]> {
+    try {
+      const response = await fetch(
+        `https://search.yahoo.com/search?q=${encodeURIComponent(barcode)}`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+          },
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+
+      if (!response.ok) return [];
+      const html = await response.text();
+
+      const titleRegex = /<h3[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/h3>/g;
+      const compTextRegex = /<div class="compText[^"]*">([\s\S]*?)<\/div>/g;
+
+      const titles: string[] = [];
+      const snippets: string[] = [];
+      let match;
+
+      while ((match = titleRegex.exec(html)) !== null) {
+        const cleanTitle = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        if (cleanTitle) {
+          titles.push(this.decodeHtmlEntities(cleanTitle));
+        }
+      }
+
+      while ((match = compTextRegex.exec(html)) !== null) {
+        const cleanSnippet = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        if (cleanSnippet) {
+          snippets.push(this.decodeHtmlEntities(cleanSnippet));
+        }
+      }
+
+      const results: NormalizedProductInfo[] = [];
+      const count = Math.min(titles.length, snippets.length, 5);
+
+      for (let i = 0; i < count; i++) {
+        results.push({
+          source: 'web-search',
+          source_url: 'https://search.yahoo.com',
+          name: titles[i],
+          description: snippets[i],
+        });
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Lỗi khi fetch search engine:', error);
+      return [];
+    }
+  }
+
+  private static decodeHtmlEntities(str: string): string {
+    if (!str) return '';
+    return str
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&aacute;/g, 'á').replace(/&amp;aacute;/g, 'á').replace(/&agrave;/g, 'à').replace(/&amp;agrave;/g, 'à')
+      .replace(/&Aacute;/g, 'Á').replace(/&amp;Aacute;/g, 'Á').replace(/&Agrave;/g, 'À').replace(/&amp;Agrave;/g, 'À')
+      .replace(/&eacute;/g, 'é').replace(/&amp;eacute;/g, 'é').replace(/&egrave;/g, 'è').replace(/&amp;egrave;/g, 'è')
+      .replace(/&Eacute;/g, 'É').replace(/&amp;Eacute;/g, 'É').replace(/&Egrave;/g, 'È').replace(/&amp;Egrave;/g, 'È')
+      .replace(/&iacute;/g, 'í').replace(/&amp;iacute;/g, 'í').replace(/&igrave;/g, 'ì').replace(/&amp;igrave;/g, 'ì')
+      .replace(/&Iacute;/g, 'Í').replace(/&amp;Iacute;/g, 'Í').replace(/&Igrave;/g, 'Ì').replace(/&amp;Igrave;/g, 'Ì')
+      .replace(/&oacute;/g, 'ó').replace(/&amp;oacute;/g, 'ó').replace(/&ograve;/g, 'ò').replace(/&amp;ograve;/g, 'ò')
+      .replace(/&Oacute;/g, 'Ó').replace(/&amp;Oacute;/g, 'Ó').replace(/&Ograve;/g, 'Ò').replace(/&amp;Ograve;/g, 'Ò')
+      .replace(/&uacute;/g, 'ú').replace(/&amp;uacute;/g, 'ú').replace(/&ugrave;/g, 'ù').replace(/&amp;ugrave;/g, 'ù')
+      .replace(/&Uacute;/g, 'Ú').replace(/&amp;Uacute;/g, 'Ú').replace(/&Ugrave;/g, 'Ù').replace(/&amp;Ugrave;/g, 'Ù')
+      .replace(/&yacute;/g, 'ý').replace(/&amp;yacute;/g, 'ý').replace(/&ygrave;/g, 'ỳ').replace(/&amp;ygrave;/g, 'ỳ')
+      .replace(/&Yacute;/g, 'Ý').replace(/&amp;Yacute;/g, 'Ý').replace(/&Ygrave;/g, 'Ỳ').replace(/&amp;Ygrave;/g, 'Ỳ')
+      .replace(/&acirc;/g, 'â').replace(/&amp;acirc;/g, 'â').replace(/&ecirc;/g, 'ê').replace(/&amp;ecirc;/g, 'ê').replace(/&ocirc;/g, 'ô').replace(/&amp;ocirc;/g, 'ô')
+      .replace(/&Acirc;/g, 'Â').replace(/&amp;Acirc;/g, 'Â').replace(/&Ecirc;/g, 'Ê').replace(/&amp;Ecirc;/g, 'Ê').replace(/&Ocirc;/g, 'Ô').replace(/&amp;Ocirc;/g, 'Ô')
+      .replace(/&atilde;/g, 'ã').replace(/&amp;atilde;/g, 'ã').replace(/&Atilde;/g, 'Ã').replace(/&amp;Atilde;/g, 'Ã').replace(/&otilde;/g, 'õ').replace(/&amp;otilde;/g, 'õ').replace(/&Otilde;/g, 'Õ').replace(/&amp;Otilde;/g, 'Õ')
+      .replace(/&deg;/g, '°')
+      .replace(/&trade;/g, '™')
+      .replace(/&reg;/g, '®')
+      .replace(/&copy;/g, '©');
   }
 
   private static async generateSku(name: string, barcode: string): Promise<string> {
@@ -903,10 +997,15 @@ Sử dụng Markdown:
     const description = results.map(r => r.description).find(Boolean) || '';
     const imageUrl = results.map(r => r.image_url).find(Boolean) || null;
 
+    // Lọc sạch tên cửa hàng / sàn thương mại điện tử khỏi tên sản phẩm
+    const cleanedRawName = rawName
+      .replace(/\s*[-–|:|]\s*(Minh Cầu Mart|Bách Hóa Xanh|Shopee|Tiki|Lazada|Sendo|WinMart|Coopmart|Co\.opmart|Điện Máy Xanh|Thế Giới Di Động|Siêu thị.*|Giá rẻ.*|Mua ngay.*)$/gi, '')
+      .trim();
+
     // Xây tên tốt nhất: nếu tên gốc chưa chứa brand thì thêm brand vào
-    let name = rawName;
-    if (brand && rawName && !rawName.toLowerCase().includes(brand.toLowerCase())) {
-      name = `${brand} ${rawName}`;
+    let name = cleanedRawName;
+    if (brand && cleanedRawName && !cleanedRawName.toLowerCase().includes(brand.toLowerCase())) {
+      name = `${brand} ${cleanedRawName}`;
     }
     if (!name) name = `Sản phẩm ${barcode}`;
     
@@ -953,8 +1052,8 @@ Danh mục POS hiện có:
 ${formattedCategories}
 
 QUY TẮC BẮT BUỘC:
-1. "name": PHẢI dùng ĐÚNG tên sản phẩm từ dữ liệu gốc ở trên. TUYỆT ĐỐI KHÔNG được đổi tên, KHÔNG dịch tên thương hiệu. Ví dụ: nếu dữ liệu gốc ghi "Pepsi" thì PHẢI giữ "Pepsi", KHÔNG được đổi thành "Coca Cola" hay bất kỳ tên khác. Chỉ được chuẩn hóa format (bỏ ký tự thừa, thêm dung tích nếu có). Tên gốc tham chiếu: "${bestSourceName}"
-2. "brand": Lấy ĐÚNG từ trường "brands" trong dữ liệu gốc. KHÔNG tự chế.
+1. "name": Chuẩn hóa tên sản phẩm từ dữ liệu gốc ở trên. Hãy loại bỏ các hậu tố tên thương mại, tên website hoặc cửa hàng (ví dụ: "- Minh Cầu Mart", "- Bách Hóa Xanh", "- Shopee", "Tiki", "Lazada", "Siêu thị...", "Giá rẻ...", "Mua ngay...") và các thông tin quảng cáo/khuyến mãi thừa thãi. Chỉ giữ lại tên sản phẩm chính xác kèm dung tích/trọng lượng nếu có. Tên gốc tham chiếu: "${bestSourceName}"
+2. "brand": Lấy đúng thương hiệu của sản phẩm từ trường "brand" trong dữ liệu gốc. Nếu không có trường thương hiệu rõ ràng (ví dụ dữ liệu từ web-search), hãy phân tích tiêu đề và mô tả sản phẩm để trích xuất thương hiệu chính xác nhất (ví dụ: "Pepsi", "Coca-Cola", "Trung Nguyên", "Chinsu"...). Nếu không xác định được thương hiệu, hãy để null.
 3. "category_name": CHỈ chọn 1 tên danh mục CÓ TRONG danh sách trên. Nếu không phù hợp → null. KHÔNG tự chế danh mục.
 4. "unit": Chọn đơn vị (Lon, Chai, Gói, Hộp, Cái, Túi, Lốc, Thùng, Cây, Cuộn). Lon dạng can/lon kim loại. Chai dạng chai nhựa/thủy tinh.
 5. "description": Mô tả ngắn 20-40 từ tiếng Việt, tự nhiên.
@@ -1229,6 +1328,17 @@ Chỉ trả về JSON thuần túy:
         .map(r => r.value);
     } catch (e) {
       console.error('Lỗi khi fetch barcode/QR APIs:', e);
+    }
+
+    if (validResults.length === 0 && cleanBarcode.length >= 6) {
+      try {
+        const searchResults = await this.fetchFromSearchEngine(cleanBarcode);
+        if (searchResults.length > 0) {
+          validResults.push(...searchResults);
+        }
+      } catch (err) {
+        console.error('Lỗi khi tìm kiếm qua search engine fallback:', err);
+      }
     }
 
     if (validResults.length === 0) {
