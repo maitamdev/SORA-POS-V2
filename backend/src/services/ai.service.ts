@@ -859,6 +859,9 @@ Sử dụng Markdown:
   }
 
   private static async fetchFromSearchEngine(barcode: string): Promise<NormalizedProductInfo[]> {
+    const results: NormalizedProductInfo[] = [];
+
+    // 1. Thử tìm kiếm bằng Yahoo Search
     try {
       const response = await fetch(
         `https://search.yahoo.com/search?q=${encodeURIComponent(barcode)}`,
@@ -867,51 +870,89 @@ Sử dụng Markdown:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
           },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(6000),
         }
       );
 
-      if (!response.ok) return [];
-      const html = await response.text();
+      if (response.ok) {
+        const html = await response.text();
+        const titleRegex = /<h3[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/h3>/g;
+        const compTextRegex = /<div class="compText[^"]*">([\s\S]*?)<\/div>/g;
 
-      const titleRegex = /<h3[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/h3>/g;
-      const compTextRegex = /<div class="compText[^"]*">([\s\S]*?)<\/div>/g;
+        const titles: string[] = [];
+        const snippets: string[] = [];
+        let match;
 
-      const titles: string[] = [];
-      const snippets: string[] = [];
-      let match;
+        while ((match = titleRegex.exec(html)) !== null) {
+          const cleanTitle = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          if (cleanTitle) {
+            titles.push(this.decodeHtmlEntities(cleanTitle));
+          }
+        }
 
-      while ((match = titleRegex.exec(html)) !== null) {
-        const cleanTitle = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-        if (cleanTitle) {
-          titles.push(this.decodeHtmlEntities(cleanTitle));
+        while ((match = compTextRegex.exec(html)) !== null) {
+          const cleanSnippet = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          if (cleanSnippet) {
+            snippets.push(this.decodeHtmlEntities(cleanSnippet));
+          }
+        }
+
+        const count = Math.min(titles.length, snippets.length, 5);
+        for (let i = 0; i < count; i++) {
+          results.push({
+            source: 'web-search',
+            source_url: 'https://search.yahoo.com',
+            name: titles[i],
+            description: snippets[i],
+          });
         }
       }
-
-      while ((match = compTextRegex.exec(html)) !== null) {
-        const cleanSnippet = match[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-        if (cleanSnippet) {
-          snippets.push(this.decodeHtmlEntities(cleanSnippet));
-        }
-      }
-
-      const results: NormalizedProductInfo[] = [];
-      const count = Math.min(titles.length, snippets.length, 5);
-
-      for (let i = 0; i < count; i++) {
-        results.push({
-          source: 'web-search',
-          source_url: 'https://search.yahoo.com',
-          name: titles[i],
-          description: snippets[i],
-        });
-      }
-
-      return results;
     } catch (error) {
-      console.error('Lỗi khi fetch search engine:', error);
-      return [];
+      console.warn('Lỗi khi fetch Yahoo Search (bỏ qua):', error);
     }
+
+    // 2. Thử tìm kiếm bằng Bing Search nếu Yahoo không trả về kết quả (thường gặp khi chạy trên serverless Vercel bị chặn IP)
+    if (results.length === 0) {
+      try {
+        const response = await fetch(
+          `https://www.bing.com/search?q=${encodeURIComponent(barcode)}`,
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+            },
+            signal: AbortSignal.timeout(6000),
+          }
+        );
+
+        if (response.ok) {
+          const html = await response.text();
+          const blockRegex = /<li[^>]*class="[^"]*b_algo[^"]*"[^>]*>([\s\S]*?)<\/li>/g;
+          let match;
+
+          while ((match = blockRegex.exec(html)) !== null && results.length < 5) {
+            const block = match[1];
+            const titleMatch = block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+            if (titleMatch) {
+              const titleText = titleMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+              const pMatch = block.match(/<p[^>]*>([\s\S]*?)<\/p>/i) || block.match(/<div[^>]*class="[^"]*b_caption[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+              const snippetText = pMatch ? pMatch[1].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() : '';
+
+              results.push({
+                source: 'web-search',
+                source_url: 'https://www.bing.com',
+                name: this.decodeHtmlEntities(titleText),
+                description: this.decodeHtmlEntities(snippetText),
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Lỗi khi fetch Bing Search (bỏ qua):', error);
+      }
+    }
+
+    return results;
   }
 
   private static decodeHtmlEntities(str: string): string {
