@@ -5,6 +5,7 @@ export const orderCreateSchema = z.object({
   customer_id: z.string().uuid().optional().nullable(),
   shift_code: z.string().trim().min(4).max(16).optional(),
   discount_amount: z.coerce.number().min(0).optional(),
+  manual_discount_amount: z.coerce.number().min(0).optional(),
   used_points: z.coerce.number().int().min(0).optional(),
   note: z.string().trim().optional().nullable(),
   payment: z.object({

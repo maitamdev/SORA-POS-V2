@@ -394,14 +394,23 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                   type="number"
                   value={discountValue || ''}
                   disabled={!operationSettings.allowDiscount}
-                  max={discountType === 'percent' ? operationSettings.maxDiscountPercent : undefined}
+                  max={
+                    discountType === 'percent'
+                      ? operationSettings.maxDiscountPercent
+                      : Math.floor((total * (operationSettings.maxDiscountPercent ?? 100)) / 100)
+                  }
                   onChange={(e) => {
-                    const nextValue = Number(e.target.value);
-                    setDiscountValue(
+                    const valStr = e.target.value;
+                    if (valStr === '') {
+                      setDiscountValue(0);
+                      return;
+                    }
+                    const nextValue = Math.max(0, Number(valStr));
+                    const maxLimit =
                       discountType === 'percent'
-                        ? Math.min(nextValue, operationSettings.maxDiscountPercent)
-                        : nextValue
-                    );
+                        ? (operationSettings.maxDiscountPercent ?? 100)
+                        : Math.floor((total * (operationSettings.maxDiscountPercent ?? 100)) / 100);
+                    setDiscountValue(Math.min(nextValue, maxLimit));
                   }}
                   placeholder="0"
                   className="flex-1 w-full px-2.5 py-1.5 text-xs font-semibold outline-none disabled:bg-slate-100 disabled:text-slate-400"

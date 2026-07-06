@@ -27,10 +27,11 @@ export const usePOSCart = (operationSettings: OperationSettings) => {
 
   const discountAmount = useMemo(() => {
     const maxPercent = operationSettings.maxDiscountPercent ?? 100;
+    const maxDiscountValue = Math.floor((total * maxPercent) / 100);
     const safeDiscountValue =
       discountType === 'percent'
         ? Math.min(discountValue, maxPercent)
-        : discountValue;
+        : Math.min(discountValue, maxDiscountValue);
     if (discountType === 'percent') {
       return Math.floor((total * safeDiscountValue) / 100);
     }

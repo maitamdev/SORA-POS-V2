@@ -18,6 +18,7 @@ type CreateOrderInput = {
   customer_id?: string | null;
   shift_code?: string;
   discount_amount?: number;
+  manual_discount_amount?: number;
   used_points?: number;
   note?: string | null;
   payment?: {

@@ -26,6 +26,25 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error('❌ ErrorBoundary caught:', error, errorInfo);
+
+    // Tự động reload khi lỗi load chunk (do deploy phiên bản mới làm thay đổi hash file assets)
+    const errorMsg = error?.message || error?.toString() || '';
+    const isChunkError = 
+      errorMsg.includes('Failed to fetch dynamically imported module') ||
+      errorMsg.includes('error loading dynamically imported module') ||
+      errorMsg.includes('Expected a JavaScript-or-Wasm module script');
+
+    if (isChunkError) {
+      console.warn('[ErrorBoundary] Chunk load error detected. Attempting to reload page...');
+      const lastReload = localStorage.getItem('last_chunk_error_reload');
+      const now = Date.now();
+      
+      // Chỉ reload nếu lần reload trước đó cách đây hơn 10 giây (tránh loop vô hạn nếu server thực sự lỗi)
+      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+        localStorage.setItem('last_chunk_error_reload', now.toString());
+        window.location.reload();
+      }
+    }
   }
 
   handleReload = () => {

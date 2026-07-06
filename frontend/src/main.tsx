@@ -18,6 +18,17 @@ registerSW({
   },
 });
 
+// Lắng nghe sự kiện preload error của Vite khi có bản cập nhật mới (file hash cũ bị xóa khỏi server)
+window.addEventListener('vite:preloadError' as any, (event: any) => {
+  console.warn('[Vite] Preload error detected. Reloading page...', event);
+  const lastReload = localStorage.getItem('last_preload_error_reload');
+  const now = Date.now();
+  if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+    localStorage.setItem('last_preload_error_reload', now.toString());
+    window.location.reload();
+  }
+});
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

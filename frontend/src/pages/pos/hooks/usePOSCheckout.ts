@@ -270,11 +270,20 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
 
     store.setLoading(true);
 
+    // Calculate exact manual discount for the backend
+    const maxPercent = operationSettings.maxDiscountPercent ?? 100;
+    const maxDiscountValue = Math.floor((total * maxPercent) / 100);
+    const manualDiscount =
+      discountType === 'percent'
+        ? Math.floor((total * Math.min(discountValue, maxPercent)) / 100)
+        : Math.min(discountValue, maxDiscountValue);
+
     // Build order payload
     const orderPayload = {
       customer_id: matchedCustomer?.id || null,
       shift_code: activeShift?.shift_code || undefined,
       discount_amount: discountAmount + pointsDiscount,
+      manual_discount_amount: manualDiscount,
       used_points: isRedeemingPoints ? usedPoints : 0,
       note: null as string | null,
       payment: {
@@ -425,8 +434,11 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
 function _computeDiscountAmount(s: ReturnType<typeof usePOSStore.getState>) {
   const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
   const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
+  const maxDiscountValue = Math.floor((total * maxPercent) / 100);
   const safeValue =
-    s.discountType === 'percent' ? Math.min(s.discountValue, maxPercent) : s.discountValue;
+    s.discountType === 'percent'
+      ? Math.min(s.discountValue, maxPercent)
+      : Math.min(s.discountValue, maxDiscountValue);
   const manualDiscount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
   return manualDiscount + (s.autoPromoDiscount || 0) + (s.voucherDiscount || 0);
 }

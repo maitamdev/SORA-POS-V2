@@ -326,10 +326,11 @@ export const usePOSStore = create<POSState>()((set, get) => ({
 function computePOS(s: POSState) {
   const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
   const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
+  const maxDiscountValue = Math.floor((total * maxPercent) / 100);
   const safeValue =
     s.discountType === 'percent'
       ? Math.min(s.discountValue, maxPercent)
-      : s.discountValue;
+      : Math.min(s.discountValue, maxDiscountValue);
   const manualDiscount = s.discountType === 'percent' ? Math.floor((total * safeValue) / 100) : safeValue;
   
   // Total discount is the sum of manual discount + auto-matched promotions + voucher discount

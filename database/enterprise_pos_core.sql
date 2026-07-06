@@ -368,7 +368,10 @@ BEGIN
     GREATEST(COALESCE((p_payload->>'discount_amount')::numeric, 0), 0),
     v_total_amount
   );
-  v_manual_discount := GREATEST(v_discount_amount - v_points_discount, 0);
+  v_manual_discount := GREATEST(COALESCE(
+    (p_payload->>'manual_discount_amount')::numeric,
+    v_discount_amount - v_points_discount
+  ), 0);
 
   IF v_manual_discount > 0 AND NOT v_allow_discount THEN
     RAISE EXCEPTION 'Discounts are disabled by store settings';
