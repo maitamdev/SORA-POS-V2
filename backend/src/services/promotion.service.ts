@@ -36,15 +36,14 @@ function calculateDiscount(
     const setsAvailable = Math.floor(totalQualifyingQty / (buyQty + getQty));
 
     if (setsAvailable < 1) {
-      // Not enough items for even 1 full set, but check if they have buyQty
-      if (totalQualifyingQty >= buyQty + getQty) {
-        // Has enough for at least one set
-      } else {
-        return { discount_amount: 0, description: `Cần mua ${buyQty + getQty} SP để được tặng` };
-      }
+      const needed = buyQty + getQty - totalQualifyingQty;
+      return {
+        discount_amount: 0,
+        description: `Mua ${buyQty} tặng ${getQty} (Cần thêm ${needed} SP)`
+      };
     }
 
-    const freeCount = setsAvailable * getQty || getQty;
+    const freeCount = setsAvailable * getQty;
 
     // Calculate discount = price of cheapest items × free count
     const sortedByPrice = [...applicableItems]
@@ -72,7 +71,11 @@ function calculateDiscount(
 
     const totalQualifyingQty = applicableItems.reduce((sum, i) => sum + i.quantity, 0);
     if (totalQualifyingQty < comboQty) {
-      return { discount_amount: 0, description: `Cần ${comboQty} SP để áp dụng combo` };
+      const needed = comboQty - totalQualifyingQty;
+      return {
+        discount_amount: 0,
+        description: `Combo ${comboQty} SP = ${comboPrice.toLocaleString('vi-VN')}đ (Cần thêm ${needed} SP)`
+      };
     }
 
     // Sum the prices of the cheapest comboQty items (that's the original price)
@@ -96,7 +99,11 @@ function calculateDiscount(
 
     const totalQualifyingQty = applicableItems.reduce((sum, i) => sum + i.quantity, 0);
     if (totalQualifyingQty < nth) {
-      return { discount_amount: 0, description: `Cần mua ${nth} SP để được giảm` };
+      const needed = nth - totalQualifyingQty;
+      return {
+        discount_amount: 0,
+        description: `Mua ${nth} SP để được giảm SP thứ ${nth} (Cần thêm ${needed} SP)`
+      };
     }
 
     // Sort by price descending → the nth cheapest item gets discount
@@ -158,7 +165,10 @@ function calculateDiscount(
     const allPresent = bundleIds.every(id => cartProductIds.includes(id));
     if (!allPresent) {
       const missing = bundleIds.length - bundleIds.filter(id => cartProductIds.includes(id)).length;
-      return { discount_amount: 0, description: `Còn thiếu ${missing} SP trong combo` };
+      return {
+        discount_amount: 0,
+        description: `Mua combo nhóm SP = ${bundlePrice.toLocaleString('vi-VN')}đ (Còn thiếu ${missing} SP)`
+      };
     }
 
     // Calculate original price of bundle items (1 each)
@@ -456,14 +466,38 @@ export class PromotionService {
 
     for (const promo of promos) {
       if (promo.usage_limit && promo.usage_count >= promo.usage_limit) continue;
-      if (orderTotal < Number(promo.min_order_amount)) continue;
 
       const { applicableTotal, applicableItems } = getApplicableScope(promo, orderTotal, items);
+
+      // If the cart doesn't qualify for min_order_amount, check if it's relevant to show it as a suggestion
+      if (orderTotal < Number(promo.min_order_amount)) {
+        if (applicableItems.length > 0 || promo.apply_to === 'all') {
+          const needed = Number(promo.min_order_amount) - orderTotal;
+          results.push({
+            promotion: {
+              id: promo.id,
+              name: promo.name,
+              discount_type: promo.discount_type,
+              discount_value: Number(promo.discount_value),
+              max_discount: promo.max_discount ? Number(promo.max_discount) : null,
+              apply_to: promo.apply_to,
+              buy_quantity: promo.buy_quantity,
+              get_quantity: promo.get_quantity,
+              combo_quantity: promo.combo_quantity,
+            },
+            discount_amount: 0,
+            description: `Đơn tối thiểu ${Number(promo.min_order_amount).toLocaleString('vi-VN')}đ (Cần thêm ${needed.toLocaleString('vi-VN')}đ)`,
+          });
+        }
+        continue;
+      }
+
       if (applicableTotal <= 0 && promo.apply_to !== 'all') continue;
 
       const result = calculateDiscount(promo, applicableTotal, applicableItems);
 
-      if (result.discount_amount > 0) {
+      // Return the promotion if it either has discount_amount > 0 OR it is relevant but not yet fully met (discount_amount = 0)
+      if (result.discount_amount > 0 || (applicableItems.length > 0 && promo.apply_to !== 'all') || (promo.apply_to === 'all' && items.length > 0)) {
         results.push({
           promotion: {
             id: promo.id,

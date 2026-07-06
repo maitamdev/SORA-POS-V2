@@ -289,26 +289,43 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
 
             {autoPromos.length > 0 && (
               <div className="space-y-1.5">
-                {autoPromos.map((ap) => (
-                  <div
-                    key={ap.promotion.id}
-                    className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-emerald-200/60 shadow-sm"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <PromoTypeIcon type={ap.promotion.discount_type} />
+                {autoPromos.map((ap) => {
+                  const isApplied = ap.discount_amount > 0;
+                  return (
+                    <div
+                      key={ap.promotion.id}
+                      className={`flex items-center justify-between bg-white rounded-lg px-3 py-2 border shadow-sm ${
+                        isApplied ? 'border-emerald-200/60' : 'border-amber-200/60 bg-amber-50/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isApplied ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
+                        }`}>
+                          <PromoTypeIcon type={ap.promotion.discount_type} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-extrabold text-slate-800 truncate">{ap.promotion.name}</p>
+                          <p className={`text-[9px] font-bold ${isApplied ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {ap.description}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-extrabold text-slate-800 truncate">{ap.promotion.name}</p>
-                        <p className="text-[9px] font-bold text-emerald-600">{ap.description}</p>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {isApplied ? (
+                          <>
+                            <span className="text-xs font-black text-emerald-700">-{money(ap.discount_amount)}</span>
+                            <HiOutlineCheck className="w-3.5 h-3.5 text-emerald-500" />
+                          </>
+                        ) : (
+                          <span className="text-[9px] font-black text-amber-700 bg-amber-100/70 px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                            Chưa đạt
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-xs font-black text-emerald-700">-{money(ap.discount_amount)}</span>
-                      <HiOutlineCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {autoPromos.length > 1 && (
                   <div className="flex justify-end pt-0.5">
