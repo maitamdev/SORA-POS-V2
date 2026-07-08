@@ -33,3 +33,7 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 | `admin@sorapos.com` | `password123` | Admin |
 
 Mật khẩu demo chỉ dùng cho môi trường thuyết trình/kiểm thử. Khi đưa lên production cần đổi ngay tài khoản mặc định.
+
+
+# Khởi Tạo Database Sora POS (PostgreSQL/Supabase)
+

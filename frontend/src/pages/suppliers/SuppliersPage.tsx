@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { catalogAPI } from '../../services/catalog.api';
-import { aiAPI } from '../../services/ai.api';
 import { Supplier } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
 import {
@@ -176,10 +175,7 @@ const SuppliersPage = () => {
   const [formTaxCode, setFormTaxCode] = useState('');
   const [formStatus, setFormStatus] = useState<'active' | 'suspended' | 'inactive'>('active');
 
-  // AI suggestion state
-  const [aiLoading, setAiLoading] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  const [aiWebsite, setAiWebsite] = useState('');
 
   // Menu dropdown state
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
@@ -293,7 +289,6 @@ const SuppliersPage = () => {
     setFormAddress('');
     setFormTaxCode('');
     setFormStatus('active');
-    setAiWebsite('');
     setShowModal(true);
   };
 
@@ -306,45 +301,10 @@ const SuppliersPage = () => {
     setFormAddress(supplier.address || '');
     setFormTaxCode(getDisplayTaxCode(supplier.tax_code));
     setFormStatus(parseSupplierStatus(supplier));
-    setAiWebsite('');
     setShowModal(true);
     setOpenDropdownId(null);
   };
 
-  // Debounced auto-fill supplier info from AI in background
-  useEffect(() => {
-    if (editingSupplier || !formName.trim() || formName.trim().length < 4) {
-      setAiWebsite('');
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setAiLoading(true);
-      try {
-        const res = await aiAPI.suggestSupplier(formName.trim());
-        const data = res.data.data;
-        if (data) {
-          if (data.name && formName.trim() !== data.name) {
-            setFormName(data.name);
-          }
-          if (data.email && !formEmail) setFormEmail(data.email);
-          if (data.phone && !formPhone) setFormPhone(data.phone);
-          if (data.address && !formAddress) setFormAddress(data.address);
-          if (data.tax_code && !formTaxCode) setFormTaxCode(data.tax_code);
-          if (data.website) setAiWebsite(data.website);
-          
-          toast.success(`AI nhận diện đối tác: ${data.name || formName.trim()}`);
-        }
-      } catch (err) {
-        console.error('AI auto-suggest error:', err);
-      } finally {
-        setAiLoading(false);
-      }
-    }, 1500);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formName]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -910,7 +870,7 @@ const SuppliersPage = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
               <div className="flex items-center gap-3">
                 {/* Logo Preview inside modal */}
-                <SupplierAvatar name={formName} email={formEmail || (aiWebsite ? `info@${aiWebsite}` : null)} />
+                <SupplierAvatar name={formName} email={formEmail || null} />
                 <div>
                   <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
                     {editingSupplier ? 'Cập nhật thông tin đối tác' : 'Thêm nhà cung cấp mới'}
@@ -930,16 +890,10 @@ const SuppliersPage = () => {
 
             {/* Modal Form */}
             <form onSubmit={handleSave} className="flex-1 space-y-4 py-4 max-h-[75vh] overflow-y-auto pr-1">
-              {/* Supplier Name (with AI assist button) */}
+              {/* Supplier Name */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold uppercase text-slate-500 flex items-center justify-between">
                   <span>Tên nhà cung cấp <span className="text-rose-500">*</span></span>
-                  {aiLoading && (
-                    <span className="text-[10px] font-black text-emerald-650 flex items-center gap-1 animate-pulse">
-                      <FiRefreshCw className="animate-spin text-emerald-600" size={10} />
-                      AI đang tự động nhận diện...
-                    </span>
-                  )}
                 </label>
                 <div className="relative">
                   <input
@@ -948,14 +902,8 @@ const SuppliersPage = () => {
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="Ví dụ: Công ty TNHH Mayora"
                     required
-                    className="w-full h-10 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold outline-none focus:border-slate-400 transition pr-20"
+                    className="w-full h-10 rounded-xl border border-slate-200 px-3.5 text-sm font-semibold outline-none focus:border-slate-400 transition"
                   />
-                  {aiWebsite && (
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-200/60 px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[120px] truncate" title={`Website: ${aiWebsite}`}>
-                      <FiGlobe size={8} />
-                      {aiWebsite}
-                    </span>
-                  )}
                 </div>
               </div>
 
