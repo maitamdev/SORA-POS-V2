@@ -501,9 +501,9 @@ const ReportsPage = () => {
   }, [topProducts]);
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10">
+    <div className="flex flex-col gap-6 animate-fadeIn pb-10">
       {/* HEADER SECTION */}
-      <header className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
+      <header className="-order-20 flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">Thống kê doanh thu</h1>
           <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-1.5">
@@ -1071,7 +1071,7 @@ const ReportsPage = () => {
       </section>
 
       {/* AI STOCK ANALYSIS + STOCK SUMMARY DASHBOARD */}
-      <section className="rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
+      <section className="-order-10 rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 p-5 bg-gradient-to-r from-slate-50/80 to-white">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 text-white shadow-md">
