@@ -43,4 +43,25 @@ export class ReportController {
   static deleteAiAnalysis = asyncHandler(async (req: Request, res: Response) => {
     successResponse(res, await ReportService.deleteAiAnalysis(req.params.id), 'Xóa bản phân tích doanh thu AI thành công');
   });
+
+  static aiInventoryAnalysis = asyncHandler(async (req: Request, res: Response) => {
+    const days = parseDays(req.body?.days ?? req.query.days, 30);
+    successResponse(
+      res,
+      await ReportService.aiInventoryAnalysis(days, req.user?.userId),
+      'Phân tích báo cáo kho AI thành công'
+    );
+  });
+
+  static aiInventoryHistory = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.aiInventoryHistory(req.query), 'Lấy lịch sử báo cáo kho AI thành công');
+  });
+
+  static aiInventoryDetail = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.aiInventoryDetail(req.params.id), 'Lấy chi tiết báo cáo kho AI thành công');
+  });
+
+  static deleteAiInventoryAnalysis = asyncHandler(async (req: Request, res: Response) => {
+    successResponse(res, await ReportService.deleteAiInventoryAnalysis(req.params.id), 'Xóa báo cáo kho AI thành công');
+  });
 }

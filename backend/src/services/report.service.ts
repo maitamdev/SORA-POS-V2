@@ -920,4 +920,586 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
     if (error) throw new AppError(500, error.message);
     return { id };
   }
+
+  /** Build inventory intelligence metrics (deterministic — charts/tables use this). */
+  private static async buildInventoryMetrics(days: number) {
+    const targetDays = 14;
+    const today = startOfDay();
+    const rangeStart = new Date(today);
+    rangeStart.setDate(rangeStart.getDate() - (days - 1));
+    const midStart = new Date(today);
+    midStart.setDate(midStart.getDate() - Math.floor(days / 2));
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [productsRes, ordersRes] = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, name, sku, unit, stock_quantity, min_stock_level, cost_price, sell_price, categories(id, name), suppliers(id, name)')
+        .eq('is_active', true),
+      supabase
+        .from('orders')
+        .select('id, created_at')
+        .eq('status', 'completed')
+        .gte('created_at', rangeStart.toISOString())
+        .lt('created_at', tomorrow.toISOString()),
+    ]);
+
+    if (productsRes.error) throw new AppError(500, productsRes.error.message);
+    if (ordersRes.error) throw new AppError(500, ordersRes.error.message);
+
+    const products = productsRes.data || [];
+    const orders = ordersRes.data || [];
+    const orderIds = orders.map((o) => o.id);
+    const midIso = midStart.toISOString();
+
+    let details: Array<{ order_id: string; product_id: string; quantity: number; subtotal: number; product_name?: string }> = [];
+    if (orderIds.length > 0) {
+      // Chunk to avoid URL length limits
+      const chunkSize = 200;
+      for (let i = 0; i < orderIds.length; i += chunkSize) {
+        const chunk = orderIds.slice(i, i + chunkSize);
+        const { data, error } = await supabase
+          .from('order_details')
+          .select('order_id, product_id, quantity, subtotal, product_name')
+          .in('order_id', chunk);
+        if (error) throw new AppError(500, error.message);
+        details = details.concat(data || []);
+      }
+    }
+
+    const orderCreatedAt = new Map(orders.map((o) => [o.id, o.created_at as string]));
+    type SalesAgg = { qty: number; revenue: number; qtyRecent: number; qtyPrior: number };
+    const salesMap = new Map<string, SalesAgg>();
+
+    for (const d of details) {
+      const created = orderCreatedAt.get(d.order_id) || '';
+      const qty = Number(d.quantity || 0);
+      const rev = Number(d.subtotal || 0);
+      const cur = salesMap.get(d.product_id) || { qty: 0, revenue: 0, qtyRecent: 0, qtyPrior: 0 };
+      cur.qty += qty;
+      cur.revenue += rev;
+      if (created >= midIso) cur.qtyRecent += qty;
+      else cur.qtyPrior += qty;
+      salesMap.set(d.product_id, cur);
+    }
+
+    const periodDays = Math.max(days, 1);
+    const halfDays = Math.max(Math.floor(days / 2), 1);
+
+    type SkuRow = {
+      id: string;
+      name: string;
+      sku: string;
+      unit: string;
+      stock_quantity: number;
+      min_stock_level: number;
+      cost_price: number;
+      sell_price: number;
+      category: string;
+      supplier: string;
+      stock_value: number;
+      retail_value: number;
+      sold_qty: number;
+      sold_revenue: number;
+      avg_daily_sales: number;
+      sales_speed_recent: number;
+      sales_trend: 'up' | 'down' | 'stable';
+      stock_days: number | null;
+      recommended_qty: number;
+      restock_cost: number;
+      status: 'out_of_stock' | 'low_stock' | 'needs_restock' | 'dead_stock' | 'overstock' | 'healthy';
+      priority: 'critical' | 'high' | 'medium' | 'low';
+    };
+
+    const rows: SkuRow[] = [];
+    let outOfStock = 0;
+    let lowStock = 0;
+    let safe = 0;
+    let needsRestock = 0;
+    let deadStock = 0;
+    let overstock = 0;
+    let totalStockValue = 0;
+    let totalRetailValue = 0;
+    let estimatedRestockCost = 0;
+    let estimatedLostRevenue = 0;
+
+    const categoryMap = new Map<string, { name: string; product_count: number; low_count: number; stock_value: number; sold_qty: number }>();
+
+    for (const p of products) {
+      const stock = Number(p.stock_quantity || 0);
+      const minStock = Number(p.min_stock_level || 0);
+      const cost = Number(p.cost_price || 0);
+      const sell = Number(p.sell_price || 0);
+      const stockValue = stock * cost;
+      const retailValue = stock * sell;
+      totalStockValue += stockValue;
+      totalRetailValue += retailValue;
+
+      const sales = salesMap.get(p.id) || { qty: 0, revenue: 0, qtyRecent: 0, qtyPrior: 0 };
+      const avgDaily = sales.qty / periodDays;
+      const speedRecent = sales.qtyRecent / halfDays;
+      const speedPrior = sales.qtyPrior / halfDays;
+      let trend: 'up' | 'down' | 'stable' = 'stable';
+      if (speedPrior > 0.05) {
+        const change = (speedRecent - speedPrior) / speedPrior;
+        if (change >= 0.2) trend = 'up';
+        else if (change <= -0.2) trend = 'down';
+      } else if (speedRecent > 0.2) {
+        trend = 'up';
+      }
+
+      const stockDays = avgDaily > 0 ? Math.round((stock / avgDaily) * 10) / 10 : null;
+      const targetStock = Math.ceil(avgDaily * targetDays);
+      const recommendedQty = Math.max(0, Math.max(minStock, targetStock) - stock);
+      const restockCost = recommendedQty * cost;
+
+      let status: SkuRow['status'] = 'healthy';
+      let priority: SkuRow['priority'] = 'low';
+
+      if (stock <= 0) {
+        status = 'out_of_stock';
+        priority = 'critical';
+        outOfStock += 1;
+        if (avgDaily > 0) estimatedLostRevenue += avgDaily * sell * Math.min(7, days);
+      } else if (stock <= minStock) {
+        status = 'low_stock';
+        priority = avgDaily > 0.5 || trend === 'up' ? 'high' : 'medium';
+        lowStock += 1;
+      } else if (stockDays !== null && stockDays <= targetDays && avgDaily > 0) {
+        status = 'needs_restock';
+        priority = stockDays <= 5 ? 'high' : 'medium';
+        needsRestock += 1;
+      } else if (avgDaily === 0 && stock > 0 && stockValue > 0) {
+        status = 'dead_stock';
+        priority = stockValue >= 500_000 ? 'medium' : 'low';
+        deadStock += 1;
+      } else if (stockDays !== null && stockDays > targetDays * 3 && stock > minStock * 2) {
+        status = 'overstock';
+        priority = 'low';
+        overstock += 1;
+        safe += 1;
+      } else {
+        safe += 1;
+      }
+
+      estimatedRestockCost += restockCost;
+
+      const catName = (p as any).categories?.name || 'Chưa phân loại';
+      const catId = (p as any).categories?.id || 'uncategorized';
+      const cat = categoryMap.get(catId) || { name: catName, product_count: 0, low_count: 0, stock_value: 0, sold_qty: 0 };
+      cat.product_count += 1;
+      cat.stock_value += stockValue;
+      cat.sold_qty += sales.qty;
+      if (status === 'out_of_stock' || status === 'low_stock' || status === 'needs_restock') cat.low_count += 1;
+      categoryMap.set(catId, cat);
+
+      rows.push({
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        unit: p.unit || 'cái',
+        stock_quantity: stock,
+        min_stock_level: minStock,
+        cost_price: cost,
+        sell_price: sell,
+        category: catName,
+        supplier: (p as any).suppliers?.name || '—',
+        stock_value: Math.round(stockValue),
+        retail_value: Math.round(retailValue),
+        sold_qty: sales.qty,
+        sold_revenue: Math.round(sales.revenue),
+        avg_daily_sales: Math.round(avgDaily * 100) / 100,
+        sales_speed_recent: Math.round(speedRecent * 100) / 100,
+        sales_trend: trend,
+        stock_days: stockDays,
+        recommended_qty: recommendedQty,
+        restock_cost: Math.round(restockCost),
+        status,
+        priority,
+      });
+    }
+
+    const priorityWeight = { critical: 0, high: 1, medium: 2, low: 3 };
+    const restockPlan = rows
+      .filter((r) => r.recommended_qty > 0 && (r.status === 'out_of_stock' || r.status === 'low_stock' || r.status === 'needs_restock'))
+      .sort((a, b) => priorityWeight[a.priority] - priorityWeight[b.priority] || b.avg_daily_sales - a.avg_daily_sales)
+      .slice(0, 20);
+
+    const deadStockList = rows
+      .filter((r) => r.status === 'dead_stock')
+      .sort((a, b) => b.stock_value - a.stock_value)
+      .slice(0, 15);
+
+    const risingDemand = rows
+      .filter((r) => r.sales_trend === 'up' && r.sold_qty > 0)
+      .sort((a, b) => b.sales_speed_recent - a.sales_speed_recent)
+      .slice(0, 12);
+
+    const fallingDemand = rows
+      .filter((r) => r.sales_trend === 'down' && r.sold_qty > 0)
+      .sort((a, b) => a.sales_speed_recent - b.sales_speed_recent)
+      .slice(0, 10);
+
+    const topValue = [...rows].sort((a, b) => b.stock_value - a.stock_value).slice(0, 10);
+    const mismatch = rows
+      .filter((r) => r.sales_trend === 'up' && (r.status === 'out_of_stock' || r.status === 'low_stock' || r.status === 'needs_restock'))
+      .sort((a, b) => b.avg_daily_sales - a.avg_daily_sales)
+      .slice(0, 10);
+
+    const categoryBreakdown = Array.from(categoryMap.entries())
+      .map(([id, v]) => ({
+        id,
+        name: v.name,
+        product_count: v.product_count,
+        low_count: v.low_count,
+        stock_value: Math.round(v.stock_value),
+        sold_qty: v.sold_qty,
+      }))
+      .sort((a, b) => b.stock_value - a.stock_value);
+
+    const totalProducts = products.length || 1;
+    const availabilityScore = Math.max(0, 100 - (outOfStock / totalProducts) * 50 - (lowStock / totalProducts) * 30);
+    const capitalScore = totalStockValue > 0
+      ? Math.max(0, 100 - (deadStockList.reduce((s, r) => s + r.stock_value, 0) / totalStockValue) * 100)
+      : 70;
+    const turnoverScore = rows.filter((r) => r.sold_qty > 0).length / totalProducts * 100;
+    const mismatchPenalty = Math.min(30, mismatch.length * 4);
+    const healthScore = Math.round(
+      Math.min(100, Math.max(0, availabilityScore * 0.4 + capitalScore * 0.25 + turnoverScore * 0.25 + (100 - mismatchPenalty) * 0.1))
+    );
+
+    const statusDistribution = [
+      { name: 'Hết hàng', value: outOfStock, key: 'out_of_stock' },
+      { name: 'Tồn thấp', value: lowStock, key: 'low_stock' },
+      { name: 'Sắp thiếu', value: needsRestock, key: 'needs_restock' },
+      { name: 'Dead stock', value: deadStock, key: 'dead_stock' },
+      { name: 'An toàn', value: Math.max(0, safe - overstock), key: 'healthy' },
+    ].filter((x) => x.value > 0);
+
+    return {
+      days,
+      target_days: targetDays,
+      period_start: getLocalDateString(rangeStart),
+      period_end: getLocalDateString(today),
+      kpis: {
+        total_products: products.length,
+        out_of_stock: outOfStock,
+        low_stock: lowStock,
+        needs_restock: needsRestock,
+        dead_stock: deadStock,
+        overstock,
+        safe: Math.max(0, safe - overstock),
+        total_stock_value: Math.round(totalStockValue),
+        total_retail_value: Math.round(totalRetailValue),
+        estimated_restock_cost: Math.round(estimatedRestockCost),
+        estimated_lost_revenue_7d: Math.round(estimatedLostRevenue),
+        health_score: healthScore,
+        score_breakdown: {
+          availability: Math.round(availabilityScore),
+          capital_efficiency: Math.round(capitalScore),
+          turnover: Math.round(turnoverScore),
+        },
+      },
+      status_distribution: statusDistribution,
+      category_breakdown: categoryBreakdown,
+      restock_plan: restockPlan,
+      dead_stock: deadStockList,
+      rising_demand: risingDemand,
+      falling_demand: fallingDemand,
+      top_stock_value: topValue,
+      demand_mismatch: mismatch,
+    };
+  }
+
+  private static buildInventoryCharts(metrics: Awaited<ReturnType<typeof ReportService.buildInventoryMetrics>>) {
+    return [
+      {
+        title: 'Phân bố trạng thái tồn kho',
+        type: 'pie' as const,
+        data: metrics.status_distribution.map((s) => ({ name: s.name, value: s.value })),
+      },
+      {
+        title: 'Giá trị tồn theo danh mục (vốn)',
+        type: 'bar' as const,
+        data: metrics.category_breakdown.slice(0, 8).map((c) => ({ name: c.name, value: c.stock_value })),
+      },
+      {
+        title: 'Top vốn kẹt (dead stock)',
+        type: 'bar' as const,
+        data: metrics.dead_stock.slice(0, 8).map((r) => ({ name: r.name.slice(0, 18), value: r.stock_value })),
+      },
+      {
+        title: 'Nhu cầu tăng — tốc độ bán/ngày (nửa kỳ gần)',
+        type: 'bar' as const,
+        data: metrics.rising_demand.slice(0, 8).map((r) => ({ name: r.name.slice(0, 18), value: r.sales_speed_recent })),
+      },
+      {
+        title: 'Kế hoạch nhập — chi phí ước tính',
+        type: 'bar' as const,
+        data: metrics.restock_plan.slice(0, 8).map((r) => ({ name: r.name.slice(0, 18), value: r.restock_cost })),
+      },
+    ];
+  }
+
+  private static buildLocalInventoryNarrative(metrics: Awaited<ReturnType<typeof ReportService.buildInventoryMetrics>>) {
+    const k = metrics.kpis;
+    const money = (v: number) => `${Math.round(v).toLocaleString('vi-VN')}đ`;
+    const summary =
+      `Sức khỏe kho ${k.health_score}/100. ` +
+      `${k.out_of_stock} SKU hết hàng, ${k.low_stock} tồn thấp, ${k.needs_restock} sắp thiếu theo ${metrics.target_days} ngày cover. ` +
+      `Giá trị tồn (vốn) ${money(k.total_stock_value)}; vốn dead stock ~${money(metrics.dead_stock.reduce((s, r) => s + r.stock_value, 0))}. ` +
+      `Ước tính chi phí nhập ưu tiên ${money(k.estimated_restock_cost)}` +
+      (k.estimated_lost_revenue_7d > 0 ? `; rủi ro mất DT ~${money(k.estimated_lost_revenue_7d)}/7 ngày nếu không nhập.` : '.');
+
+    const insights = [
+      `Khả dụng: ${k.out_of_stock + k.low_stock}/${k.total_products} SKU dưới ngưỡng an toàn (điểm availability ${k.score_breakdown.availability}).`,
+      `Vốn: ${money(k.total_stock_value)} giá vốn / ${money(k.total_retail_value)} bán lẻ — hiệu quả vốn ${k.score_breakdown.capital_efficiency}/100.`,
+      `Nhu cầu: ${metrics.rising_demand.length} SKU tăng tốc, ${metrics.demand_mismatch.length} SKU vừa tăng cầu vừa thiếu hàng.`,
+      `Dead stock: ${k.dead_stock} SKU không bán trong ${metrics.days} ngày — ưu tiên xả/combo hoặc ngừng nhập.`,
+    ];
+
+    const recommendations = [
+      `[CAO] Nhập gấp ${metrics.restock_plan.filter((r) => r.priority === 'critical' || r.priority === 'high').length} SKU ưu tiên cao — chi phí ~${money(metrics.restock_plan.filter((r) => r.priority === 'critical' || r.priority === 'high').reduce((s, r) => s + r.restock_cost, 0))}.`,
+      `[CAO] Xử lý ${metrics.demand_mismatch.length} SKU lệch cầu (bán tăng + tồn thấp) trước cuối tuần.`,
+      `[TB] Xả / bundle ${Math.min(5, metrics.dead_stock.length)} SKU dead stock giá trị cao nhất.`,
+      `[TB] Rà min_stock theo velocity; target cover ${metrics.target_days} ngày cho nhóm bán chạy.`,
+    ];
+
+    return { summary, insights, recommendations };
+  }
+
+  static async aiInventoryAnalysis(days = 30, generatedBy?: string) {
+    const safeDays = Math.min(Math.max(Number(days) || 30, 7), 90);
+    const metrics = await this.buildInventoryMetrics(safeDays);
+    const charts = this.buildInventoryCharts(metrics);
+    const local = this.buildLocalInventoryNarrative(metrics);
+    const money = (v: number) => `${Math.round(v || 0).toLocaleString('vi-VN')} VND`;
+
+    let summary = local.summary;
+    let insights = local.insights;
+    let recommendations = local.recommendations;
+    let aiProvider = 'local';
+
+    if (env.groqApiKey) {
+      try {
+        const restockLines = metrics.restock_plan.slice(0, 12).map((r, i) =>
+          `${i + 1}. ${r.name} | tồn ${r.stock_quantity}/${r.min_stock_level} | bán/ngày ${r.avg_daily_sales} | ${r.sales_trend} | đề xuất +${r.recommended_qty} | ${r.priority} | NCC ${r.supplier}`
+        ).join('\n') || 'Không có SKU cần nhập.';
+
+        const deadLines = metrics.dead_stock.slice(0, 8).map((r, i) =>
+          `${i + 1}. ${r.name} | tồn ${r.stock_quantity} | vốn ${money(r.stock_value)}`
+        ).join('\n') || 'Không có dead stock đáng kể.';
+
+        const riseLines = metrics.rising_demand.slice(0, 8).map((r, i) =>
+          `${i + 1}. ${r.name} | tốc độ ${r.sales_speed_recent}/ngày | tồn ${r.stock_quantity} | ${r.status}`
+        ).join('\n') || 'Không có tín hiệu tăng mạnh.';
+
+        const systemInstruction = `Bạn là Giám đốc Chuỗi cung ứng (Supply Chain Director) bán lẻ. Viết báo cáo ngắn, chuyên nghiệp, tiếng Việt.
+BẮT BUỘC trả về ĐÚNG 1 JSON object (không markdown):
+{
+  "summary": "3-5 câu tóm tắt điều hành, có số liệu",
+  "insights": ["insight 1", "insight 2", "insight 3", "insight 4"],
+  "recommendations": ["hành động 1 [Ưu tiên]", "hành động 2", "hành động 3", "hành động 4"]
+}
+Quy tắc: mỗi insight/recommendation 1-2 câu, có số liệu, actionable. Không bịa SKU ngoài dữ liệu. Không trả charts.`;
+
+        const userPrompt = `BÁO CÁO KHO — ${safeDays} ngày (${metrics.period_start} → ${metrics.period_end})
+Health: ${metrics.kpis.health_score}/100 | Availability ${metrics.kpis.score_breakdown.availability} | Capital ${metrics.kpis.score_breakdown.capital_efficiency} | Turnover ${metrics.kpis.score_breakdown.turnover}
+SKU: ${metrics.kpis.total_products} | Hết: ${metrics.kpis.out_of_stock} | Thấp: ${metrics.kpis.low_stock} | Sắp thiếu: ${metrics.kpis.needs_restock} | Dead: ${metrics.kpis.dead_stock}
+Giá trị vốn: ${money(metrics.kpis.total_stock_value)} | Bán lẻ: ${money(metrics.kpis.total_retail_value)}
+Chi phí nhập ưu tiên: ${money(metrics.kpis.estimated_restock_cost)} | Rủi ro mất DT 7d: ${money(metrics.kpis.estimated_lost_revenue_7d)}
+
+RESTOCK TOP:
+${restockLines}
+
+DEAD STOCK:
+${deadLines}
+
+RISING DEMAND:
+${riseLines}
+
+Lệch cầu-tồn: ${metrics.demand_mismatch.length} SKU
+Viết summary + 4 insights + 4 recommendations.`;
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.groqApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemInstruction },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.2,
+            max_tokens: 1800,
+          }),
+        });
+
+        if (response.ok) {
+          const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          const raw = data.choices?.[0]?.message?.content?.trim();
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (typeof parsed.summary === 'string' && parsed.summary.trim()) summary = parsed.summary.trim();
+            if (Array.isArray(parsed.insights) && parsed.insights.length) {
+              insights = parsed.insights.map((x: unknown) => String(x)).filter(Boolean).slice(0, 5);
+            }
+            if (Array.isArray(parsed.recommendations) && parsed.recommendations.length) {
+              recommendations = parsed.recommendations.map((x: unknown) => String(x)).filter(Boolean).slice(0, 5);
+            }
+            aiProvider = 'groq';
+          }
+        }
+      } catch (err) {
+        console.error('[aiInventoryAnalysis] Groq fallback to local:', err);
+      }
+    }
+
+    const analysis = {
+      health_score: metrics.kpis.health_score,
+      score_breakdown: metrics.kpis.score_breakdown,
+      summary,
+      insights,
+      recommendations,
+      charts,
+      kpis: metrics.kpis,
+      restock_plan: metrics.restock_plan,
+      dead_stock: metrics.dead_stock,
+      rising_demand: metrics.rising_demand,
+      falling_demand: metrics.falling_demand,
+      demand_mismatch: metrics.demand_mismatch,
+      category_breakdown: metrics.category_breakdown,
+      status_distribution: metrics.status_distribution,
+      top_stock_value: metrics.top_stock_value,
+      target_days: metrics.target_days,
+      ai_provider: aiProvider,
+    };
+
+    const generatedAt = new Date().toISOString();
+    const metricsSnapshot = {
+      ...metrics,
+      generated_at: generatedAt,
+    };
+
+    const { data: savedAnalysis, error: saveError } = await supabase
+      .from('ai_inventory_analyses')
+      .insert({
+        days: safeDays,
+        period_start: metrics.period_start,
+        period_end: metrics.period_end,
+        health_score: metrics.kpis.health_score,
+        total_products: metrics.kpis.total_products,
+        out_of_stock_count: metrics.kpis.out_of_stock,
+        low_stock_count: metrics.kpis.low_stock,
+        safe_count: metrics.kpis.safe,
+        total_stock_value: metrics.kpis.total_stock_value,
+        total_retail_value: metrics.kpis.total_retail_value,
+        estimated_restock_cost: metrics.kpis.estimated_restock_cost,
+        analysis,
+        metrics_snapshot: metricsSnapshot,
+        generated_by: generatedBy || null,
+        generated_at: generatedAt,
+      })
+      .select('id, days, period_start, period_end, health_score, total_products, out_of_stock_count, low_stock_count, safe_count, total_stock_value, total_retail_value, estimated_restock_cost, generated_at, generated_by')
+      .single();
+
+    if (saveError) {
+      if (saveError.message.includes('ai_inventory_analyses')) {
+        // Table missing: still return analysis without history
+        console.warn('[aiInventoryAnalysis] table missing, return without save:', saveError.message);
+        return {
+          analysis,
+          generated_at: generatedAt,
+          days: safeDays,
+          saved_report: null,
+          save_warning: 'Chưa chạy migration database/ai_inventory_analyses.sql — không lưu lịch sử',
+        };
+      }
+      throw new AppError(500, saveError.message);
+    }
+
+    return {
+      analysis,
+      generated_at: generatedAt,
+      days: safeDays,
+      saved_report: savedAnalysis,
+    };
+  }
+
+  static async aiInventoryHistory(queryParams: AnalysisHistoryQuery) {
+    const { page, limit, from, to } = parsePagination(queryParams);
+    let query = supabase
+      .from('ai_inventory_analyses')
+      .select('id, days, period_start, period_end, health_score, total_products, out_of_stock_count, low_stock_count, safe_count, total_stock_value, total_retail_value, estimated_restock_cost, generated_at, generated_by, users:generated_by(full_name, email)', { count: 'exact' })
+      .order('generated_at', { ascending: false })
+      .range(from, to);
+
+    if (queryParams.days) query = query.eq('days', Number(queryParams.days));
+
+    const { data, error, count } = await query;
+    if (error) {
+      if (error.message.includes('ai_inventory_analyses')) {
+        return { items: [], pagination: { page, limit, total: 0 } };
+      }
+      throw new AppError(500, error.message);
+    }
+
+    return {
+      items: (data || []).map((item: any) => ({
+        id: item.id,
+        days: item.days,
+        period_start: item.period_start,
+        period_end: item.period_end,
+        health_score: item.health_score,
+        total_products: Number(item.total_products || 0),
+        out_of_stock_count: Number(item.out_of_stock_count || 0),
+        low_stock_count: Number(item.low_stock_count || 0),
+        safe_count: Number(item.safe_count || 0),
+        total_stock_value: Number(item.total_stock_value || 0),
+        total_retail_value: Number(item.total_retail_value || 0),
+        estimated_restock_cost: Number(item.estimated_restock_cost || 0),
+        generated_at: item.generated_at,
+        generated_by: item.generated_by,
+        generated_by_user: item.users || null,
+      })),
+      pagination: { page, limit, total: count || 0 },
+    };
+  }
+
+  static async aiInventoryDetail(id: string) {
+    const { data, error } = await supabase
+      .from('ai_inventory_analyses')
+      .select('*, users:generated_by(full_name, email)')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') throw new AppError(404, 'Không tìm thấy báo cáo kho AI');
+      throw new AppError(500, error.message);
+    }
+
+    return {
+      ...data,
+      total_products: Number(data.total_products || 0),
+      out_of_stock_count: Number(data.out_of_stock_count || 0),
+      low_stock_count: Number(data.low_stock_count || 0),
+      safe_count: Number(data.safe_count || 0),
+      total_stock_value: Number(data.total_stock_value || 0),
+      total_retail_value: Number(data.total_retail_value || 0),
+      estimated_restock_cost: Number(data.estimated_restock_cost || 0),
+      generated_by_user: data.users || null,
+      users: undefined,
+    };
+  }
+
+  static async deleteAiInventoryAnalysis(id: string) {
+    const { error } = await supabase.from('ai_inventory_analyses').delete().eq('id', id);
+    if (error) throw new AppError(500, error.message);
+    return { id };
+  }
 }

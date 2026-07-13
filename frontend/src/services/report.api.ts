@@ -118,6 +118,103 @@ export interface PaginatedResult<T> {
   pagination: { page: number; limit: number; total: number };
 }
 
+export interface InventorySkuRow {
+  id: string;
+  name: string;
+  sku: string;
+  unit: string;
+  stock_quantity: number;
+  min_stock_level: number;
+  cost_price: number;
+  sell_price: number;
+  category: string;
+  supplier: string;
+  stock_value: number;
+  retail_value: number;
+  sold_qty: number;
+  sold_revenue: number;
+  avg_daily_sales: number;
+  sales_speed_recent: number;
+  sales_trend: 'up' | 'down' | 'stable';
+  stock_days: number | null;
+  recommended_qty: number;
+  restock_cost: number;
+  status: 'out_of_stock' | 'low_stock' | 'needs_restock' | 'dead_stock' | 'overstock' | 'healthy';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface AiInventoryAnalysisResult {
+  health_score: number;
+  score_breakdown: {
+    availability: number;
+    capital_efficiency: number;
+    turnover: number;
+  };
+  summary: string;
+  insights: string[];
+  recommendations: string[];
+  charts: AiChartData[];
+  kpis: {
+    total_products: number;
+    out_of_stock: number;
+    low_stock: number;
+    needs_restock: number;
+    dead_stock: number;
+    overstock: number;
+    safe: number;
+    total_stock_value: number;
+    total_retail_value: number;
+    estimated_restock_cost: number;
+    estimated_lost_revenue_7d: number;
+    health_score: number;
+    score_breakdown: {
+      availability: number;
+      capital_efficiency: number;
+      turnover: number;
+    };
+  };
+  restock_plan: InventorySkuRow[];
+  dead_stock: InventorySkuRow[];
+  rising_demand: InventorySkuRow[];
+  falling_demand: InventorySkuRow[];
+  demand_mismatch: InventorySkuRow[];
+  category_breakdown: Array<{
+    id: string;
+    name: string;
+    product_count: number;
+    low_count: number;
+    stock_value: number;
+    sold_qty: number;
+  }>;
+  status_distribution: Array<{ name: string; value: number; key: string }>;
+  top_stock_value: InventorySkuRow[];
+  target_days: number;
+  ai_provider?: string;
+}
+
+export interface AiInventoryReportSummary {
+  id: string;
+  days: number;
+  period_start: string;
+  period_end: string;
+  health_score?: number | null;
+  total_products: number;
+  out_of_stock_count: number;
+  low_stock_count: number;
+  safe_count: number;
+  total_stock_value: number;
+  total_retail_value: number;
+  estimated_restock_cost: number;
+  generated_at: string;
+  generated_by?: string | null;
+  generated_by_user?: { full_name?: string; email?: string } | null;
+}
+
+export interface AiInventoryReportDetail extends AiInventoryReportSummary {
+  analysis: AiInventoryAnalysisResult;
+  metrics_snapshot: Record<string, unknown>;
+}
+
 export const reportAPI = {
   dashboard: (date?: string, days = 7) => api.get<ApiResponse<DashboardData>>(`/reports/dashboard${buildQuery({ date, days })}`),
   revenue: (days = 30) => api.get<ApiResponse<RevenuePoint[]>>(`/reports/revenue${buildQuery({ days })}`),
@@ -131,4 +228,18 @@ export const reportAPI = {
     api.get<ApiResponse<AiAnalysisReportDetail>>(`/reports/ai-analysis/${id}`),
   deleteAiAnalysis: (id: string) =>
     api.delete<ApiResponse<{ id: string }>>(`/reports/ai-analysis/${id}`),
+  aiInventoryAnalysis: (days = 30) =>
+    api.post<ApiResponse<{
+      analysis: AiInventoryAnalysisResult;
+      generated_at: string;
+      days: number;
+      saved_report: AiInventoryReportSummary | null;
+      save_warning?: string;
+    }>>('/reports/ai-inventory', { days }),
+  aiInventoryHistory: (params: { page?: number; limit?: number; days?: number } = {}) =>
+    api.get<ApiResponse<PaginatedResult<AiInventoryReportSummary>>>(`/reports/ai-inventory/history${buildQuery(params)}`),
+  aiInventoryDetail: (id: string) =>
+    api.get<ApiResponse<AiInventoryReportDetail>>(`/reports/ai-inventory/${id}`),
+  deleteAiInventoryAnalysis: (id: string) =>
+    api.delete<ApiResponse<{ id: string }>>(`/reports/ai-inventory/${id}`),
 };

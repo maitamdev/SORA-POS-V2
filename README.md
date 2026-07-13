@@ -173,8 +173,9 @@ For an existing Supabase database, also run these newer migrations after the bas
 
 1. `database/order_details_cost_snapshot.sql`
 2. `database/ai_revenue_analyses.sql`
-3. `database/hardening.sql`
-4. `database/enterprise_pos_core.sql`
+3. `database/ai_inventory_analyses.sql`
+4. `database/hardening.sql`
+5. `database/enterprise_pos_core.sql`
 
-These keep historical profit reports accurate and persist AI revenue analysis reports in the database.
+These keep historical profit reports accurate and persist AI revenue / inventory analysis reports in the database.
 

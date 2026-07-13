@@ -12,10 +12,16 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi';
 import { FiTrendingUp, FiTrendingDown, FiMinus, FiPackage } from 'react-icons/fi';
-import { reportAPI, RevenuePoint, TopProduct, AiAnalysisResult, AiAnalysisReportSummary } from '../../services/report.api';
-import { aiAPI } from '../../services/ai.api';
-import { stockAPI, StockSummary } from '../../services/stock.api';
-import { RestockAnalysis } from '../../types/domain.type';
+import {
+  reportAPI,
+  RevenuePoint,
+  TopProduct,
+  AiAnalysisResult,
+  AiAnalysisReportSummary,
+  AiInventoryAnalysisResult,
+  AiInventoryReportSummary,
+  InventorySkuRow,
+} from '../../services/report.api';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -34,6 +40,7 @@ import {
   Line
 } from 'recharts';
 import { downloadCsv } from '../../utils/exportCsv';
+import { useNavigate } from 'react-router-dom';
 
 // Format money to VND (round to integer, no decimals)
 const money = (value: number) => {
@@ -130,7 +137,24 @@ const StockDaysBar = ({ stockDays, targetDays }: { stockDays: number | null; tar
   );
 };
 
+const statusLabelInv: Record<string, string> = {
+  out_of_stock: 'Hết hàng',
+  low_stock: 'Tồn thấp',
+  needs_restock: 'Sắp thiếu',
+  dead_stock: 'Dead stock',
+  overstock: 'Dư tồn',
+  healthy: 'An toàn',
+};
+
+const priorityLabelInv: Record<string, string> = {
+  critical: 'Khẩn',
+  high: 'Cao',
+  medium: 'TB',
+  low: 'Thấp',
+};
+
 const ReportsPage = () => {
+  const navigate = useNavigate();
   const [days, setDays] = useState(30);
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
@@ -141,10 +165,14 @@ const ReportsPage = () => {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [stockAnalysis, setStockAnalysis] = useState<RestockAnalysis | null>(null);
-  const [stockLoading, setStockLoading] = useState(false);
-  const [stockSummary, setStockSummary] = useState<StockSummary | null>(null);
+  const [invAnalysis, setInvAnalysis] = useState<AiInventoryAnalysisResult | null>(null);
+  const [invReport, setInvReport] = useState<AiInventoryReportSummary | null>(null);
+  const [invHistory, setInvHistory] = useState<AiInventoryReportSummary[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [invHistoryLoading, setInvHistoryLoading] = useState(false);
+  const [invTableTab, setInvTableTab] = useState<'restock' | 'mismatch' | 'dead' | 'rising'>('restock');
   const lastAutoOpenKey = useRef<string | null>(null);
+  const lastInvAutoKey = useRef<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -223,28 +251,66 @@ const ReportsPage = () => {
     }
   }, [days, loadAiHistory]);
 
-  const loadStockAnalysis = useCallback(async () => {
-    setStockLoading(true);
+  const loadInvHistory = useCallback(async () => {
+    setInvHistoryLoading(true);
     try {
-      const [aiRes, summaryRes] = await Promise.all([
-        aiAPI.restockAnalysis({ target_days: 14 }),
-        stockAPI.summary(),
-      ]);
-      setStockAnalysis(aiRes.data.data);
-      setStockSummary(summaryRes.data.data);
+      const res = await reportAPI.aiInventoryHistory({ page: 1, limit: 6 });
+      setInvHistory(res.data.data.items);
     } catch {
-      // Stock analysis is optional, silently fail
+      // optional if table not migrated
     } finally {
-      setStockLoading(false);
+      setInvHistoryLoading(false);
     }
   }, []);
+
+  const handleOpenInvReport = useCallback(async (id: string) => {
+    try {
+      const res = await reportAPI.aiInventoryDetail(id);
+      setInvAnalysis(res.data.data.analysis);
+      setInvReport(res.data.data);
+      toast.success('Đã mở báo cáo kho đã lưu');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không mở được báo cáo kho');
+    }
+  }, []);
+
+  const handleDeleteInvReport = useCallback(async (id: string) => {
+    if (!window.confirm('Xóa bản báo cáo kho này?')) return;
+    try {
+      await reportAPI.deleteAiInventoryAnalysis(id);
+      setInvHistory((items) => items.filter((x) => x.id !== id));
+      if (invReport?.id === id) {
+        setInvReport(null);
+        setInvAnalysis(null);
+      }
+      toast.success('Đã xóa báo cáo kho');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không xóa được');
+    }
+  }, [invReport?.id]);
+
+  const runInventoryAi = useCallback(async () => {
+    setInvLoading(true);
+    try {
+      const res = await reportAPI.aiInventoryAnalysis(days);
+      setInvAnalysis(res.data.data.analysis);
+      setInvReport(res.data.data.saved_report);
+      if (res.data.data.save_warning) toast(res.data.data.save_warning, { icon: '⚠️' });
+      else toast.success('Đã tạo báo cáo kho AI');
+      await loadInvHistory();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Không phân tích được kho');
+    } finally {
+      setInvLoading(false);
+    }
+  }, [days, loadInvHistory]);
 
   // Auto-load everything on page open
   useEffect(() => {
     loadData();
     loadAiHistory();
-    loadStockAnalysis();
-  }, [loadData, loadAiHistory, loadStockAnalysis]);
+    loadInvHistory();
+  }, [loadData, loadAiHistory, loadInvHistory]);
 
   useEffect(() => {
     setAiAnalysisData(null);
@@ -268,6 +334,27 @@ const ReportsPage = () => {
 
     handleAiAnalysis();
   }, [revenue, days, aiAnalysisData, aiLoading, historyLoading, aiHistory, handleOpenSavedAnalysis, handleAiAnalysis]);
+
+  // Auto-load inventory AI: prefer saved for range, else generate once
+  useEffect(() => {
+    if (invAnalysis || invLoading || invHistoryLoading) return;
+    const key = `inv:${days}:${invHistory.length}`;
+    if (lastInvAutoKey.current === key) return;
+    lastInvAutoKey.current = key;
+
+    const saved = invHistory.find((item) => item.days === days);
+    if (saved) {
+      handleOpenInvReport(saved.id);
+      return;
+    }
+    runInventoryAi();
+  }, [days, invAnalysis, invLoading, invHistoryLoading, invHistory, handleOpenInvReport, runInventoryAi]);
+
+  useEffect(() => {
+    setInvAnalysis(null);
+    setInvReport(null);
+    lastInvAutoKey.current = null;
+  }, [days]);
 
   // Aggregate metrics
   const totalRevenue = useMemo(() => revenue.reduce((sum, item) => sum + item.revenue, 0), [revenue]);
@@ -1070,235 +1157,346 @@ const ReportsPage = () => {
         </div>
       </section>
 
-      {/* AI STOCK ANALYSIS + STOCK SUMMARY DASHBOARD */}
+      {/* ═══════════════ AI BÁO CÁO KHO (ENTERPRISE) ═══════════════ */}
       <section className="-order-10 rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 p-5 bg-gradient-to-r from-slate-50/80 to-white">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-100 p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 text-white shadow-md">
-              <FiPackage className="w-5 h-5" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+              <FiPackage className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="font-black text-slate-800 text-base tracking-tight">Báo cáo Tồn kho & Cảnh báo AI</h2>
-              <p className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                Tổng quan giá trị kho, phân tích xu hướng nhu cầu và đề xuất nhập hàng thông minh.
+              <h2 className="text-base font-black tracking-tight">AI Báo cáo kho</h2>
+              <p className="text-[11px] font-medium text-slate-300 mt-0.5">
+                KPI · Biểu đồ · Kế hoạch nhập · Xu hướng nhu cầu · Dead stock
+                {invReport?.generated_at ? ` · ${formatDateTime(invReport.generated_at)}` : ''}
               </p>
             </div>
           </div>
-          <button
-            onClick={loadStockAnalysis}
-            disabled={stockLoading}
-            className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
-          >
-            {stockLoading ? 'Đang phân tích...' : 'Làm mới'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/stock?tab=alerts')}
+              className="h-9 px-3 rounded-xl border border-white/20 bg-white/5 text-[11px] font-bold hover:bg-white/10"
+            >
+              Mở cảnh báo kho
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/stock/receipts/new')}
+              className="h-9 px-3 rounded-xl border border-white/20 bg-white/5 text-[11px] font-bold hover:bg-white/10"
+            >
+              Tạo phiếu nhập
+            </button>
+            <button
+              type="button"
+              onClick={runInventoryAi}
+              disabled={invLoading}
+              className="h-9 px-4 rounded-xl bg-white text-slate-900 text-[11px] font-black shadow-sm disabled:opacity-50"
+            >
+              {invLoading ? 'Đang phân tích...' : 'Phân tích lại'}
+            </button>
+          </div>
         </div>
 
-        {stockLoading ? (
-          <div className="py-14 flex flex-col items-center justify-center gap-3">
+        {invLoading && !invAnalysis ? (
+          <div className="py-16 flex flex-col items-center justify-center gap-3">
             <div className="relative w-10 h-10">
               <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-slate-800 animate-spin" />
-              <div className="absolute inset-1.5 rounded-full border-4 border-slate-100 border-b-blue-600 animate-spin [animation-duration:1.5s]" />
             </div>
-            <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp dữ liệu tồn kho và phân tích...</span>
+            <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp tồn kho, velocity bán & lập báo cáo...</span>
           </div>
-        ) : (
-          <div className="space-y-0 divide-y divide-slate-100">
-            {/* Stock Summary KPI Cards */}
-            {stockSummary && (
-              <div className="p-5 space-y-5">
-                {/* Row 1: Main KPIs */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="rounded-xl border border-blue-200/60 bg-blue-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-blue-500/80 tracking-wider">Tổng mặt hàng</p>
-                    <p className="mt-1.5 text-xl font-black text-blue-800 tracking-tight">{stockSummary.total_products}</p>
-                  </div>
-                  <div className="rounded-xl border border-red-200/60 bg-red-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-red-500/80 tracking-wider">Hết hàng</p>
-                    <p className={`mt-1.5 text-xl font-black tracking-tight ${stockSummary.out_of_stock_count > 0 ? 'text-red-700 animate-pulse' : 'text-slate-600'}`}>{stockSummary.out_of_stock_count}</p>
-                  </div>
-                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-amber-600/80 tracking-wider">Tồn thấp</p>
-                    <p className={`mt-1.5 text-xl font-black tracking-tight ${stockSummary.low_stock_count > 0 ? 'text-amber-700' : 'text-slate-600'}`}>{stockSummary.low_stock_count}</p>
-                  </div>
-                  <div className="rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-emerald-500/80 tracking-wider">An toàn</p>
-                    <p className="mt-1.5 text-xl font-black text-emerald-700 tracking-tight">{stockSummary.safe_count}</p>
-                  </div>
-                  <div className="rounded-xl border border-indigo-200/60 bg-indigo-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-indigo-500/80 tracking-wider">Giá trị kho (vốn)</p>
-                    <p className="mt-1.5 text-lg font-black text-indigo-800 tracking-tight">{money(stockSummary.total_stock_value)}</p>
-                  </div>
-                  <div className="rounded-xl border border-violet-200/60 bg-violet-50/40 p-3.5">
-                    <p className="text-[9px] font-black uppercase text-violet-500/80 tracking-wider">Giá trị bán lẻ</p>
-                    <p className="mt-1.5 text-lg font-black text-violet-800 tracking-tight">{money(stockSummary.total_retail_value)}</p>
+        ) : invAnalysis ? (
+          <div className="divide-y divide-slate-100">
+            {/* Health + summary */}
+            <div className="p-5 flex flex-col md:flex-row gap-5">
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <div className="relative w-24 h-24">
+                  <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                    <circle
+                      cx="60" cy="60" r="50" fill="none"
+                      stroke={invAnalysis.health_score >= 70 ? '#10b981' : invAnalysis.health_score >= 40 ? '#f59e0b' : '#ef4444'}
+                      strokeWidth="10" strokeLinecap="round"
+                      strokeDasharray={`${(invAnalysis.health_score / 100) * 314} 314`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black text-slate-800">{invAnalysis.health_score}</span>
+                    <span className="text-[8px] font-bold text-slate-400 uppercase">điểm kho</span>
                   </div>
                 </div>
-
-                {/* Row 2: Category Breakdown Donut + Top Low Stock */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {/* Category Breakdown Donut Chart */}
-                  {stockSummary.category_breakdown.length > 0 && (
-                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4">
-                      <h4 className="text-[11px] font-black text-slate-700 mb-3 uppercase tracking-wider">Phân bố tồn kho theo Danh mục</h4>
-                      <div className="h-[260px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={stockSummary.category_breakdown.map(c => ({ name: c.name, value: c.total_stock }))}
-                              cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}
-                              dataKey="value"
-                              label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                            >
-                              {stockSummary.category_breakdown.map((_, index) => (
-                                <Cell key={`cat-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(val: any) => `${Number(val).toLocaleString('vi-VN')} sản phẩm`} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      {/* Category legend with low stock count */}
-                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                        {stockSummary.category_breakdown.map((cat, idx) => (
-                          <div key={cat.id} className="flex items-center gap-2 text-[10px]">
-                            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                            <span className="font-semibold text-slate-600 truncate">{cat.name}</span>
-                            {cat.low_stock_count > 0 && (
-                              <span className="ml-auto text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{cat.low_stock_count} cảnh báo</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Top 10 Low Stock Products */}
-                  {stockSummary.top_low_stock.length > 0 && (
-                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/30 p-4">
-                      <h4 className="text-[11px] font-black text-slate-700 mb-3 uppercase tracking-wider flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                        Top {stockSummary.top_low_stock.length} sản phẩm cần nhập gấp
-                      </h4>
-                      <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 scrollbar-thin">
-                        {stockSummary.top_low_stock.map((item, idx) => {
-                          const ratio = item.min_stock_level > 0 ? (item.stock_quantity / item.min_stock_level) * 100 : 0;
-                          const barColor = item.stock_quantity <= 0 ? 'bg-red-500' : ratio <= 50 ? 'bg-amber-500' : 'bg-emerald-500';
-                          return (
-                            <div key={item.id} className="group rounded-xl border border-slate-200/60 bg-white p-3 hover:border-slate-300 hover:shadow-sm transition-all">
-                              <div className="flex items-start gap-2.5">
-                                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-black ${
-                                  idx === 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                }`}>{idx + 1}</span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold text-slate-800 truncate">{item.name}</p>
-                                      <p className="text-[10px] font-medium text-slate-400">{item.sku}{item.category ? ` • ${item.category}` : ''}</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <p className={`text-xs font-black tabular-nums ${item.stock_quantity <= 0 ? 'text-red-600' : 'text-amber-600'}`}>
-                                        {item.stock_quantity}
-                                      </p>
-                                      <p className="text-[9px] text-slate-400 font-semibold">/ {item.min_stock_level}</p>
-                                    </div>
-                                  </div>
-                                  {/* Stock bar */}
-                                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${Math.min(ratio, 100)}%` }} />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                <div className="flex gap-1.5 text-[9px] font-bold">
+                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Sẵn {invAnalysis.score_breakdown.availability}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">Vốn {invAnalysis.score_breakdown.capital_efficiency}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Vòng {invAnalysis.score_breakdown.turnover}</span>
                 </div>
               </div>
-            )}
-
-            {/* AI Restock Analysis Table */}
-            {stockAnalysis && (
-              <div>
-                {/* Stock Summary KPIs from AI */}
-                <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-4">
-                  <div className="rounded-xl border border-red-200/60 bg-red-50/40 p-3">
-                    <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
-                    <p className="mt-1 text-xl font-bold text-red-700">{stockAnalysis.summary.out_of_stock}</p>
-                  </div>
-                  <div className="rounded-xl border border-amber-200/60 bg-amber-50/40 p-3">
-                    <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">Tồn thấp</p>
-                    <p className="mt-1 text-xl font-bold text-amber-700">{stockAnalysis.summary.low_stock}</p>
-                  </div>
-                  <div className="rounded-xl border border-orange-200/60 bg-orange-50/40 p-3">
-                    <p className="text-[10px] font-bold uppercase text-orange-600 tracking-wider">Sắp thiếu</p>
-                    <p className="mt-1 text-xl font-bold text-orange-700">{stockAnalysis.summary.needs_restock}</p>
-                  </div>
-                  <div className="rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-3">
-                    <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">An toàn</p>
-                    <p className="mt-1 text-xl font-bold text-emerald-700">{stockAnalysis.summary.healthy}</p>
-                  </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-medium text-slate-700 leading-relaxed">{invAnalysis.summary}</p>
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                  {[
+                    { label: 'SKU', v: invAnalysis.kpis.total_products, c: 'text-slate-800' },
+                    { label: 'Hết hàng', v: invAnalysis.kpis.out_of_stock, c: 'text-red-600' },
+                    { label: 'Tồn thấp', v: invAnalysis.kpis.low_stock, c: 'text-amber-600' },
+                    { label: 'Sắp thiếu', v: invAnalysis.kpis.needs_restock, c: 'text-orange-600' },
+                    { label: 'Dead', v: invAnalysis.kpis.dead_stock, c: 'text-slate-600' },
+                    { label: 'An toàn', v: invAnalysis.kpis.safe, c: 'text-emerald-600' },
+                    { label: 'Vốn kho', v: money(invAnalysis.kpis.total_stock_value), c: 'text-indigo-700' },
+                    { label: 'Chi phí nhập', v: money(invAnalysis.kpis.estimated_restock_cost), c: 'text-blue-700' },
+                  ].map((k) => (
+                    <div key={k.label} className="rounded-xl border border-slate-100 bg-slate-50/60 px-2.5 py-2">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">{k.label}</p>
+                      <p className={`mt-0.5 text-sm font-black tabular-nums ${k.c}`}>{k.v}</p>
+                    </div>
+                  ))}
                 </div>
-                {/* Stock Alert Table */}
-                {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').length > 0 ? (
-                  <div className="overflow-x-auto border-t border-slate-100">
-                    <table className="min-w-full divide-y divide-slate-50 text-sm">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Sản phẩm</th>
-                          <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase text-slate-400 tracking-wider">Trạng thái</th>
-                          <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Xu hướng</th>
-                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn</th>
-                          <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase text-slate-400 tracking-wider">Tồn (ngày)</th>
-                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Bán/ngày</th>
-                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase text-slate-400 tracking-wider">Đề xuất nhập</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {stockAnalysis.items.filter(i => i.alert_status !== 'healthy').map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3">
-                              <p className="font-bold text-slate-800 text-xs">{item.name}</p>
-                              <p className="text-[10px] font-medium text-slate-400">{item.sku}</p>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                                item.alert_status === 'out_of_stock' ? 'bg-red-600 text-white' :
-                                item.alert_status === 'low_stock' ? 'bg-amber-500 text-white' :
-                                'bg-orange-500 text-white'
-                              }`}>
-                                {item.alert_status === 'out_of_stock' ? 'Hết hàng' : item.alert_status === 'low_stock' ? 'Tồn thấp' : 'Sắp thiếu'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center"><TrendBadge trend={item.sales_trend} /></td>
-                            <td className="px-3 py-3 text-right font-bold text-slate-800 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.stock_quantity)}</td>
-                            <td className="px-3 py-3"><StockDaysBar stockDays={item.stock_days} targetDays={stockAnalysis.target_days} /></td>
-                            <td className="px-3 py-3 text-right text-xs tabular-nums">
-                              <span className="font-bold text-slate-700">{Number(item.average_daily_sales).toFixed(1)}</span>
-                              {item.sales_speed_7d !== undefined && (
-                                <span className="block text-[9px] text-slate-400">(7d: {Number(item.sales_speed_7d).toFixed(1)})</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right font-bold text-blue-700 text-xs tabular-nums">{new Intl.NumberFormat('vi-VN').format(item.recommended_quantity)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-6 text-center text-xs font-medium text-emerald-600 bg-emerald-50/30">
-                    Tất cả sản phẩm đều có tồn kho an toàn.
+                {invAnalysis.kpis.estimated_lost_revenue_7d > 0 && (
+                  <p className="mt-2 text-[11px] font-bold text-rose-600">
+                    Rủi ro mất DT ~{money(invAnalysis.kpis.estimated_lost_revenue_7d)} / 7 ngày nếu không nhập SKU hết hàng
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Charts */}
+            {invAnalysis.charts?.length > 0 && (
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {invAnalysis.charts.slice(0, 2).map((chart, idx) => (
+                    <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">{chart.title}</h4>
+                      <div className="h-[240px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          {chart.type === 'pie' ? (
+                            <PieChart>
+                              <Pie data={chart.data} cx="50%" cy="50%" innerRadius={50} outerRadius={78} paddingAngle={3} dataKey="value"
+                                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                                {chart.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                              </Pie>
+                              <Tooltip formatter={(val: any) => Number(val).toLocaleString('vi-VN')} />
+                            </PieChart>
+                          ) : (
+                            <BarChart data={chart.data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                              <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={50} />
+                              <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false}
+                                tickFormatter={(v) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
+                              <Tooltip formatter={(val: any) => Number(val).toLocaleString('vi-VN')} cursor={{ fill: 'rgba(15,23,42,0.04)' }} />
+                              <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                {chart.data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                              </Bar>
+                            </BarChart>
+                          )}
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {invAnalysis.charts.length > 2 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {invAnalysis.charts.slice(2, 5).map((chart, idx) => (
+                      <div key={idx + 2} className="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                        <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">{chart.title}</h4>
+                        <div className="h-[220px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chart.data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                              <XAxis dataKey="name" tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={-20} textAnchor="end" height={48} />
+                              <YAxis tick={{ fontSize: 8, fill: '#64748b' }} axisLine={false} tickLine={false}
+                                tickFormatter={(v) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)} />
+                              <Tooltip formatter={(val: any) => Number(val).toLocaleString('vi-VN')} />
+                              <Bar dataKey="value" radius={[5, 5, 0, 0]} fill={COLORS[(idx + 2) % COLORS.length]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
-            {!stockAnalysis && !stockSummary && (
-              <div className="p-6 text-center text-xs font-medium text-slate-400">
-                Không có dữ liệu tồn kho.
+            {/* Insights + actions — short */}
+            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">Nhận định</h3>
+                <div className="space-y-2">
+                  {invAnalysis.insights?.map((t, i) => (
+                    <div key={i} className="flex gap-2 rounded-lg border border-blue-100 bg-blue-50/40 p-2.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white">{i + 1}</span>
+                      <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
+              <div>
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">Hành động</h3>
+                <div className="space-y-2">
+                  {invAnalysis.recommendations?.map((t, i) => (
+                    <div key={i} className="flex gap-2 rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-[10px] font-black text-white">{i + 1}</span>
+                      <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Data tables */}
+            <div className="p-5 pt-0">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {([
+                  { id: 'restock' as const, label: `Kế hoạch nhập (${invAnalysis.restock_plan?.length || 0})` },
+                  { id: 'mismatch' as const, label: `Lệch cầu (${invAnalysis.demand_mismatch?.length || 0})` },
+                  { id: 'rising' as const, label: `Nhu cầu tăng (${invAnalysis.rising_demand?.length || 0})` },
+                  { id: 'dead' as const, label: `Dead stock (${invAnalysis.dead_stock?.length || 0})` },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setInvTableTab(tab.id)}
+                    className={`h-8 px-3 rounded-lg text-[11px] font-bold border transition-colors ${
+                      invTableTab === tab.id
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {(() => {
+                const tableMap: Record<typeof invTableTab, InventorySkuRow[]> = {
+                  restock: invAnalysis.restock_plan || [],
+                  mismatch: invAnalysis.demand_mismatch || [],
+                  rising: invAnalysis.rising_demand || [],
+                  dead: invAnalysis.dead_stock || [],
+                };
+                const rows = tableMap[invTableTab];
+                if (!rows.length) {
+                  return (
+                    <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-xs font-semibold text-slate-400">
+                      Không có dữ liệu cho bảng này
+                    </div>
+                  );
+                }
+                return (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">Sản phẩm</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">TT</th>
+                          <th className="px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-400">Ưu tiên</th>
+                          <th className="px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-400">Xu hướng</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Tồn</th>
+                          <th className="px-3 py-2.5 text-center text-[10px] font-black uppercase tracking-wider text-slate-400">Ngày cover</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Bán/ngày</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Đề xuất</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Chi phí</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">NCC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {rows.map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-50/80">
+                            <td className="px-3 py-2.5">
+                              <p className="text-xs font-bold text-slate-800">{item.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">{item.sku} · {item.category}</p>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[9px] font-black ${
+                                item.status === 'out_of_stock' ? 'bg-red-600 text-white' :
+                                item.status === 'low_stock' ? 'bg-amber-500 text-white' :
+                                item.status === 'needs_restock' ? 'bg-orange-500 text-white' :
+                                item.status === 'dead_stock' ? 'bg-slate-600 text-white' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {statusLabelInv[item.status] || item.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              <span className={`text-[10px] font-black ${
+                                item.priority === 'critical' ? 'text-red-600' :
+                                item.priority === 'high' ? 'text-orange-600' :
+                                item.priority === 'medium' ? 'text-amber-600' : 'text-slate-500'
+                              }`}>
+                                {priorityLabelInv[item.priority]}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-center"><TrendBadge trend={item.sales_trend} /></td>
+                            <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800">
+                              {item.stock_quantity}<span className="text-slate-400 font-semibold">/{item.min_stock_level}</span>
+                            </td>
+                            <td className="px-3 py-2.5"><StockDaysBar stockDays={item.stock_days} targetDays={invAnalysis.target_days} /></td>
+                            <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-700">
+                              {Number(item.avg_daily_sales).toFixed(1)}
+                              <span className="block text-[9px] text-slate-400 font-semibold">gần: {Number(item.sales_speed_recent).toFixed(1)}</span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right text-xs font-black tabular-nums text-blue-700">{item.recommended_qty}</td>
+                            <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-700">
+                              {item.restock_cost > 0 ? money(item.restock_cost) : item.stock_value > 0 && invTableTab === 'dead' ? money(item.stock_value) : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 max-w-[100px] truncate">{item.supplier}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* History strip */}
+            <div className="px-5 pb-5">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-500">Lịch sử báo cáo kho</h3>
+                {invHistoryLoading && <span className="text-[10px] text-slate-400">Đang tải...</span>}
+              </div>
+              {invHistory.length === 0 ? (
+                <p className="text-[11px] text-slate-400 font-medium">Chưa có bản lưu (chạy migration ai_inventory_analyses.sql để lưu lịch sử).</p>
+              ) : (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {invHistory.map((h) => (
+                    <div
+                      key={h.id}
+                      className={`min-w-[180px] rounded-xl border p-2.5 ${invReport?.id === h.id ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <div>
+                          <p className="text-[11px] font-black text-slate-800">{h.health_score ?? '—'}/100 · {h.days}d</p>
+                          <p className="text-[10px] text-slate-400 font-medium">{formatDateTime(h.generated_at)}</p>
+                          <p className="text-[10px] font-bold text-slate-500 mt-0.5">
+                            Hết {h.out_of_stock_count} · Thấp {h.low_stock_count}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <button type="button" onClick={() => handleOpenInvReport(h.id)} className="h-7 w-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:border-blue-300">
+                            <HiOutlineEye className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={() => handleDeleteInvReport(h.id)} className="h-7 w-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:border-red-300 hover:text-red-600">
+                            <HiOutlineTrash className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <p className="text-xs font-semibold text-slate-400 mb-3">Chưa có báo cáo kho AI</p>
+            <button
+              type="button"
+              onClick={runInventoryAi}
+              disabled={invLoading}
+              className="h-9 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold disabled:opacity-50"
+            >
+              Tạo báo cáo kho
+            </button>
           </div>
         )}
       </section>
