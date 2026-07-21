@@ -207,17 +207,10 @@ export class CatalogService {
 
   static async deleteSupplier(id: string, hard?: boolean) {
     if (hard) {
-      const { data: products } = await supabase
-        .from('products')
-        .select('id')
-        .eq('supplier_id', id)
-        .limit(1);
-
-      const { data: receipts } = await supabase
-        .from('goods_receipts')
-        .select('id')
-        .eq('supplier_id', id)
-        .limit(1);
+      const [{ data: products }, { data: receipts }] = await Promise.all([
+        supabase.from('products').select('id').eq('supplier_id', id).limit(1),
+        supabase.from('goods_receipts').select('id').eq('supplier_id', id).limit(1),
+      ]);
 
       if ((products && products.length > 0) || (receipts && receipts.length > 0)) {
         throw new AppError(400, 'Không thể xóa hoàn toàn nhà cung cấp này vì đã có sản phẩm hoặc phiếu nhập liên kết. Vui lòng chọn Ngưng hợp tác.');
@@ -348,21 +341,13 @@ export class CatalogService {
     // Dùng 2 query riêng để tránh vấn đề syntax với or() khi giá trị có ký tự đặc biệt
     const conflictIds = new Set<string>();
 
-    if (sku) {
-      const { data: bySku } = await supabase
-        .from('products')
-        .select('id, is_active')
-        .eq('sku', sku);
-      bySku?.forEach((p: any) => conflictIds.add(p.id));
-    }
+    const [bySkuRes, byBarcodeRes] = await Promise.all([
+      sku ? supabase.from('products').select('id, is_active').eq('sku', sku) : Promise.resolve({ data: [] }),
+      barcode ? supabase.from('products').select('id, is_active').eq('barcode', barcode) : Promise.resolve({ data: [] }),
+    ]);
 
-    if (barcode) {
-      const { data: byBarcode } = await supabase
-        .from('products')
-        .select('id, is_active')
-        .eq('barcode', barcode);
-      byBarcode?.forEach((p: any) => conflictIds.add(p.id));
-    }
+    bySkuRes.data?.forEach((p: any) => conflictIds.add(p.id));
+    byBarcodeRes.data?.forEach((p: any) => conflictIds.add(p.id));
 
     if (conflictIds.size === 0) return;
 

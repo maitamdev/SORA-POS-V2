@@ -111,13 +111,15 @@ export class OrderService {
 
     // Đồng bộ cảnh báo tồn kho & gửi thông báo Telegram cho các sản phẩm trong hóa đơn
     if (input.items && Array.isArray(input.items)) {
-      for (const item of input.items) {
-        if (item.product_id) {
-          CatalogService.syncStockAlert(item.product_id).catch((err) => {
-            console.error('[OrderService.create] Lỗi đồng bộ cảnh báo tồn kho:', err);
-          });
-        }
-      }
+      Promise.all(
+        input.items
+          .filter((item) => item.product_id)
+          .map((item) =>
+            CatalogService.syncStockAlert(item.product_id).catch((err) => {
+              console.error('[OrderService.create] Lỗi đồng bộ cảnh báo tồn kho:', err);
+            })
+          )
+      );
     }
 
     return this.getById(String(orderId));
@@ -142,13 +144,15 @@ export class OrderService {
 
     // Đồng bộ lại cảnh báo tồn kho sau khi hoàn trả hàng (để tự động xóa cảnh báo nếu tồn kho tăng)
     if (restock && cancelledOrder && cancelledOrder.order_details) {
-      for (const detail of cancelledOrder.order_details) {
-        if (detail.product_id) {
-          CatalogService.syncStockAlert(detail.product_id).catch((err) => {
-            console.error('[OrderService.cancel] Lỗi đồng bộ cảnh báo tồn kho:', err);
-          });
-        }
-      }
+      Promise.all(
+        cancelledOrder.order_details
+          .filter((detail: any) => detail.product_id)
+          .map((detail: any) =>
+            CatalogService.syncStockAlert(detail.product_id).catch((err) => {
+              console.error('[OrderService.cancel] Lỗi đồng bộ cảnh báo tồn kho:', err);
+            })
+          )
+      );
     }
 
     return cancelledOrder;

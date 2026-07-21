@@ -54,9 +54,11 @@ export default defineConfig({
           if (id.includes('node_modules')) {
             if (id.includes('react-dom') || id.includes('react-router')) return 'react-vendor';
             if (id.includes('recharts') || id.includes('d3-')) return 'chart-vendor';
+            if (id.includes('@supabase') || id.includes('dexie')) return 'db-vendor';
+            if (id.includes('axios') || id.includes('zustand')) return 'data-vendor';
+            if (id.includes('html2canvas') || id.includes('html5-qrcode') || id.includes('qrcode')) return 'media-vendor';
             if (id.includes('react-icons') || id.includes('react-hot-toast')) return 'ui-vendor';
-            if (id.includes('axios') || id.includes('zustand') || id.includes('dexie') || id.includes('@supabase')) return 'data-vendor';
-            if (id.includes('zod') || id.includes('qrcode') || id.includes('html2canvas')) return 'utility-vendor';
+            if (id.includes('zod') || id.includes('react-hook-form') || id.includes('@hookform')) return 'form-vendor';
           }
         },
       },
