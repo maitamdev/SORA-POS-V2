@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HiOutlineShoppingCart,
@@ -6,6 +7,7 @@ import {
 import { useAuthStore } from '../../../stores/auth.store';
 import { usePOSStore } from '../../../stores/pos.store';
 import { useBarcodeScanner } from '../../../hooks/useBarcodeScanner';
+import { useDebounce } from '../../../hooks/useDebounce';
 import { getRoleLabel, getUserInitials } from '../../../utils/userDisplay';
 
 // Custom Barcode icon svg
@@ -31,6 +33,22 @@ const POSHeader = ({ onBarcodeSubmit }: POSHeaderProps) => {
   const setPage = usePOSStore((s) => s.setPage);
   const setShowPairingModal = usePOSStore((s) => s.setShowPairingModal);
 
+  const [localSearch, setLocalSearch] = useState(search);
+  const debouncedSearch = useDebounce(localSearch, 250);
+
+  // Sync debounced input to store search
+  useEffect(() => {
+    if (debouncedSearch !== search) {
+      setSearch(debouncedSearch);
+      setPage(1);
+    }
+  }, [debouncedSearch]);
+
+  // Sync external search reset to local input
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
   const isCashierShiftRequired = user?.role === 'cashier';
 
   return (
@@ -52,16 +70,13 @@ const POSHeader = ({ onBarcodeSubmit }: POSHeaderProps) => {
           <HiOutlineSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <input
             id="product-search-input"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             placeholder="Tìm sản phẩm"
             className="w-60 lg:w-80 pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 bg-slate-50 transition"
           />
-          {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600">✕</button>
+          {localSearch && (
+            <button onClick={() => { setLocalSearch(''); setSearch(''); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600">✕</button>
           )}
         </div>
 

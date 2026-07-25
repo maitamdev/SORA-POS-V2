@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   HiOutlineShoppingCart,
   HiOutlinePlus,
@@ -5,6 +6,94 @@ import {
 } from 'react-icons/hi';
 import { usePOSStore, usePOSSortedProducts } from '../../../stores/pos.store';
 import { money, getProductImage } from '../utils/posHelpers';
+import { Product } from '../../../types/domain.type';
+
+interface ProductItemProps {
+  product: Product;
+  operationSettings: any;
+  onAddToCart: (product: Product) => void;
+}
+
+const ProductGridCard = memo(({ product, operationSettings, onAddToCart }: ProductItemProps) => {
+  const isLowStock = product.stock_quantity <= product.min_stock_level;
+  const isOutOfStock = product.stock_quantity <= 0;
+
+  return (
+    <div className="bg-white border border-slate-200/60 rounded-xl p-3 flex flex-col justify-between hover:shadow-md hover:border-blue-400 transition relative overflow-hidden group">
+      <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 text-[9px] font-black rounded-full border ${
+        isOutOfStock
+          ? 'bg-red-100 text-red-700 border-red-200'
+          : isLowStock
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      }`}>
+        Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '(Thấp)'} {isOutOfStock && 'Hết'}
+      </span>
+
+      <div className="h-28 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-2 overflow-hidden flex-shrink-0">
+        <img
+          src={getProductImage(product)}
+          alt={product.name}
+          className="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300"
+          loading="lazy"
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <h3 className="text-xs font-black text-slate-800 line-clamp-2 mt-1 min-h-[32px]">
+          {product.name}
+        </h3>
+        <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">
+          {product.sku}
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <span className="text-sm font-black text-blue-600 block">{money(product.sell_price)}</span>
+        <button
+          onClick={() => onAddToCart(product)}
+          disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
+          className="w-full mt-2.5 flex items-center justify-center gap-1 py-1.5 border border-blue-600 text-blue-600 text-[11px] font-black rounded-lg hover:bg-blue-600 hover:text-white transition disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-blue-600"
+        >
+          <HiOutlinePlus className="w-3.5 h-3.5" />
+          <span>Thêm</span>
+        </button>
+      </div>
+    </div>
+  );
+});
+
+const ProductRowItem = memo(({ product, operationSettings, onAddToCart }: ProductItemProps) => {
+  const isLowStock = product.stock_quantity <= product.min_stock_level;
+  const isOutOfStock = product.stock_quantity <= 0;
+
+  return (
+    <div className="p-3 flex items-center justify-between gap-4 hover:bg-slate-50/40 transition">
+      <div className="flex items-center gap-3 min-w-0">
+        <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 object-contain bg-slate-50 rounded p-1 flex-shrink-0" />
+        <div className="min-w-0 leading-tight">
+          <h4 className="text-xs font-black text-slate-800 truncate">{product.name}</h4>
+          <span className="text-[10px] text-slate-400 font-bold uppercase">{product.sku}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-6">
+        <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border ${
+          isOutOfStock ? 'bg-red-100 text-red-700 border-red-200' : isLowStock ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        }`}>
+          Tồn: {product.stock_quantity}
+        </span>
+        <span className="text-xs font-black text-slate-800 w-20 text-right">{money(product.sell_price)}</span>
+        <button
+          onClick={() => onAddToCart(product)}
+          disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
+          className="p-1 px-3 border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
+        >
+          + Thêm
+        </button>
+      </div>
+    </div>
+  );
+});
 
 const ProductGrid = () => {
   const categories = usePOSStore((s) => s.categories);
@@ -27,8 +116,7 @@ const ProductGrid = () => {
   const itemsStart = (pagination.page - 1) * pagination.limit + 1;
   const itemsEnd = Math.min(pagination.page * pagination.limit, pagination.total);
 
-  // Low stock warning toast
-  const handleAddToCart = (product: typeof products[0]) => {
+  const handleAddToCart = (product: Product) => {
     import('react-hot-toast').then(({ default: toast }) => {
       if (!operationSettings.allowSellOutOfStock && Number(product.stock_quantity) <= 0) {
         toast.error('Sản phẩm đã hết hàng');
@@ -132,89 +220,25 @@ const ProductGrid = () => {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {sortedProducts.map((product) => {
-              const isLowStock = product.stock_quantity <= product.min_stock_level;
-              const isOutOfStock = product.stock_quantity <= 0;
-              return (
-                <div
-                  key={product.id}
-                  className="bg-white border border-slate-200/60 rounded-xl p-3 flex flex-col justify-between hover:shadow-md hover:border-blue-400 transition relative overflow-hidden group"
-                >
-                  <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 text-[9px] font-black rounded-full border ${
-                    isOutOfStock
-                      ? 'bg-red-100 text-red-700 border-red-200'
-                      : isLowStock
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  }`}>
-                    Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '(Thấp)'} {isOutOfStock && 'Hết'}
-                  </span>
-
-                  <div className="h-28 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-2 overflow-hidden flex-shrink-0">
-                    <img
-                      src={getProductImage(product)}
-                      alt={product.name}
-                      className="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300"
-                      loading="lazy"
-                    />
-                  </div>
-
-                  <div className="flex-1 flex flex-col">
-                    <h3 className="text-xs font-black text-slate-800 line-clamp-2 mt-1 min-h-[32px]">
-                      {product.name}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">
-                      {product.sku}
-                    </p>
-                  </div>
-
-                  <div className="mt-3">
-                    <span className="text-sm font-black text-blue-600 block">{money(product.sell_price)}</span>
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
-                      className="w-full mt-2.5 flex items-center justify-center gap-1 py-1.5 border border-blue-600 text-blue-600 text-[11px] font-black rounded-lg hover:bg-blue-600 hover:text-white transition disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-blue-600"
-                    >
-                      <HiOutlinePlus className="w-3.5 h-3.5" />
-                      <span>Thêm</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {sortedProducts.map((product) => (
+              <ProductGridCard
+                key={product.id}
+                product={product}
+                operationSettings={operationSettings}
+                onAddToCart={handleAddToCart}
+              />
+            ))}
           </div>
         ) : (
           <div className="space-y-2 bg-white rounded-xl border border-slate-200/60 overflow-hidden divide-y divide-slate-100 shadow-sm">
-            {sortedProducts.map((product) => {
-              const isLowStock = product.stock_quantity <= product.min_stock_level;
-              const isOutOfStock = product.stock_quantity <= 0;
-              return (
-                <div key={product.id} className="p-3 flex items-center justify-between gap-4 hover:bg-slate-50/40 transition">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img src={getProductImage(product)} alt={product.name} className="w-10 h-10 object-contain bg-slate-50 rounded p-1 flex-shrink-0" />
-                    <div className="min-w-0 leading-tight">
-                      <h4 className="text-xs font-black text-slate-800 truncate">{product.name}</h4>
-                      <span className="text-[10px] text-slate-400 font-bold uppercase">{product.sku}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-full border ${
-                      isOutOfStock ? 'bg-red-100 text-red-700 border-red-200' : isLowStock ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    }`}>
-                      Tồn: {product.stock_quantity}
-                    </span>
-                    <span className="text-xs font-black text-slate-800 w-20 text-right">{money(product.sell_price)}</span>
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
-                      className="p-1 px-3 border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition disabled:opacity-50"
-                    >
-                      + Thêm
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {sortedProducts.map((product) => (
+              <ProductRowItem
+                key={product.id}
+                product={product}
+                operationSettings={operationSettings}
+                onAddToCart={handleAddToCart}
+              />
+            ))}
           </div>
         )}
       </div>

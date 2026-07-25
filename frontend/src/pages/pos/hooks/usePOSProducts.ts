@@ -28,60 +28,73 @@ export const usePOSProducts = () => {
     setPaymentMethod,
   } = usePOSStore();
 
-  // Load products (re-runs on search/page/category/settings changes)
+  // Load products with Stale-While-Revalidate (IndexedDB first -> network sync)
   const loadProducts = async () => {
-    if (!navigator.onLine) {
-      try {
-        const categoryIdFilter = selectedCategoryId !== 'all' ? selectedCategoryId : undefined;
-        const { items, total } = await getProductsOffline(
-          search,
-          categoryIdFilter,
-          page,
-          operationSettings.productPageSize
-        );
-        setProducts(items);
-        setPagination({ page, limit: operationSettings.productPageSize, total });
-      } catch (err) {
-        console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
+    const categoryIdFilter = selectedCategoryId !== 'all' ? selectedCategoryId : undefined;
+
+    // 1. Stale-While-Revalidate: Try IndexedDB first for instant 0ms load
+    try {
+      const { items: offlineItems, total: offlineTotal } = await getProductsOffline(
+        search,
+        categoryIdFilter,
+        page,
+        operationSettings.productPageSize
+      );
+      if (offlineItems && offlineItems.length > 0) {
+        setProducts(offlineItems);
+        setPagination({ page, limit: operationSettings.productPageSize, total: offlineTotal });
       }
-      return;
+    } catch (err) {
+      console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
     }
 
-    const params: Record<string, unknown> = {
-      search,
-      is_active: true,
-      limit: operationSettings.productPageSize,
-      page,
-    };
-    if (selectedCategoryId !== 'all') {
-      params.category_id = selectedCategoryId;
-    }
+    // 2. Fetch fresh data from Server if online
+    if (!navigator.onLine) return;
 
-    const productRes = await catalogAPI.products.list(params);
-    setProducts(productRes.data.data.items);
-    setPagination(productRes.data.data.pagination);
+    try {
+      const params: Record<string, unknown> = {
+        search,
+        is_active: true,
+        limit: operationSettings.productPageSize,
+        page,
+      };
+      if (selectedCategoryId !== 'all') {
+        params.category_id = selectedCategoryId;
+      }
+
+      const productRes = await catalogAPI.products.list(params);
+      setProducts(productRes.data.data.items);
+      setPagination(productRes.data.data.pagination);
+    } catch (err) {
+      console.warn('[POS Network] Lỗi fetch sản phẩm từ server:', err);
+    }
   };
 
-  // Load categories & customers (once on mount)
+  // Load categories & customers with Stale-While-Revalidate
   const loadCategoriesAndCustomers = async () => {
-    if (!navigator.onLine) {
-      try {
-        const offlineCategories = await getCategoriesOffline();
-        if (offlineCategories.length > 0) setCategories(offlineCategories);
-        const offlineCustomers = await getCustomersOffline();
-        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
-      } catch (err) {
-        console.warn('[POS Offline] Lỗi đọc dữ liệu offline:', err);
-      }
-      return;
+    // 1. Fast boot from IndexedDB
+    try {
+      const offlineCategories = await getCategoriesOffline();
+      if (offlineCategories.length > 0) setCategories(offlineCategories);
+      const offlineCustomers = await getCustomersOffline();
+      if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+    } catch (err) {
+      console.warn('[POS Offline] Lỗi đọc danh mục/khách hàng offline:', err);
     }
 
-    const [categoryRes, customerRes] = await Promise.all([
-      catalogAPI.categories.list({ is_active: true, limit: 100 }),
-      catalogAPI.customers.list({ is_active: true, limit: 100 }),
-    ]);
-    setCategories(categoryRes.data.data.items);
-    setCustomers(customerRes.data.data.items);
+    // 2. Refresh from Server if online
+    if (!navigator.onLine) return;
+
+    try {
+      const [categoryRes, customerRes] = await Promise.all([
+        catalogAPI.categories.list({ is_active: true, limit: 100 }),
+        catalogAPI.customers.list({ is_active: true, limit: 100 }),
+      ]);
+      setCategories(categoryRes.data.data.items);
+      setCustomers(customerRes.data.data.items);
+    } catch (err) {
+      console.warn('[POS Network] Lỗi fetch danh mục/khách hàng từ server:', err);
+    }
   };
 
   // Effects

@@ -182,7 +182,7 @@ const ProductsPage = () => {
       let lowStock = 0;
       let outStock = 0;
 
-      allProducts.forEach(p => {
+      allProducts.forEach((p: Product) => {
         if (p.is_active) active++;
         if (p.stock_quantity <= 0) outStock++;
         else if (p.stock_quantity <= p.min_stock_level) lowStock++;

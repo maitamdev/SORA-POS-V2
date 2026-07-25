@@ -1,8 +1,10 @@
 import { supabase } from '../config/supabase';
 import { AppError } from '../utils/AppError';
+import { appCache } from '../utils/cache';
 import { OperationSettings, operationSettingsSchema } from '../validations/settings.validation';
 
 const OPERATION_SETTINGS_KEY = 'operation';
+const SETTINGS_CACHE_KEY = 'settings:operation';
 
 export const defaultOperationSettings: OperationSettings = operationSettingsSchema.parse({
   storeName: 'SORA MART',
@@ -52,6 +54,9 @@ const handleMissingTable = (message: string) => {
 
 export class SettingsService {
   static async getOperationSettings() {
+    const cached = appCache.get<any>(SETTINGS_CACHE_KEY);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from('app_settings')
       .select('value, updated_at, updated_by')
@@ -63,11 +68,14 @@ export class SettingsService {
       throw new AppError(500, error.message);
     }
 
-    return {
+    const result = {
       settings: normalizeSettings(data?.value),
       updated_at: data?.updated_at || null,
       updated_by: data?.updated_by || null,
     };
+
+    appCache.set(SETTINGS_CACHE_KEY, result, 5 * 60 * 1000); // 5 min cache
+    return result;
   }
 
   static async updateOperationSettings(settings: OperationSettings, userId: string) {
@@ -89,6 +97,8 @@ export class SettingsService {
       handleMissingTable(error.message);
       throw new AppError(500, error.message);
     }
+
+    appCache.clear();
 
     return {
       settings: normalizeSettings(data.value),

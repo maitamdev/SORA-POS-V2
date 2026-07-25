@@ -1,0 +1,214 @@
+TY  - ELEC
+AU  - Oracle
+TI  - Completing Transactions
+T2  - Oracle Retail Point-of-Service User Guide
+ET  - Release 14.1
+PY  - 2014
+UR  - https://docs.oracle.com/cd/E12521_01/point_of_service/pdf/141/html/pos_ug/Output/transactions.htm
+Y2  - 2026/07/24
+ER  -
+
+TY  - BOOK
+AU  - Laudon, Kenneth C.
+AU  - Laudon, Jane P.
+TI  - Management Information Systems: Managing the Digital Firm
+ET  - 16th Global Edition
+PY  - 2020
+PB  - Pearson
+SN  - 9781292296562
+ER  -
+
+TY  - BOOK
+AU  - Levy, Michael
+AU  - Weitz, Barton A.
+AU  - Grewal, Dhruv
+TI  - Retailing Management
+ET  - 10th
+PY  - 2019
+PB  - McGraw-Hill Education
+SN  - 9781259573088
+ER  -
+
+TY  - JOUR
+AU  - DeHoratius, Nicole
+AU  - Raman, Ananth
+TI  - Inventory Record Inaccuracy: An Empirical Analysis
+JO  - Management Science
+PY  - 2008
+VL  - 54
+IS  - 4
+SP  - 627
+EP  - 641
+DO  - 10.1287/mnsc.1070.0789
+UR  - https://pubsonline.informs.org/doi/10.1287/mnsc.1070.0789
+ER  -
+
+TY  - BOOK
+AU  - Silver, Edward A.
+AU  - Pyke, David F.
+AU  - Peterson, Rein
+TI  - Inventory Management and Production Planning and Scheduling
+ET  - 3rd
+CY  - New York
+PY  - 1998
+PB  - John Wiley & Sons
+SN  - 9780471119470
+ER  -
+
+TY  - JOUR
+AU  - Ferraiolo, David F.
+AU  - Sandhu, Ravi
+AU  - Gavrila, Serban
+AU  - Kuhn, D. Richard
+AU  - Chandramouli, Ramaswamy
+TI  - Proposed NIST Standard for Role-Based Access Control
+JO  - ACM Transactions on Information and System Security
+PY  - 2001
+VL  - 4
+IS  - 3
+SP  - 224
+EP  - 274
+DO  - 10.1145/501978.501980
+UR  - https://csrc.nist.gov/pubs/journal/2001/08/proposed-nist-standard-for-rolebased-access-contro/final
+ER  -
+
+TY  - BOOK
+AU  - Russell, Stuart
+AU  - Norvig, Peter
+TI  - Artificial Intelligence: A Modern Approach
+ET  - 4th
+PY  - 2021
+PB  - Pearson
+SN  - 9781292401133
+ER  -
+
+TY  - RPRT
+AU  - Bommasani, Rishi
+AU  - Hudson, Drew A.
+AU  - Adeli, Ehsan
+AU  - Altman, Russ
+AU  - Arora, Simran
+AU  - Liang, Percy
+TI  - On the Opportunities and Risks of Foundation Models
+PY  - 2021
+DO  - 10.48550/arXiv.2108.07258
+UR  - https://arxiv.org/abs/2108.07258
+N1  - arXiv:2108.07258; danh sách tác giả được rút gọn trong tệp RIS, xem bản ghi arXiv để lấy đầy đủ.
+ER  -
+
+TY  - JOUR
+AU  - Carbonneau, Réal
+AU  - Laframboise, Kevin
+AU  - Vahidov, Rustam
+TI  - Application of Machine Learning Techniques for Supply Chain Demand Forecasting
+JO  - European Journal of Operational Research
+PY  - 2008
+VL  - 184
+IS  - 3
+SP  - 1140
+EP  - 1154
+DO  - 10.1016/j.ejor.2006.12.004
+UR  - https://doi.org/10.1016/j.ejor.2006.12.004
+ER  -
+
+TY  - RPRT
+AU  - Tabassi, Elham
+TI  - Artificial Intelligence Risk Management Framework (AI RMF 1.0)
+T2  - NIST AI 100-1
+PY  - 2023
+PB  - National Institute of Standards and Technology
+DO  - 10.6028/NIST.AI.100-1
+UR  - https://doi.org/10.6028/NIST.AI.100-1
+ER  -
+
+TY  - ELEC
+AU  - React Team
+TI  - Describing the UI
+T2  - React Documentation
+UR  - https://react.dev/learn/describing-the-ui
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - Microsoft
+TI  - TypeScript Documentation
+UR  - https://www.typescriptlang.org/docs/
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - Vite Team
+TI  - Getting Started
+T2  - Vite Documentation
+UR  - https://vite.dev/guide/
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - Tailwind Labs
+TI  - Styling with Utility Classes
+T2  - Tailwind CSS Documentation
+UR  - https://tailwindcss.com/docs/styling-with-utility-classes
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - pmndrs
+TI  - Introduction
+T2  - Zustand Documentation
+UR  - https://zustand.docs.pmnd.rs/learn/getting-started/introduction
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - OpenJS Foundation
+TI  - Express - Node.js Web Application Framework
+UR  - https://expressjs.com/
+Y2  - 2026/07/24
+ER  -
+
+TY  - THES
+AU  - Fielding, Roy Thomas
+TI  - Architectural Styles and the Design of Network-based Software Architectures
+PY  - 2000
+PB  - University of California, Irvine
+M3  - PhD dissertation
+UR  - https://www.ics.uci.edu/~fielding/pubs/dissertation/top.htm
+ER  -
+
+TY  - STD
+AU  - Jones, Michael
+AU  - Bradley, John
+AU  - Sakimura, Nat
+TI  - JSON Web Token (JWT)
+T2  - RFC 7519
+PY  - 2015
+PB  - Internet Engineering Task Force
+DO  - 10.17487/RFC7519
+UR  - https://www.rfc-editor.org/info/rfc7519/
+ER  -
+
+TY  - ELEC
+AU  - Supabase
+TI  - Database
+T2  - Supabase Documentation
+UR  - https://supabase.com/docs/guides/database/overview
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - Groq
+TI  - API Reference
+T2  - GroqDocs
+UR  - https://console.groq.com/docs/api-reference
+Y2  - 2026/07/24
+ER  -
+
+TY  - ELEC
+AU  - payOS
+TI  - Bắt đầu và payOS API
+T2  - Tài liệu payOS
+UR  - https://payos.vn/docs/
+Y2  - 2026/07/24
+N1  - API reference: https://payos.vn/docs/api/
+ER  -

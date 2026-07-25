@@ -1,5 +1,6 @@
 import api from './api';
 import { ApiResponse } from '../types/user.type';
+import { queryCache } from '../utils/queryCache';
 
 export interface OperationSettings {
   storeName: string;
@@ -67,9 +68,22 @@ export const defaultOperationSettings: OperationSettings = {
   bankAccountName: '',
 };
 
+const SETTINGS_CACHE_KEY = 'settings:operation';
+
 export const settingsAPI = {
-  getOperation: () => api.get<ApiResponse<OperationSettingsResponse>>('/settings/operation'),
-  updateOperation: (settings: OperationSettings) =>
-    api.put<ApiResponse<OperationSettingsResponse>>('/settings/operation', settings),
+  getOperation: async () => {
+    const cached = queryCache.get<ApiResponse<OperationSettingsResponse>>(SETTINGS_CACHE_KEY);
+    if (cached) return { data: cached } as any;
+
+    const res = await api.get<ApiResponse<OperationSettingsResponse>>('/settings/operation');
+    queryCache.set(SETTINGS_CACHE_KEY, res.data, 5 * 60 * 1000); // Cache 5 min
+    return res;
+  },
+  updateOperation: async (settings: OperationSettings) => {
+    const res = await api.put<ApiResponse<OperationSettingsResponse>>('/settings/operation', settings);
+    queryCache.invalidatePrefix('settings:');
+    return res;
+  },
   defaults: () => api.get<ApiResponse<OperationSettings>>('/settings/operation/defaults'),
 };
+

@@ -169,6 +169,10 @@ export class CatalogService {
   }
 
   static async listSuppliers(queryParams: Query) {
+    const cacheKey = stableCacheKey('catalog:suppliers', queryParams);
+    const cached = appCache.get<{ items: unknown[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
+    if (cached) return cached;
+
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('suppliers')
@@ -181,7 +185,9 @@ export class CatalogService {
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
-    return { items: data || [], pagination: { page, limit, total: count || 0 } };
+    const result = { items: data || [], pagination: { page, limit, total: count || 0 } };
+    appCache.set(cacheKey, result, 60_000);
+    return result;
   }
 
   static async createSupplier(data: Entity) {
@@ -191,6 +197,7 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:suppliers');
     return created;
   }
 
@@ -202,6 +209,7 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:suppliers');
     return updated;
   }
 
@@ -218,15 +226,21 @@ export class CatalogService {
 
       const { error } = await supabase.from('suppliers').delete().eq('id', id);
       if (error) throw new AppError(400, error.message);
+      appCache.deletePrefix('catalog:suppliers');
       return { message: 'Đã xóa hoàn toàn nhà cung cấp khỏi hệ thống.' };
     }
 
     const { error } = await supabase.from('suppliers').update({ is_active: false }).eq('id', id);
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:suppliers');
     return { message: 'Đã ngưng hợp tác với nhà cung cấp thành công.' };
   }
 
   static async listCustomers(queryParams: Query) {
+    const cacheKey = stableCacheKey('catalog:customers', queryParams);
+    const cached = appCache.get<{ items: unknown[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
+    if (cached) return cached;
+
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('customers')
@@ -239,7 +253,9 @@ export class CatalogService {
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
-    return { items: data || [], pagination: { page, limit, total: count || 0 } };
+    const result = { items: data || [], pagination: { page, limit, total: count || 0 } };
+    appCache.set(cacheKey, result, 60_000);
+    return result;
   }
 
   static async createCustomer(data: Entity) {
@@ -250,6 +266,7 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:customers');
     return created;
   }
 
@@ -262,12 +279,14 @@ export class CatalogService {
       .select('*')
       .single();
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:customers');
     return updated;
   }
 
   static async deleteCustomer(id: string) {
     const { error } = await supabase.from('customers').update({ is_active: false }).eq('id', id);
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix('catalog:customers');
     return null;
   }
 

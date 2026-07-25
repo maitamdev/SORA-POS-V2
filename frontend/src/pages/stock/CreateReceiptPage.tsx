@@ -50,7 +50,7 @@ export default function CreateReceiptPage() {
     const toastId = toast.loading(`Đang tìm sản phẩm có mã: ${code}...`);
     try {
       const response = await catalogAPI.products.list({ search: code, is_active: true, limit: 5 });
-      const dbMatch = response.data.data.items.find((p) => p.barcode === code || p.sku === code);
+      const dbMatch = response.data.data.items.find((p: Product) => p.barcode === code || p.sku === code);
 
       if (dbMatch) {
         handleAddItem(dbMatch);
