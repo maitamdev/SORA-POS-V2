@@ -84,10 +84,10 @@ const LoginPage = () => {
           <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-16 h-1 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" />
           {/* Header */}
           <div className="flex flex-col items-center mb-5">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-white shadow-md border border-slate-100 p-2 mb-3">
-              <img src="/assets/logo.png" alt="SORA-POS Logo" className="h-full w-full object-contain" />
+            <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-white shadow-md border border-slate-100 p-1 mb-3 overflow-hidden">
+              <img src="/assets/logo.png" alt="SORA-POS Logo" className="h-full w-full object-contain scale-[1.3]" />
             </div>
-            <h1 className="font-bold text-xl tracking-tight text-slate-800">SORA-POS</h1>
+            <h1 className="font-bold text-xl tracking-tight text-slate-800 mt-2">SORA-POS</h1>
             <h2 className="text-lg font-semibold text-slate-900 mt-1">Chào mừng trở lại</h2>
             <p className="text-[11px] text-slate-400 font-medium mt-0.5">Đăng nhập để tiếp tục quản lý bán hàng hiệu quả</p>
           </div>

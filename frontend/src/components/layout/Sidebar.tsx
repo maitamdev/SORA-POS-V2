@@ -148,7 +148,7 @@ const Sidebar = () => {
           <img
             src="/assets/logo.png"
             alt="Sora POS Logo"
-            className="w-9 h-9 object-contain"
+            className="w-11 h-11 object-contain scale-[1.3]"
           />
           <div>
             <h1 className="text-white font-bold text-sm tracking-tight leading-none">Sora POS</h1>
