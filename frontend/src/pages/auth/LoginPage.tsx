@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,8 +22,16 @@ const LoginPage = () => {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: localStorage.getItem('sora_pos_remembered_email') || '', password: '' },
+    defaultValues: { email: '', password: '' },
   });
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('sora_pos_remembered_email');
+    if (savedEmail) {
+      setValue('email', savedEmail);
+      setRememberEmail(true);
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -47,6 +55,9 @@ const LoginPage = () => {
     setValue('email', 'demo@sora-pos.com');
     setValue('password', 'demo123');
     try {
+      if (rememberEmail) {
+        localStorage.setItem('sora_pos_remembered_email', 'demo@sora-pos.com');
+      }
       await login('demo@sora-pos.com', 'demo123');
       toast.success('Đăng nhập với tài khoản Demo thành công!');
       navigate('/', { replace: true });
