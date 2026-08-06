@@ -13,6 +13,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [focusField, setFocusField] = useState<string | null>(null);
+  const [rememberEmail, setRememberEmail] = useState(!!localStorage.getItem('sora_pos_remembered_email'));
 
   const {
     register,
@@ -21,11 +22,16 @@ const LoginPage = () => {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: localStorage.getItem('sora_pos_remembered_email') || '', password: '' },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     try {
+      if (rememberEmail) {
+        localStorage.setItem('sora_pos_remembered_email', data.email);
+      } else {
+        localStorage.removeItem('sora_pos_remembered_email');
+      }
       await login(data.email, data.password);
       toast.success('Đăng nhập thành công!');
       navigate('/', { replace: true });
@@ -180,6 +186,8 @@ const LoginPage = () => {
               <label className="flex items-center gap-2 cursor-pointer select-none group">
                 <input
                   type="checkbox"
+                  checked={rememberEmail}
+                  onChange={(e) => setRememberEmail(e.target.checked)}
                   className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-600"
                 />
                 <span className="text-[11px] font-medium text-slate-500 group-hover:text-slate-700 transition-colors duration-200">
