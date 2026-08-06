@@ -112,13 +112,13 @@ export class EmailService {
               order.loyalty_points_used > 0
                 ? `<tr>
                     <td style="color: #64748b; padding: 2px 0;">Điểm đã sử dụng:</td>
-                    <td style="text-align: right; color: #ef4444; font-weight: bold;">-${order.loyalty_points_used} đp</td>
+                    <td style="text-align: right; color: #ef4444; font-weight: bold;">-${order.loyalty_points_used} điểm</td>
                   </tr>`
                 : ''
             }
             <tr>
               <td style="color: #64748b; padding: 2px 0;">Điểm tích lũy mới:</td>
-              <td style="text-align: right; color: #16a34a; font-weight: bold;">+${order.loyalty_points_earned} đp</td>
+              <td style="text-align: right; color: #16a34a; font-weight: bold;">+${order.loyalty_points_earned} điểm</td>
             </tr>
           </table>
         </div>

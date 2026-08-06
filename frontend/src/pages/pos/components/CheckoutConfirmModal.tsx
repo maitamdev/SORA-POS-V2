@@ -66,7 +66,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                       <p className="text-sm font-black text-slate-800">{matchedCustomer.name}</p>
                       <p className="text-slate-500">{customerPhone}</p>
                       <p className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold mt-1">
-                        Tích lũy khả dụng: {matchedCustomer.points} đp
+                        Điểm khả dụng: {matchedCustomer.points} điểm
                       </p>
                     </div>
                   ) : newCustName.trim() ? (
@@ -126,7 +126,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                       className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 w-4 h-4"
                     />
                     <span className="text-xs font-black text-blue-900">
-                      Sử dụng điểm tích lũy ({matchedCustomer.points} đp khả dụng)
+                      Sử dụng điểm tích lũy ({matchedCustomer.points} điểm khả dụng)
                     </span>
                   </label>
                   {isRedeemingPoints && (
@@ -144,7 +144,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                         placeholder="0"
                         className="w-24 bg-white border border-slate-250 px-2.5 py-1 rounded-lg text-xs font-black text-slate-800 text-center outline-none focus:border-blue-500 transition"
                       />
-                      <span className="text-xs text-blue-700 font-bold">đp (Giảm -{money(usedPoints * 1000)})</span>
+                      <span className="text-xs text-blue-700 font-bold">điểm (giảm {money(usedPoints * 1000)})</span>
                     </div>
                   )}
                 </div>

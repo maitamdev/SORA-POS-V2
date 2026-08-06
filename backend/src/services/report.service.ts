@@ -292,8 +292,9 @@ export class ReportService {
     const recent_orders = recentOrders.map((o) => {
       let methodLabel = 'Tiền mặt';
       const method = recentPaymentsMap.get(o.id);
-      if (method === 'transfer' || method === 'momo' || method === 'zalopay') methodLabel = 'QR Pay';
-      else if (method === 'card') methodLabel = 'Thẻ Visa';
+      if (method === 'transfer') methodLabel = 'Chuyển khoản/VietQR';
+      else if (method === 'momo' || method === 'zalopay') methodLabel = 'Ví điện tử';
+      else if (method === 'card') methodLabel = 'Thẻ ngân hàng';
 
       return {
         id: o.id,
@@ -301,7 +302,7 @@ export class ReportService {
         customer_name: o.customers ? (o.customers as any).name : 'Khách lẻ',
         payment_method: methodLabel,
         total_amount: Number(o.final_amount || 0),
-        status: o.status === 'completed' ? 'Hoàn thành' : o.status === 'cancelled' ? 'Đã hủy' : 'Hoạt động',
+        status: o.status === 'completed' ? 'Hoàn thành' : o.status === 'cancelled' ? 'Đã hủy' : 'Trạng thái khác',
         created_at: o.created_at,
       };
     });
@@ -547,7 +548,7 @@ export class ReportService {
     const totalPaymentCount = paymentCounts.cash + paymentCounts.transfer + paymentCounts.card || 1;
     const payment_stats = [
       { name: 'Tiền mặt', percentage: Math.round((paymentCounts.cash / totalPaymentCount) * 1000) / 10, count: paymentCounts.cash, amount: paymentStats.cash },
-      { name: 'QR Pay/Chuyển khoản', percentage: Math.round((paymentCounts.transfer / totalPaymentCount) * 1000) / 10, count: paymentCounts.transfer, amount: paymentStats.transfer },
+      { name: 'Chuyển khoản/Ví điện tử', percentage: Math.round((paymentCounts.transfer / totalPaymentCount) * 1000) / 10, count: paymentCounts.transfer, amount: paymentStats.transfer },
       { name: 'Thẻ', percentage: Math.round((paymentCounts.card / totalPaymentCount) * 1000) / 10, count: paymentCounts.card, amount: paymentStats.card },
     ];
 
@@ -688,7 +689,7 @@ Cấu trúc JSON:
     {
       "title": "Cơ cấu phương thức thanh toán",
       "type": "pie",
-      "data": [{ "name": "Tiền mặt", "value": 45 }, { "name": "QR Pay", "value": 40 }]
+      "data": [{ "name": "Tiền mặt", "value": 45 }, { "name": "Thanh toán điện tử", "value": 40 }]
     }
   ]
 }
@@ -1173,7 +1174,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       { name: 'Hết hàng', value: outOfStock, key: 'out_of_stock' },
       { name: 'Tồn thấp', value: lowStock, key: 'low_stock' },
       { name: 'Sắp thiếu', value: needsRestock, key: 'needs_restock' },
-      { name: 'Dead stock', value: deadStock, key: 'dead_stock' },
+      { name: 'Hàng tồn lâu', value: deadStock, key: 'dead_stock' },
       { name: 'An toàn', value: Math.max(0, safe - overstock), key: 'healthy' },
     ].filter((x) => x.value > 0);
 
@@ -1225,7 +1226,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
         data: metrics.category_breakdown.slice(0, 8).map((c) => ({ name: c.name, value: c.stock_value })),
       },
       {
-        title: 'Top vốn kẹt (dead stock)',
+        title: 'Top vốn tồn lâu',
         type: 'bar' as const,
         data: metrics.dead_stock.slice(0, 8).map((r) => ({ name: r.name.slice(0, 18), value: r.stock_value })),
       },
@@ -1256,13 +1257,13 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       `Khả dụng: ${k.out_of_stock + k.low_stock}/${k.total_products} SKU dưới ngưỡng an toàn (điểm availability ${k.score_breakdown.availability}).`,
       `Vốn: ${money(k.total_stock_value)} giá vốn / ${money(k.total_retail_value)} bán lẻ — hiệu quả vốn ${k.score_breakdown.capital_efficiency}/100.`,
       `Nhu cầu: ${metrics.rising_demand.length} SKU tăng tốc, ${metrics.demand_mismatch.length} SKU vừa tăng cầu vừa thiếu hàng.`,
-      `Dead stock: ${k.dead_stock} SKU không bán trong ${metrics.days} ngày — ưu tiên xả/combo hoặc ngừng nhập.`,
+      `Hàng tồn lâu: ${k.dead_stock} SKU không bán trong ${metrics.days} ngày — ưu tiên xả hàng, tạo combo hoặc ngừng nhập.`,
     ];
 
     const recommendations = [
       `[CAO] Nhập gấp ${metrics.restock_plan.filter((r) => r.priority === 'critical' || r.priority === 'high').length} SKU ưu tiên cao — chi phí ~${money(metrics.restock_plan.filter((r) => r.priority === 'critical' || r.priority === 'high').reduce((s, r) => s + r.restock_cost, 0))}.`,
       `[CAO] Xử lý ${metrics.demand_mismatch.length} SKU lệch cầu (bán tăng + tồn thấp) trước cuối tuần.`,
-      `[TB] Xả / bundle ${Math.min(5, metrics.dead_stock.length)} SKU dead stock giá trị cao nhất.`,
+      `[TB] Xả hàng hoặc tạo combo cho ${Math.min(5, metrics.dead_stock.length)} SKU tồn lâu có giá trị cao nhất.`,
       `[TB] Rà min_stock theo velocity; target cover ${metrics.target_days} ngày cho nhóm bán chạy.`,
     ];
 

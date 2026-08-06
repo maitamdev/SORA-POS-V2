@@ -373,10 +373,10 @@ const ShiftsPage = () => {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-400 uppercase">Nhanh</label>
+            <label className="mb-1 block text-xs font-bold text-slate-400 uppercase">Lọc nhanh</label>
             <div className="grid grid-cols-4 gap-1">
-              <button onClick={presetToday} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === today() && dateTo === today() ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Nay</button>
-              <button onClick={presetYesterday} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === nDaysAgo(1) && dateTo === nDaysAgo(1) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Qua</button>
+              <button onClick={presetToday} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === today() && dateTo === today() ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Hôm nay</button>
+              <button onClick={presetYesterday} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === nDaysAgo(1) && dateTo === nDaysAgo(1) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Hôm qua</button>
               <button onClick={presetWeek} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === nDaysAgo(6) && dateTo === today() ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>7N</button>
               <button onClick={presetMonth} className={`py-2 rounded-lg text-xs font-black transition ${dateFrom === nDaysAgo(29) && dateTo === today() ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>30N</button>
             </div>

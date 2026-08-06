@@ -217,8 +217,9 @@ export class StaffService {
     const formattedOrders = (orders || []).map((o) => {
       const p = o.payments?.[0];
       let methodLabel = 'Tiền mặt';
-      if (p?.method === 'transfer' || p?.method === 'momo' || p?.method === 'zalopay') methodLabel = 'QR Pay';
-      else if (p?.method === 'card') methodLabel = 'Thẻ';
+      if (p?.method === 'transfer') methodLabel = 'Chuyển khoản/VietQR';
+      else if (p?.method === 'momo' || p?.method === 'zalopay') methodLabel = 'Ví điện tử';
+      else if (p?.method === 'card') methodLabel = 'Thẻ ngân hàng';
 
       return {
         id: o.id,

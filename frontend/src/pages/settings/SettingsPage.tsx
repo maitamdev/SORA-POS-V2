@@ -170,7 +170,7 @@ const SettingsPage = () => {
                 { value: 'card', label: 'Thẻ' },
               ]}
             />
-            <NumberField label="Số SP mỗi trang POS" value={settings.productPageSize} onChange={(value) => updateSetting('productPageSize', value)} min={8} max={100} />
+            <NumberField label="Số sản phẩm mỗi trang POS" value={settings.productPageSize} onChange={(value) => updateSetting('productPageSize', value)} min={8} max={100} />
             <NumberField label="Giảm giá tối đa (%)" value={settings.maxDiscountPercent} onChange={(value) => updateSetting('maxDiscountPercent', value)} min={0} max={100} />
             <NumberField label="Tự khóa sau (phút)" value={settings.sessionLockMinutes} onChange={(value) => updateSetting('sessionLockMinutes', value)} min={5} max={240} />
             <Toggle checked={settings.allowDiscount} label="Cho phép chiết khấu đơn hàng" onChange={(checked) => updateSetting('allowDiscount', checked)} />
@@ -207,8 +207,8 @@ const SettingsPage = () => {
         <Panel icon={<HiOutlineCog />} title="Kho hàng">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <NumberField label="Ngưỡng tồn kho mặc định" value={settings.defaultMinStockLevel} onChange={(value) => updateSetting('defaultMinStockLevel', value)} min={0} max={9999} />
-            <Toggle checked={settings.lowStockWarning} label="Cảnh báo khi bán sản phẩm tồn thấp" onChange={(checked) => updateSetting('lowStockWarning', checked)} />
-            <Toggle checked={settings.allowSellOutOfStock} label="Cho phép bán vượt tồn kho" onChange={(checked) => updateSetting('allowSellOutOfStock', checked)} />
+            <Toggle checked={settings.lowStockWarning} label="Cảnh báo khi tồn kho xuống thấp" onChange={(checked) => updateSetting('lowStockWarning', checked)} />
+            <Toggle checked={settings.allowSellOutOfStock} label="Cho phép bán âm kho" onChange={(checked) => updateSetting('allowSellOutOfStock', checked)} />
           </div>
         </Panel>
 

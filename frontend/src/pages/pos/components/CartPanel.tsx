@@ -353,7 +353,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                   type="text"
                   value={customerPhone}
                   onChange={(e) => onPhoneChange(e.target.value)}
-                  placeholder="Nhập SĐT để tích/tiêu điểm"
+                  placeholder="Nhập số điện thoại để tích điểm/đổi điểm"
                   className="w-full bg-white border border-slate-200 pl-8 pr-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
                 />
               </div>
@@ -369,7 +369,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                         {matchedCustomer.name}
                       </span>
                       <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
-                        {matchedCustomer.points}đp
+                        {matchedCustomer.points} điểm
                       </span>
                     </div>
                     <button
@@ -394,7 +394,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                     type="text"
                     value={newCustName}
                     onChange={(e) => setNewCustName(e.target.value)}
-                    placeholder="Nhập Họ & Tên để tự động tạo TK"
+                    placeholder="Nhập họ và tên để tự động tạo tài khoản"
                     className="w-full bg-white border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-amber-500 transition"
                   />
                 </div>

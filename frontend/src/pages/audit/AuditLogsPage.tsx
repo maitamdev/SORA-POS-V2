@@ -55,9 +55,9 @@ const AuditLogsPage = () => {
         <div>
           <h1 className="flex items-center gap-2 text-xl sm:text-2xl font-black text-slate-800">
             <HiOutlineClipboardList className="h-6 w-6 text-blue-600" />
-            Audit log
+            Nhật ký thao tác
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500">Nhật ký thao tác quan trọng trên hóa đơn và kho.</p>
+          <p className="text-xs sm:text-sm font-medium text-slate-500">Nhật ký các thao tác quan trọng trên đơn hàng và kho.</p>
         </div>
         <button
           onClick={loadData}
@@ -65,19 +65,19 @@ const AuditLogsPage = () => {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
           <HiOutlineRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Tai lai
+          Làm mới
         </button>
       </header>
 
       <section className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-4">
         <label className="space-y-1.5">
-          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Action</span>
+          <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">Hành động</span>
           <select
             value={action}
             onChange={(event) => setAction(event.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-blue-500"
           >
-            <option value="all">Tat ca</option>
+            <option value="all">Tất cả</option>
             <option value="order.create">Tạo hóa đơn</option>
             <option value="order.cancel">Hủy hóa đơn</option>
           </select>
@@ -108,7 +108,7 @@ const AuditLogsPage = () => {
           }}
           className="self-end rounded-xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200"
         >
-          Xoa loc
+          Xóa bộ lọc
         </button>
       </section>
 
@@ -117,11 +117,11 @@ const AuditLogsPage = () => {
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-4 py-3 font-black">Thoi gian</th>
-                <th className="px-4 py-3 font-black">Nguoi thao tac</th>
-                <th className="px-4 py-3 font-black">Action</th>
-                <th className="px-4 py-3 font-black">Doi tuong</th>
-                <th className="px-4 py-3 font-black">Chi tiet</th>
+                <th className="px-4 py-3 font-black">Thời gian</th>
+                <th className="px-4 py-3 font-black">Người thao tác</th>
+                <th className="px-4 py-3 font-black">Hành động</th>
+                <th className="px-4 py-3 font-black">Đối tượng</th>
+                <th className="px-4 py-3 font-black">Chi tiết</th>
               </tr>
             </thead>
             <tbody>
@@ -138,7 +138,7 @@ const AuditLogsPage = () => {
                   <tr key={item.id} className="border-t border-slate-100">
                     <td className="px-4 py-3 font-semibold text-slate-600">{formatDate(item.created_at)}</td>
                     <td className="px-4 py-3">
-                      <p className="font-black text-slate-800">{item.actor?.full_name || 'He thong'}</p>
+                      <p className="font-black text-slate-800">{item.actor?.full_name || 'Hệ thống'}</p>
                       <p className="text-xs font-semibold text-slate-400">{item.actor?.email || item.actor_id || '-'}</p>
                     </td>
                     <td className="px-4 py-3">

@@ -228,21 +228,21 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
               <div className="mx-7 border-t border-slate-200 py-3.5 space-y-1.5 bg-blue-50/20 px-4 rounded-xl border border-blue-100/50 mb-3">
                 <div className="flex justify-between text-[12px]">
                   <span className="text-blue-600/70 font-semibold">Điểm tích lũy trước:</span>
-                  <span className="font-bold text-slate-700">{info.pointsBefore} đp</span>
+                  <span className="font-bold text-slate-700">{info.pointsBefore} điểm</span>
                 </div>
                 {info.pointsUsed !== undefined && info.pointsUsed > 0 && (
                   <div className="flex justify-between text-[12px]">
                     <span className="text-red-500 font-semibold">Điểm đã sử dụng:</span>
-                    <span className="font-bold text-red-600">-{info.pointsUsed} đp</span>
+                  <span className="font-bold text-red-600">-{info.pointsUsed} điểm</span>
                   </div>
                 )}
                 <div className="flex justify-between text-[12px]">
                   <span className="text-emerald-600 font-semibold">Điểm tích lũy mới:</span>
-                  <span className="font-bold text-emerald-600">+{info.pointsEarned} đp</span>
+                  <span className="font-bold text-emerald-600">+{info.pointsEarned} điểm</span>
                 </div>
                 <div className="flex justify-between text-[12px] border-t border-slate-200/60 pt-1.5 mt-1 font-black">
                   <span className="text-slate-800">Số dư điểm hiện tại:</span>
-                  <span className="text-blue-600">{info.pointsAfter} đp</span>
+                  <span className="text-blue-600">{info.pointsAfter} điểm</span>
                 </div>
               </div>
             )}

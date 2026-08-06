@@ -595,7 +595,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
               {/* Code + Description */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã KM</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã khuyến mãi</label>
                   <input type="text" value={formCode} onChange={(e) => setFormCode(e.target.value.toUpperCase())}
                     placeholder="VD: SALE20"
                     className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition uppercase" />

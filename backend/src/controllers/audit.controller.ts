@@ -5,6 +5,6 @@ import { successResponse } from '../utils/response';
 
 export class AuditController {
   static list = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await AuditService.list(req.query), 'Lay nhat ky he thong thanh cong');
+    successResponse(res, await AuditService.list(req.query), 'Lấy nhật ký hệ thống thành công');
   });
 }

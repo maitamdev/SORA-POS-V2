@@ -285,21 +285,21 @@ export const buildReceiptHtml = (
               <div style="font-weight: 700; margin-bottom: 5px; color: #0f172a;">Thông tin điểm tích lũy</div>
               <div class="loyalty-row">
                 <span>Số dư điểm cũ:</span>
-                <span>${data.pointsBefore ?? 0} đp</span>
+                <span>${data.pointsBefore ?? 0} điểm</span>
               </div>
               ${(data.pointsUsed ?? 0) > 0 ? `
                 <div class="loyalty-row" style="color: #dc2626;">
                   <span>Điểm đã dùng:</span>
-                  <span>-${data.pointsUsed} đp</span>
+                  <span>-${data.pointsUsed} điểm</span>
                 </div>
               ` : ''}
               <div class="loyalty-row" style="color: #2563eb;">
                 <span>Điểm tích mới:</span>
-                <span>+${data.pointsEarned ?? 0} đp</span>
+                <span>+${data.pointsEarned ?? 0} điểm</span>
               </div>
               <div class="loyalty-row" style="border-top: 1px dashed #cbd5e1; margin-top: 5px; padding-top: 5px; font-weight: 700; color: #0f172a;">
                 <span>Số dư điểm mới:</span>
-                <span>${data.pointsAfter ?? 0} đp</span>
+                <span>${data.pointsAfter ?? 0} điểm</span>
               </div>
             </div>
           ` : ''}
