@@ -22,6 +22,7 @@ import {
   HiOutlineDownload,
 } from 'react-icons/hi';
 import NotificationCenter from '../common/NotificationCenter';
+import logoUrl from '../../assets/logo.png';
 
 /**
  * Cấu trúc menu sidebar
@@ -146,7 +147,7 @@ const Sidebar = () => {
       <div className="h-16 flex items-center px-5 border-b border-slate-800/40">
         <div className="flex items-center gap-2.5 flex-1">
           <img
-            src="/assets/logo.png"
+            src={logoUrl}
             alt="Sora POS Logo"
             className="w-11 h-11 object-contain scale-[1.3]"
           />

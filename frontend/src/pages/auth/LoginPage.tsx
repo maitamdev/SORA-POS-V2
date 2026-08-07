@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { HiOutlineEye, HiOutlineEyeOff, HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi';
 import { loginSchema, LoginFormData } from '../../validations/login.schema';
 import { useAuthStore } from '../../stores/auth.store';
+import logoUrl from '../../assets/logo.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -102,7 +103,7 @@ const LoginPage = () => {
           {/* Header */}
           <div className="flex flex-col items-center mb-5">
             <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-white shadow-md border border-slate-100 p-1 mb-3 overflow-hidden">
-              <img src="/assets/logo.png" alt="SORA-POS Logo" className="h-full w-full object-contain scale-[1.3]" />
+              <img src={logoUrl} alt="SORA-POS Logo" className="h-full w-full object-contain scale-[1.3]" />
             </div>
             <h1 className="font-bold text-xl tracking-tight text-slate-800 mt-2">SORA-POS</h1>
             <h2 className="text-lg font-semibold text-slate-900 mt-1">Chào mừng trở lại</h2>
