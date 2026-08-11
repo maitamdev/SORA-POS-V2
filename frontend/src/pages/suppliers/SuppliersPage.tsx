@@ -422,7 +422,7 @@ const SuppliersPage = () => {
           {canManageSuppliers && (
             <button
               onClick={openCreateModal}
-              className="h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 text-xs sm:text-sm font-black text-white transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+              className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 text-xs sm:text-sm font-black text-white transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
             >
               <FiPlus size={16} className="stroke-[3]" />
               Thêm nhà cung cấp
@@ -993,7 +993,7 @@ const SuppliersPage = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-black text-white transition disabled:opacity-60 shadow-sm"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-black text-white transition disabled:opacity-60 shadow-sm"
                 >
                   {saving ? 'Đang lưu...' : 'Lưu lại'}
                 </button>
