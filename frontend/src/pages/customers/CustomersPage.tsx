@@ -74,6 +74,7 @@ const CustomersPage = () => {
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -123,6 +124,13 @@ const CustomersPage = () => {
   const resetForm = () => {
     setForm(emptyForm);
     setEditingCustomer(null);
+    setCustomerModalOpen(false);
+  };
+
+  const openCreateModal = () => {
+    setForm(emptyForm);
+    setEditingCustomer(null);
+    setCustomerModalOpen(true);
   };
 
   const startEdit = (customer: Customer) => {
@@ -133,6 +141,7 @@ const CustomersPage = () => {
       phone: customer.phone || '',
       address: customer.address || '',
     });
+    setCustomerModalOpen(true);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -250,71 +259,28 @@ const CustomersPage = () => {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-        <form onSubmit={submit} className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-wide text-slate-800">
-                {editingCustomer ? 'Cập nhật khách' : 'Tạo khách mới'}
-              </h2>
-              <p className="text-xs font-medium text-slate-400">
-                {editingCustomer ? 'Đang sửa hồ sơ đã chọn.' : 'Thêm khách để tích điểm khi bán hàng.'}
-              </p>
-            </div>
-            {editingCustomer && (
-              <button type="button" onClick={resetForm} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
-                <FiX size={15} />
-              </button>
-            )}
-          </div>
-
-          <div className="space-y-3">
-            <label className="block">
-              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Tên khách hàng *</span>
-              <input
-                value={form.name}
-                onChange={(event) => setForm((state) => ({ ...state, name: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none transition focus:border-blue-500"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Số điện thoại</span>
-              <input
-                value={form.phone}
-                onChange={(event) => setForm((state) => ({ ...state, phone: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none transition focus:border-blue-500"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Email</span>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm((state) => ({ ...state, email: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none transition focus:border-blue-500"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-black uppercase text-slate-500">Địa chỉ</span>
-              <textarea
-                value={form.address}
-                onChange={(event) => setForm((state) => ({ ...state, address: event.target.value }))}
-                rows={3}
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none transition focus:border-blue-500"
-              />
-            </label>
-          </div>
-
-          <button
-            disabled={saving}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60"
-          >
-            <FiPlus size={16} />
-            {saving ? 'Đang lưu...' : editingCustomer ? 'Lưu thay đổi' : 'Tạo mới'}
-          </button>
-        </form>
-
+      <section className="space-y-4">
         <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50/45 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="app-icon-tile flex h-10 w-10 shrink-0 items-center justify-center bg-blue-600 text-white">
+                <FiUsers size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-slate-900">Xây dựng tệp khách hàng thân thiết</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-500">Thêm hồ sơ để tích điểm và cá nhân hóa trải nghiệm mua hàng.</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="app-modal-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+            >
+              <FiPlus size={16} />
+              Thêm khách hàng
+            </button>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             {tierOptions.map((option) => (
               <button
@@ -499,6 +465,106 @@ const CustomersPage = () => {
           </div>
         </div>
       </section>
+
+      {customerModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) resetForm();
+          }}
+        >
+          <div className="app-modal-panel w-full max-w-lg overflow-hidden border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="customer-modal-title">
+            <div className="border-t-4 border-blue-600 bg-white px-5 pb-4 pt-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-blue-50 text-blue-600">
+                    <FiUsers size={19} />
+                  </div>
+                  <div>
+                    <h2 id="customer-modal-title" className="text-base font-black text-slate-900">
+                      {editingCustomer ? 'Cập nhật khách hàng' : 'Thêm khách hàng'}
+                    </h2>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      {editingCustomer ? 'Cập nhật thông tin hồ sơ đang chọn.' : 'Tạo hồ sơ mới để tích điểm khi bán hàng.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="app-modal-control flex h-9 w-9 items-center justify-center border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                  aria-label="Đóng cửa sổ"
+                >
+                  <FiX size={17} />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={submit} className="border-t border-slate-100 px-5 py-5 sm:px-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Tên khách hàng *</span>
+                  <input
+                    autoFocus
+                    value={form.name}
+                    onChange={(event) => setForm((state) => ({ ...state, name: event.target.value }))}
+                    className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Ví dụ: Nguyễn Văn An"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Số điện thoại</span>
+                  <input
+                    value={form.phone}
+                    onChange={(event) => setForm((state) => ({ ...state, phone: event.target.value }))}
+                    className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="09xx xxx xxx"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Email</span>
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => setForm((state) => ({ ...state, email: event.target.value }))}
+                    className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="khach@example.com"
+                  />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Địa chỉ</span>
+                  <textarea
+                    value={form.address}
+                    onChange={(event) => setForm((state) => ({ ...state, address: event.target.value }))}
+                    rows={3}
+                    className="app-modal-control w-full resize-none border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Số nhà, đường, phường/xã..."
+                  />
+                </label>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="app-modal-control h-10 border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="app-modal-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FiPlus size={16} />
+                  {saving ? 'Đang lưu...' : editingCustomer ? 'Lưu thay đổi' : 'Tạo khách hàng'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

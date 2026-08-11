@@ -125,6 +125,7 @@ const ShiftsPage = () => {
   const [startMinute, setStartMinute] = useState('00');
   const [endHour, setEndHour] = useState('12');
   const [endMinute, setEndMinute] = useState('00');
+  const [openShiftModal, setOpenShiftModal] = useState(false);
 
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -224,6 +225,7 @@ const ShiftsPage = () => {
       setStartMinute('00');
       setEndHour('12');
       setEndMinute('00');
+      setOpenShiftModal(false);
       await loadData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -418,24 +420,64 @@ const ShiftsPage = () => {
       </section>
 
       {/* ═══════════════ MAIN CONTENT ═══════════════ */}
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr]">
-        {/* ─── Open Shift Form ─── */}
-        <form onSubmit={openShift} className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-              <HiOutlinePlus className="h-4 w-4 text-blue-600" />
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 border border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="app-icon-tile flex h-10 w-10 shrink-0 items-center justify-center bg-blue-600 text-white">
+              <HiOutlineClock className="h-5 w-5" />
             </div>
-            <h2 className="text-sm font-black uppercase text-slate-700">Mở ca cho nhân viên</h2>
+            <div>
+              <p className="text-sm font-black text-slate-900">Mở ca cho nhân viên</p>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">Thiết lập ca làm và bàn giao cho thu ngân ngay tại đây.</p>
+            </div>
           </div>
-          <p className="text-xs font-semibold text-slate-400 mb-4">Sau khi mở ca, nhân viên có thể đăng nhập và nhận ca.</p>
+          <button
+            type="button"
+            onClick={() => setOpenShiftModal(true)}
+            className="app-modal-control inline-flex h-10 shrink-0 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <HiOutlinePlus className="h-4 w-4" />
+            Mở ca mới
+          </button>
+        </div>
 
+        {openShiftModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setOpenShiftModal(false);
+            }}
+          >
+            <div className="app-modal-panel w-full max-w-xl overflow-hidden border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="shift-modal-title">
+              {/* ─── Open Shift Form ─── */}
+              <form onSubmit={openShift} className="p-5 sm:p-6">
+                <div className="mb-5 flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-blue-50 text-blue-600">
+                      <HiOutlineClock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 id="shift-modal-title" className="text-base font-black text-slate-900">Mở ca cho nhân viên</h2>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Sau khi mở ca, nhân viên có thể đăng nhập và nhận ca.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenShiftModal(false)}
+                    className="app-modal-control flex h-9 w-9 items-center justify-center border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                    aria-label="Đóng cửa sổ"
+                  >
+                    <HiOutlineX className="h-5 w-5" />
+                  </button>
+                </div>
           <div className="space-y-3">
             <label className="block">
               <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Thu ngân</span>
               <select
                 value={selectedEmployee}
                 onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                className="app-modal-control w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
               >
                 <option value="">Chọn nhân viên</option>
                 {cashiers.map((cashier) => (
@@ -474,7 +516,7 @@ const ShiftsPage = () => {
                     setEndMinute('00');
                   }
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                className="app-modal-control w-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
               >
                 <option value="ca_sang">Ca sáng (08:00 - 12:00)</option>
                 <option value="ca_chieu">Ca chiều (12:00 - 17:00)</option>
@@ -494,7 +536,7 @@ const ShiftsPage = () => {
                       setStartHour(e.target.value);
                       setShiftPreset('custom');
                     }}
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                    className="app-modal-control w-1/2 border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
                   >
                     {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
                       <option key={h} value={h}>{h}</option>
@@ -507,7 +549,7 @@ const ShiftsPage = () => {
                       setStartMinute(e.target.value);
                       setShiftPreset('custom');
                     }}
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                    className="app-modal-control w-1/2 border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
                   >
                     {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(m => (
                       <option key={m} value={m}>{m}</option>
@@ -524,7 +566,7 @@ const ShiftsPage = () => {
                       setEndHour(e.target.value);
                       setShiftPreset('custom');
                     }}
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                    className="app-modal-control w-1/2 border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
                   >
                     {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
                       <option key={h} value={h}>{h}</option>
@@ -537,7 +579,7 @@ const ShiftsPage = () => {
                       setEndMinute(e.target.value);
                       setShiftPreset('custom');
                     }}
-                    className="w-1/2 rounded-xl border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
+                    className="app-modal-control w-1/2 border border-slate-200 bg-slate-50 px-2 py-2 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white transition"
                   >
                     {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(m => (
                       <option key={m} value={m}>{m}</option>
@@ -558,13 +600,17 @@ const ShiftsPage = () => {
           </div>
 
           <button
+            type="submit"
             disabled={saving}
-            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60 transition"
+            className="app-modal-control mt-5 inline-flex w-full items-center justify-center gap-2 bg-blue-600 py-2.5 text-sm font-black text-white transition hover:bg-blue-700 disabled:opacity-60"
           >
             <HiOutlinePlus className="h-4 w-4" />
             {saving ? 'Đang mở ca...' : 'Mở ca'}
           </button>
         </form>
+            </div>
+          </div>
+        )}
 
         {/* ─── Shift Table ─── */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">

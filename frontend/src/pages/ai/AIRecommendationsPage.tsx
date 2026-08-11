@@ -222,7 +222,7 @@ const AIRecommendationsPage = () => {
       <header className="flex flex-col gap-4 border-b border-slate-200 pb-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl tracking-tight flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-slate-900 text-white shadow-sm">
+            <div className="report-card flex h-9 w-9 items-center justify-center bg-blue-50 text-blue-600 shadow-sm">
               <FiPackage className="w-4 h-4" />
             </div>
             Trợ Lý Chuỗi Cung Ứng AI
@@ -242,12 +242,12 @@ const AIRecommendationsPage = () => {
             type="number"
             min={1}
             max={90}
-            className="h-10 w-24 rounded-lg border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            className="report-control h-10 w-24 border border-slate-200 px-3 text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
           />
           <button
             onClick={loadData}
             disabled={loading}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+            className="report-control inline-flex h-10 items-center justify-center gap-2 border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60 transition-colors"
           >
             <FiRefreshCw className={loading ? 'animate-spin' : ''} size={14} />
             Làm mới
@@ -255,7 +255,7 @@ const AIRecommendationsPage = () => {
           <button
             onClick={generate}
             disabled={generating}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700 px-5 text-xs font-bold text-white shadow-sm disabled:opacity-60 transition-colors"
+            className="report-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-5 text-xs font-bold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
           >
             <FiZap size={14} />
             {generating ? 'Đang phân tích AI...' : 'Tạo gợi ý nhập'}
@@ -265,27 +265,27 @@ const AIRecommendationsPage = () => {
 
       {/* KPI CARDS */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <div className="report-card border-l-4 border-rose-500 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
           <p className="mt-2 text-2xl font-bold text-red-700">{summary?.out_of_stock || 0}</p>
           <p className="text-[10px] text-red-400 font-medium mt-0.5">sản phẩm</p>
         </div>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+        <div className="report-card border-l-4 border-amber-500 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-amber-600 tracking-wider">Tồn thấp</p>
           <p className="mt-2 text-2xl font-bold text-amber-700">{summary?.low_stock || 0}</p>
           <p className="text-[10px] text-amber-400 font-medium mt-0.5">sản phẩm</p>
         </div>
-        <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+        <div className="report-card border-l-4 border-orange-500 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-orange-600 tracking-wider">Sắp thiếu</p>
           <p className="mt-2 text-2xl font-bold text-orange-700">{summary?.needs_restock || 0}</p>
           <p className="text-[10px] text-orange-400 font-medium mt-0.5">sản phẩm</p>
         </div>
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <div className="report-card border-l-4 border-emerald-500 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-emerald-600 tracking-wider">An toàn</p>
           <p className="mt-2 text-2xl font-bold text-emerald-700">{summary?.healthy || 0}</p>
           <p className="text-[10px] text-emerald-400 font-medium mt-0.5">sản phẩm</p>
         </div>
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="report-card border-l-4 border-blue-500 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase text-blue-600 tracking-wider">Xu hướng</p>
           </div>
@@ -301,7 +301,7 @@ const AIRecommendationsPage = () => {
           </div>
           <p className="text-[10px] text-blue-400 font-medium mt-0.5">tăng / giảm</p>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="report-card border-l-4 border-slate-400 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Chi phí nhập</p>
           <p className="mt-2 text-lg font-bold text-slate-800 truncate">{money(totalEstimatedCost)}</p>
           <p className="text-[10px] text-slate-400 font-medium mt-0.5">ước tính</p>
@@ -309,10 +309,10 @@ const AIRecommendationsPage = () => {
       </section>
 
       {/* STOCK ANALYSIS TABLE */}
-      <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <section className="report-panel overflow-hidden border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50/50">
           <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white">
+            <div className="report-card flex h-8 w-8 items-center justify-center bg-blue-50 text-blue-600">
               <FiAlertTriangle className="w-4 h-4" />
             </div>
             <div>
@@ -324,7 +324,7 @@ const AIRecommendationsPage = () => {
           </div>
           <button
             onClick={() => setShowAllProducts((value) => !value)}
-            className="h-8 rounded-lg border border-slate-200 px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+            className="report-control h-8 border border-slate-200 px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-colors"
           >
             {showAllProducts ? 'Chỉ xem cảnh báo' : 'Xem tất cả sản phẩm'}
           </button>
@@ -395,9 +395,9 @@ const AIRecommendationsPage = () => {
       </section>
 
       {/* SAVED RECOMMENDATIONS */}
-      <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <section className="report-panel overflow-hidden border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center gap-2.5 border-b border-slate-200 p-4 bg-slate-50/50">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white">
+          <div className="report-card flex h-8 w-8 items-center justify-center bg-blue-50 text-blue-600">
             <FiShoppingCart className="w-4 h-4" />
           </div>
           <div>

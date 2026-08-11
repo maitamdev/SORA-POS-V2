@@ -60,6 +60,7 @@ const StaffPage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<StaffUser | null>(null);
+  const [staffModalOpen, setStaffModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [lastCreated, setLastCreated] = useState<{ code: string; password: string; name: string } | null>(null);
   const canManageStaff = user?.role === 'admin';
@@ -140,6 +141,14 @@ const StaffPage = () => {
   const resetForm = () => {
     setEditing(null);
     setForm(emptyForm);
+    setStaffModalOpen(false);
+  };
+
+  const openCreateStaff = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setLastCreated(null);
+    setStaffModalOpen(true);
   };
 
   const startEdit = (item: StaffUser) => {
@@ -156,6 +165,7 @@ const StaffPage = () => {
       role: item.role as any,
       is_active: item.is_active,
     });
+    setStaffModalOpen(true);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -334,102 +344,28 @@ const StaffPage = () => {
             </section>
           )}
 
-          {/* Accounts List & Form Section */}
-          <section className={`grid grid-cols-1 gap-6 ${canManageStaff ? 'xl:grid-cols-[380px_1fr]' : ''}`}>
+          {/* Accounts List & Create Action */}
+          <section className="space-y-4">
             {canManageStaff && (
-              <form onSubmit={submit} className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-black uppercase tracking-wide text-slate-700">
-                      {editing ? 'Cập nhật tài khoản' : 'Tạo nhân viên'}
-                    </h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">
-                      {editing ? `Mã đăng nhập: ${editing.email}` : 'Mã đăng nhập sẽ tự sinh 6 số'}
-                    </p>
+              <div className="flex flex-col gap-3 border border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="app-icon-tile flex h-10 w-10 shrink-0 items-center justify-center bg-blue-600 text-white">
+                    <HiOutlineIdentification className="h-5 w-5" />
                   </div>
-                  {editing && (
-                    <button type="button" onClick={resetForm} className="text-xs font-bold text-slate-500 hover:text-slate-900">
-                      Hủy
-                    </button>
-                  )}
+                  <div>
+                    <p className="text-sm font-black text-slate-900">Thêm tài khoản nhân viên</p>
+                    <p className="mt-0.5 text-xs font-medium text-slate-500">Mã đăng nhập sẽ được hệ thống tự sinh sau khi tạo.</p>
+                  </div>
                 </div>
-
-                <div className="space-y-3 text-sm">
-                  {editing && (
-                    <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2">
-                      <span className="mb-1 block text-xs font-bold uppercase text-blue-500">Mã đăng nhập</span>
-                      <div className="flex items-center gap-2 font-mono text-lg font-black text-blue-700">
-                        <HiOutlineIdentification className="h-5 w-5" />
-                        {editing.email}
-                      </div>
-                    </div>
-                  )}
-
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Họ tên</span>
-                    <input
-                      value={form.full_name}
-                      onChange={(event) => setForm((state) => ({ ...state, full_name: event.target.value }))}
-                      required
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-blue-500"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Số điện thoại</span>
-                    <input
-                      value={form.phone}
-                      onChange={(event) => setForm((state) => ({ ...state, phone: event.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-blue-500"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase text-slate-500">
-                      {editing ? 'Mật khẩu mới' : 'Mật khẩu'}
-                    </span>
-                    <input
-                      type="password"
-                      autoComplete={editing ? 'new-password' : 'current-password'}
-                      value={form.password}
-                      onChange={(event) => setForm((state) => ({ ...state, password: event.target.value }))}
-                      required={!editing}
-                      placeholder={editing ? 'Bỏ trống nếu không đổi' : 'Tối thiểu 6 ký tự'}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold outline-none focus:border-blue-500"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Vai trò</span>
-                    <select
-                      value={form.role}
-                      onChange={(event) => setForm((state) => ({ ...state, role: event.target.value as any }))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold text-slate-700 outline-none focus:border-blue-500"
-                    >
-                      <option value="cashier">Thu ngân</option>
-                      <option value="manager">Quản lý</option>
-                    </select>
-                  </label>
-
-                  <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={form.is_active}
-                      onChange={(event) => setForm((state) => ({ ...state, is_active: event.target.checked }))}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600"
-                    />
-                    Cho phép đăng nhập
-                  </label>
-                </div>
-
                 <button
-                  disabled={saving}
-                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 text-sm font-black text-white hover:bg-blue-700 disabled:opacity-60"
+                  type="button"
+                  onClick={openCreateStaff}
+                  className="app-modal-control inline-flex h-10 shrink-0 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
                 >
-                  {editing ? <HiOutlineLockClosed className="h-4 w-4" /> : <HiOutlinePlus className="h-4 w-4" />}
-                  {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Tạo mã đăng nhập'}
+                  <HiOutlinePlus className="h-4 w-4" />
+                  Tạo nhân viên
                 </button>
-              </form>
+              </div>
             )}
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -507,6 +443,135 @@ const StaffPage = () => {
               </div>
             </div>
           </section>
+
+          {staffModalOpen && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) resetForm();
+              }}
+            >
+              <div className="app-modal-panel w-full max-w-xl overflow-hidden border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="staff-modal-title">
+                <div className="border-t-4 border-blue-600 px-5 pb-4 pt-4 sm:px-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-blue-50 text-blue-600">
+                        <HiOutlineIdentification className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 id="staff-modal-title" className="text-base font-black text-slate-900">
+                          {editing ? 'Cập nhật tài khoản' : 'Tạo tài khoản nhân viên'}
+                        </h2>
+                        <p className="mt-1 text-xs font-medium text-slate-500">
+                          {editing ? `Mã đăng nhập: ${editing.email}` : 'Mã đăng nhập sẽ tự sinh sau khi tạo.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="app-modal-control flex h-9 w-9 items-center justify-center border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                      aria-label="Đóng cửa sổ"
+                    >
+                      <HiOutlineX className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <form onSubmit={submit} className="border-t border-slate-100 px-5 py-5 sm:px-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {editing && (
+                      <div className="border border-blue-100 bg-blue-50 px-3 py-2 sm:col-span-2">
+                        <span className="mb-1 block text-xs font-bold uppercase text-blue-500">Mã đăng nhập</span>
+                        <div className="flex items-center gap-2 font-mono text-lg font-black text-blue-700">
+                          <HiOutlineIdentification className="h-5 w-5" />
+                          {editing.email}
+                        </div>
+                      </div>
+                    )}
+
+                    <label className="block sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Họ tên *</span>
+                      <input
+                        autoFocus
+                        value={form.full_name}
+                        onChange={(event) => setForm((state) => ({ ...state, full_name: event.target.value }))}
+                        required
+                        className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        placeholder="Ví dụ: Nguyễn Văn An"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Số điện thoại</span>
+                      <input
+                        value={form.phone}
+                        onChange={(event) => setForm((state) => ({ ...state, phone: event.target.value }))}
+                        className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        placeholder="09xx xxx xxx"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
+                        {editing ? 'Mật khẩu mới' : 'Mật khẩu *'}
+                      </span>
+                      <input
+                        type="password"
+                        autoComplete={editing ? 'new-password' : 'current-password'}
+                        value={form.password}
+                        onChange={(event) => setForm((state) => ({ ...state, password: event.target.value }))}
+                        required={!editing}
+                        placeholder={editing ? 'Bỏ trống nếu không đổi' : 'Tối thiểu 6 ký tự'}
+                        className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+
+                    <label className="block sm:col-span-2">
+                      <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Vai trò</span>
+                      <select
+                        value={form.role}
+                        onChange={(event) => setForm((state) => ({ ...state, role: event.target.value as any }))}
+                        className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="cashier">Thu ngân</option>
+                        <option value="manager">Quản lý</option>
+                      </select>
+                    </label>
+
+                    <label className="flex items-center gap-2 border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={form.is_active}
+                        onChange={(event) => setForm((state) => ({ ...state, is_active: event.target.checked }))}
+                        className="h-4 w-4 border-slate-300 text-blue-600"
+                      />
+                      Cho phép đăng nhập ngay
+                    </label>
+                  </div>
+
+                  <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="app-modal-control h-10 border border-slate-200 px-4 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="app-modal-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {editing ? <HiOutlineLockClosed className="h-4 w-4" /> : <HiOutlinePlus className="h-4 w-4" />}
+                      {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Tạo mã đăng nhập'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </>
       ) : (
         /* Revenue / Sales Statistics Tab */

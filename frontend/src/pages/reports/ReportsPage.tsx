@@ -77,7 +77,7 @@ const pdfMoney = (value: number) => `${Math.round(value || 0).toLocaleString('vi
 
 const pdfPercent = (value: number) => `${Number.isFinite(value) ? value.toFixed(1) : '0.0'}%`;
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+const COLORS = ['#2563eb', '#0f766e', '#f59e0b', '#e11d48', '#64748b', '#38bdf8', '#059669', '#fb7185', '#334155', '#14b8a6'];
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -694,7 +694,7 @@ const ReportsPage = () => {
       </div>
 
       {/* AI REVENUE REPORT ASSISTANT — AUTO-LOADED */}
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="report-panel border-t-4 border-blue-600 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
@@ -709,7 +709,7 @@ const ReportsPage = () => {
             type="button"
             onClick={handleExportAiPdf}
             disabled={!aiAnalysisData || aiLoading}
-            className="flex items-center justify-center gap-2 h-9 px-4 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
+            className="report-control flex items-center justify-center gap-2 h-9 px-4 border border-slate-200 bg-white text-slate-700 text-xs font-bold shadow-sm transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
             <HiOutlineDownload className="w-4 h-4" />
             <span>Xuất PDF</span>
@@ -717,13 +717,13 @@ const ReportsPage = () => {
           <button
             onClick={handleAiAnalysis}
             disabled={aiLoading || loading || revenue.length === 0}
-            className="flex items-center justify-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
+            className="report-control flex items-center justify-center gap-2 h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
           >
             {aiLoading ? 'Đang phân tích...' : 'Phân tích lại'}
           </button>
         </div>
 
-        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+        <div className="report-card mt-4 border border-slate-200 bg-slate-50/70 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h3 className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-blue-800">
@@ -744,7 +744,7 @@ const ReportsPage = () => {
               type="button"
               onClick={loadAiHistory}
               disabled={historyLoading}
-              className="h-8 rounded-lg border border-blue-200 bg-white px-3 text-[11px] font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+              className="report-control h-8 border border-slate-200 bg-white px-3 text-[11px] font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
             >
               {historyLoading ? 'Đang tải...' : 'Làm mới lịch sử'}
             </button>
@@ -761,11 +761,11 @@ const ReportsPage = () => {
               </div>
             ) : (
               aiHistory.map((item) => (
-                <div key={item.id} className={`rounded-lg border bg-white p-3 transition-colors ${activeAiReport?.id === item.id ? 'border-blue-400 ring-1 ring-blue-200' : 'border-blue-100 hover:border-blue-200'}`}>
+                <div key={item.id} className={`report-card border bg-white p-3 transition-colors ${activeAiReport?.id === item.id ? 'border-blue-400 ring-1 ring-blue-200' : 'border-slate-200 hover:border-blue-200'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-black text-white">
+                        <span className="rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">
                           {item.health_score ?? '--'} điểm
                         </span>
                         <span className="text-[11px] font-black text-slate-800">Kỳ {item.days} ngày</span>
@@ -816,7 +816,7 @@ const ReportsPage = () => {
               <span className="text-xs font-bold text-slate-500 animate-pulse">Trợ lý AI đang tổng hợp số liệu và lập báo cáo tài chính...</span>
             </div>
           ) : aiAnalysisData ? (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-6 md:p-8 shadow-sm animate-fadeIn space-y-8">
+              <div className="report-panel border border-slate-200 bg-white p-6 shadow-sm animate-fadeIn space-y-8 md:p-8">
               {/* Health Score + Summary Header */}
               <div className="flex flex-col md:flex-row items-start gap-6 pb-6 border-b border-slate-100">
                 {/* Health Score Gauge */}
@@ -851,10 +851,8 @@ const ReportsPage = () => {
                 {/* Summary Text */}
                 <div className="flex-1">
                   <div className="flex items-center gap-2.5 mb-2">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-slate-900 text-white shrink-0 shadow-md">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
+                    <div className="report-card flex h-10 w-10 shrink-0 items-center justify-center bg-blue-50 text-blue-600">
+                      <HiTrendUp className="h-5 w-5" />
                     </div>
                     <h3 className="text-base font-bold text-slate-900 tracking-tight">Báo cáo Phân tích Kinh doanh</h3>
                   </div>
@@ -868,7 +866,7 @@ const ReportsPage = () => {
                   {/* First row: 2 charts */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {aiAnalysisData.charts.slice(0, 2).map((chart, idx) => (
-                      <div key={idx} className="flex flex-col rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                      <div key={idx} className="report-card flex flex-col border border-slate-200 bg-slate-50/40 p-4">
                         <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider">{chart.title}</h4>
                         <div className="h-[260px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
@@ -911,7 +909,7 @@ const ReportsPage = () => {
                   {aiAnalysisData.charts.length > 2 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {aiAnalysisData.charts.slice(2, 5).map((chart, idx) => (
-                        <div key={idx + 2} className="flex flex-col rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                        <div key={idx + 2} className="report-card flex flex-col border border-slate-200 bg-slate-50/40 p-4">
                           <h4 className="text-[11px] font-bold text-slate-700 mb-3 uppercase tracking-wider">{chart.title}</h4>
                           <div className="h-[240px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
@@ -930,7 +928,7 @@ const ReportsPage = () => {
                                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} />
                                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
                                   <Tooltip formatter={(val: any) => money(Number(val))} />
-                                  <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} />
+                                  <Line type="monotone" dataKey="value" stroke="#0f766e" strokeWidth={2.5} dot={{ r: 3, fill: '#0f766e', stroke: '#fff', strokeWidth: 2 }} />
                                 </LineChart>
                               ) : (
                                 <BarChart data={chart.data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
@@ -1158,15 +1156,15 @@ const ReportsPage = () => {
       </section>
 
       {/* ═══════════════ AI BÁO CÁO KHO (ENTERPRISE) ═══════════════ */}
-      <section className="-order-10 rounded-2xl border border-slate-200/80 bg-white overflow-hidden shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 border-b border-slate-100 p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
+      <section className="report-panel -order-10 overflow-hidden border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-t-4 border-blue-600 border-b border-slate-200 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+            <div className="report-card flex h-11 w-11 items-center justify-center bg-blue-50 text-blue-600">
               <FiPackage className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-black tracking-tight">AI Báo cáo kho</h2>
-              <p className="text-[11px] font-medium text-slate-300 mt-0.5">
+              <h2 className="text-base font-black tracking-tight text-slate-900">AI Báo cáo kho</h2>
+              <p className="mt-0.5 text-[11px] font-medium text-slate-500">
                 KPI · Biểu đồ · Kế hoạch nhập · Xu hướng nhu cầu · Dead stock
                 {invReport?.generated_at ? ` · ${formatDateTime(invReport.generated_at)}` : ''}
               </p>
@@ -1176,14 +1174,14 @@ const ReportsPage = () => {
             <button
               type="button"
               onClick={() => navigate('/stock?tab=alerts')}
-              className="h-9 px-3 rounded-xl border border-white/20 bg-white/5 text-[11px] font-bold hover:bg-white/10"
+              className="report-control h-9 border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
             >
               Mở cảnh báo kho
             </button>
             <button
               type="button"
               onClick={() => navigate('/stock/receipts/new')}
-              className="h-9 px-3 rounded-xl border border-white/20 bg-white/5 text-[11px] font-bold hover:bg-white/10"
+              className="report-control h-9 border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
             >
               Tạo phiếu nhập
             </button>
@@ -1191,7 +1189,7 @@ const ReportsPage = () => {
               type="button"
               onClick={runInventoryAi}
               disabled={invLoading}
-              className="h-9 px-4 rounded-xl bg-white text-slate-900 text-[11px] font-black shadow-sm disabled:opacity-50"
+              className="report-control h-9 bg-blue-600 px-4 text-[11px] font-black text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
             >
               {invLoading ? 'Đang phân tích...' : 'Phân tích lại'}
             </button>
@@ -1201,7 +1199,7 @@ const ReportsPage = () => {
         {invLoading && !invAnalysis ? (
           <div className="py-16 flex flex-col items-center justify-center gap-3">
             <div className="relative w-10 h-10">
-              <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-slate-800 animate-spin" />
+              <div className="absolute inset-0 rounded-full border-4 border-slate-100 border-t-blue-600 animate-spin" />
             </div>
             <span className="text-xs font-bold text-slate-500 animate-pulse">Đang tổng hợp tồn kho, velocity bán & lập báo cáo...</span>
           </div>
@@ -1227,7 +1225,7 @@ const ReportsPage = () => {
                 </div>
                 <div className="flex gap-1.5 text-[9px] font-bold">
                   <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Sẵn {invAnalysis.score_breakdown.availability}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">Vốn {invAnalysis.score_breakdown.capital_efficiency}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">Vốn {invAnalysis.score_breakdown.capital_efficiency}</span>
                   <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Vòng {invAnalysis.score_breakdown.turnover}</span>
                 </div>
               </div>
@@ -1263,7 +1261,7 @@ const ReportsPage = () => {
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {invAnalysis.charts.slice(0, 2).map((chart, idx) => (
-                    <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                    <div key={idx} className="report-card border border-slate-200 bg-slate-50/40 p-4">
                       <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">{chart.title}</h4>
                       <div className="h-[240px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
@@ -1295,7 +1293,7 @@ const ReportsPage = () => {
                 {invAnalysis.charts.length > 2 && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {invAnalysis.charts.slice(2, 5).map((chart, idx) => (
-                      <div key={idx + 2} className="rounded-xl border border-slate-100 bg-slate-50/30 p-4">
+                      <div key={idx + 2} className="report-card border border-slate-200 bg-slate-50/40 p-4">
                         <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">{chart.title}</h4>
                         <div className="h-[220px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
@@ -1357,7 +1355,7 @@ const ReportsPage = () => {
                     onClick={() => setInvTableTab(tab.id)}
                     className={`h-8 px-3 rounded-lg text-[11px] font-bold border transition-colors ${
                       invTableTab === tab.id
-                        ? 'bg-slate-900 text-white border-slate-900'
+                        ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
                     }`}
                   >
@@ -1407,10 +1405,10 @@ const ReportsPage = () => {
                             </td>
                             <td className="px-3 py-2.5">
                               <span className={`inline-flex rounded-md px-1.5 py-0.5 text-[9px] font-black ${
-                                item.status === 'out_of_stock' ? 'bg-red-600 text-white' :
-                                item.status === 'low_stock' ? 'bg-amber-500 text-white' :
-                                item.status === 'needs_restock' ? 'bg-orange-500 text-white' :
-                                item.status === 'dead_stock' ? 'bg-slate-600 text-white' :
+                                item.status === 'out_of_stock' ? 'border border-rose-200 bg-rose-50 text-rose-700' :
+                                item.status === 'low_stock' ? 'border border-amber-200 bg-amber-50 text-amber-700' :
+                                item.status === 'needs_restock' ? 'border border-orange-200 bg-orange-50 text-orange-700' :
+                                item.status === 'dead_stock' ? 'border border-slate-200 bg-slate-100 text-slate-600' :
                                 'bg-slate-100 text-slate-600'
                               }`}>
                                 {statusLabelInv[item.status] || item.status}
@@ -1436,7 +1434,7 @@ const ReportsPage = () => {
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs font-black tabular-nums text-blue-700">{item.recommended_qty}</td>
                             <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-700">
-                              {item.restock_cost > 0 ? money(item.restock_cost) : item.stock_value > 0 && invTableTab === 'dead' ? money(item.stock_value) : '—'}
+                              {item.restock_cost > 0 ? money(item.restock_cost) : item.stock_value > 0 && invTableTab === 'dead' ? money(item.stock_value) : 'N/A'}
                             </td>
                             <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 max-w-[100px] truncate">{item.supplier}</td>
                           </tr>
@@ -1461,11 +1459,11 @@ const ReportsPage = () => {
                   {invHistory.map((h) => (
                     <div
                       key={h.id}
-                      className={`min-w-[180px] rounded-xl border p-2.5 ${invReport?.id === h.id ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}
+                      className={`report-card min-w-[180px] border p-2.5 ${invReport?.id === h.id ? 'border-blue-400 bg-blue-50/50' : 'border-slate-200 bg-white'}`}
                     >
                       <div className="flex items-start justify-between gap-1">
                         <div>
-                          <p className="text-[11px] font-black text-slate-800">{h.health_score ?? '—'}/100 · {h.days}d</p>
+                          <p className="text-[11px] font-black text-slate-800">{h.health_score ?? 'N/A'}/100 · {h.days} ngày</p>
                           <p className="text-[10px] text-slate-400 font-medium">{formatDateTime(h.generated_at)}</p>
                           <p className="text-[10px] font-bold text-slate-500 mt-0.5">
                             Hết {h.out_of_stock_count} · Thấp {h.low_stock_count}
@@ -1493,7 +1491,7 @@ const ReportsPage = () => {
               type="button"
               onClick={runInventoryAi}
               disabled={invLoading}
-              className="h-9 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold disabled:opacity-50"
+              className="report-control h-9 bg-blue-600 px-4 text-xs font-bold text-white disabled:opacity-50"
             >
               Tạo báo cáo kho
             </button>

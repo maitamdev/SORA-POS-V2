@@ -77,6 +77,26 @@ dialog,
   border-radius: 10px !important;
 }
 
+/* Shared dialog surfaces keep creation flows compact and tactile in the admin shell. */
+.app-modal-panel {
+  border-radius: 18px !important;
+}
+
+.app-modal-control,
+.app-icon-tile {
+  border-radius: 10px !important;
+}
+
+/* Report surfaces use the same restrained hierarchy while keeping dense data readable. */
+.report-panel {
+  border-radius: 16px !important;
+}
+
+.report-card,
+.report-control {
+  border-radius: 10px !important;
+}
+
 @media (max-width: 639px) {
   .order-detail-shell {
     border-radius: 0 !important;
