@@ -189,13 +189,7 @@ Dự án này được cấp phép theo tiêu chuẩn **MIT License**. Bạn có
 
 ## Ghi chú cập nhật cơ sở dữ liệu
 
-Đối với cơ sở dữ liệu Supabase đã tồn tại, chạy thêm các migration dưới đây sau khi áp dụng schema nền:
+Đối với database Supabase mới hoặc đã tồn tại, xem thứ tự migration đầy đủ tại [`database/README.md`](database/README.md). Không tự ý đổi thứ tự, đặc biệt với các RPC kho, lô/HSD, chính sách nhập hàng và vòng đời PO.
 
-1. `database/order_details_cost_snapshot.sql`
-2. `database/ai_revenue_analyses.sql`
-3. `database/ai_inventory_analyses.sql`
-4. `database/hardening.sql`
-5. `database/enterprise_pos_core.sql`
-
-Các migration này lưu giá vốn tại thời điểm bán để báo cáo lợi nhuận lịch sử không bị thay đổi, đồng thời lưu kết quả phân tích doanh thu và tồn kho.
+Các migration lõi lưu giá vốn tại thời điểm bán, bảo vệ transaction checkout/nhập kho, bật RLS và lưu kết quả phân tích doanh thu/tồn kho. `seed.sql` chỉ chạy trên database demo mới.
 
