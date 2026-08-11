@@ -188,6 +188,13 @@ export interface AiInventoryAnalysisResult {
   }>;
   status_distribution: Array<{ name: string; value: number; key: string }>;
   top_stock_value: InventorySkuRow[];
+  forecast_quality?: {
+    measured_items: number;
+    average_wape: number | null;
+    average_bias: number | null;
+    high_error_items: number;
+    method: 'rolling_origin_7d';
+  };
   target_days: number;
   ai_provider?: string;
 }

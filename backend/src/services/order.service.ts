@@ -110,6 +110,8 @@ export class OrderService {
 
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     appCache.deletePrefix('report:dashboard');
+    appCache.deletePrefix('report:revenue');
+    appCache.deletePrefix('report:top-products');
 
     const promotionIds = Array.from(new Set(
       (Array.isArray(input.promotion_ids) ? input.promotion_ids : [])
@@ -155,6 +157,8 @@ export class OrderService {
 
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     appCache.deletePrefix('report:dashboard');
+    appCache.deletePrefix('report:revenue');
+    appCache.deletePrefix('report:top-products');
 
     const cancelledOrder = await this.getById(String(orderId));
 

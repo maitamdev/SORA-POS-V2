@@ -45,6 +45,17 @@ const aiRevenueNarrativeSchema = z.object({
 });
 
 const clampScore = (value: number) => Math.round(Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0)));
+const REPORT_QUERY_CACHE_TTL_MS = 15_000;
+
+type RevenuePoint = { date: string; revenue: number; orders: number; cogs: number; profit: number };
+type TopProductPoint = { product_id: string; product_name: string; quantity: number; revenue: number };
+type ForecastQuality = {
+  measured_items: number;
+  average_wape: number | null;
+  average_bias: number | null;
+  high_error_items: number;
+  method: 'rolling_origin_7d';
+};
 
 export class ReportService {
   static async dashboard(dateStr?: string, days = 7) {
@@ -376,6 +387,10 @@ export class ReportService {
   }
 
   static async revenue(days = 7, endDate = startOfDay()) {
+    const cacheKey = stableCacheKey('report:revenue', { days, end: getLocalDateString(endDate) });
+    const cached = appCache.get<RevenuePoint[]>(cacheKey);
+    if (cached) return cached;
+
     const fromDate = new Date(endDate);
     fromDate.setDate(fromDate.getDate() - (days - 1));
 
@@ -431,10 +446,16 @@ export class ReportService {
       bucket.profit += (rev - cogs);
     }
 
-    return Array.from(buckets.values());
+    const result = Array.from(buckets.values());
+    appCache.set(cacheKey, result, REPORT_QUERY_CACHE_TTL_MS);
+    return result;
   }
 
   static async topProducts(days = 7, limit = 10, endDate = startOfDay()) {
+    const cacheKey = stableCacheKey('report:top-products', { days, limit, end: getLocalDateString(endDate) });
+    const cached = appCache.get<TopProductPoint[]>(cacheKey);
+    if (cached) return cached;
+
     const fromDate = new Date(endDate);
     fromDate.setDate(fromDate.getDate() - (days - 1));
 
@@ -447,7 +468,10 @@ export class ReportService {
 
     if (orderError) throw new AppError(500, orderError.message);
     const orderIds = (orders || []).map((order) => order.id);
-    if (orderIds.length === 0) return [];
+    if (orderIds.length === 0) {
+      appCache.set(cacheKey, [], REPORT_QUERY_CACHE_TTL_MS);
+      return [];
+    }
 
     const { data: details, error } = await supabase
       .from('order_details')
@@ -469,9 +493,11 @@ export class ReportService {
       grouped.set(detail.product_id, current);
     }
 
-    return Array.from(grouped.values())
+    const result = Array.from(grouped.values())
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, limit);
+    appCache.set(cacheKey, result, REPORT_QUERY_CACHE_TTL_MS);
+    return result;
   }
 
   static async aiAnalysis(days = 30, generatedBy?: string) {
@@ -1173,6 +1199,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       falling_demand: fallingDemand,
       top_stock_value: topStockValue,
       demand_mismatch: demandMismatch,
+      forecast_quality: replenishment.forecast_quality,
     };
   }
 
@@ -1463,6 +1490,13 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       falling_demand: fallingDemand,
       top_stock_value: topValue,
       demand_mismatch: mismatch,
+      forecast_quality: {
+        measured_items: 0,
+        average_wape: null,
+        average_bias: null,
+        high_error_items: 0,
+        method: 'rolling_origin_7d' as const,
+      } as ForecastQuality,
     };
   }
 
@@ -1511,6 +1545,9 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       `Vốn: ${money(k.total_stock_value)} giá vốn / ${money(k.total_retail_value)} bán lẻ — hiệu quả vốn ${k.score_breakdown.capital_efficiency}/100.`,
       `Nhu cầu: ${metrics.rising_demand.length} SKU tăng tốc, ${metrics.demand_mismatch.length} SKU vừa tăng cầu vừa thiếu hàng.`,
       `Hàng tồn lâu: ${k.dead_stock} SKU không bán trong ${metrics.days} ngày — ưu tiên xả hàng, tạo combo hoặc ngừng nhập.`,
+      metrics.forecast_quality.average_wape === null
+        ? 'Chưa có đủ dữ liệu để kiểm định sai số dự báo; các đề xuất cần quản lý duyệt thủ công.'
+        : `Backtest rolling-origin: WAPE trung bình ${metrics.forecast_quality.average_wape}%, bias ${metrics.forecast_quality.average_bias}%, có ${metrics.forecast_quality.high_error_items} SKU sai số cao.`,
     ];
 
     const recommendations = [
@@ -1574,6 +1611,7 @@ RISING DEMAND:
 ${riseLines}
 
 Lệch cầu-tồn: ${metrics.demand_mismatch.length} SKU
+Chất lượng forecast: WAPE ${metrics.forecast_quality.average_wape ?? 'N/A'}% | bias ${metrics.forecast_quality.average_bias ?? 'N/A'}% | sai số cao ${metrics.forecast_quality.high_error_items} SKU
 Viết summary + 4 insights + 4 recommendations.`;
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1630,6 +1668,7 @@ Viết summary + 4 insights + 4 recommendations.`;
       category_breakdown: metrics.category_breakdown,
       status_distribution: metrics.status_distribution,
       top_stock_value: metrics.top_stock_value,
+      forecast_quality: metrics.forecast_quality,
       target_days: metrics.target_days,
       ai_provider: aiProvider,
     };

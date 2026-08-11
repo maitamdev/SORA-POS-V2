@@ -174,6 +174,8 @@ const ReportsPage = () => {
   const [invTableTab, setInvTableTab] = useState<'restock' | 'mismatch' | 'dead' | 'rising'>('restock');
   const lastAutoOpenKey = useRef<string | null>(null);
   const lastInvAutoKey = useRef<string | null>(null);
+  const revenueLoadedDays = useRef<number | null>(null);
+  const invHistoryReady = useRef(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -184,6 +186,7 @@ const ReportsPage = () => {
       ]);
       setRevenue(revenueRes.data.data);
       setTopProducts(topRes.data.data);
+      revenueLoadedDays.current = days;
     } catch {
       toast.error('Không tải được báo cáo');
     } finally {
@@ -261,6 +264,7 @@ const ReportsPage = () => {
       // optional if table not migrated
     } finally {
       setInvHistoryLoading(false);
+      invHistoryReady.current = true;
     }
   }, []);
 
@@ -306,12 +310,21 @@ const ReportsPage = () => {
     }
   }, [days, loadInvHistory]);
 
-  // Auto-load everything on page open
+  // Load only the active report family. Inventory AI is intentionally deferred
+  // until the user opens its tab because it aggregates 90-day demand and may
+  // call the narrative provider.
   useEffect(() => {
+    if (activeReportTab !== 'revenue' || revenueLoadedDays.current === days) return;
     loadData();
     loadAiHistory();
-    loadInvHistory();
-  }, [loadData, loadAiHistory, loadInvHistory]);
+  }, [activeReportTab, days, loadData, loadAiHistory]);
+
+  useEffect(() => {
+    if (activeReportTab === 'inventory') {
+      invHistoryReady.current = false;
+      loadInvHistory();
+    }
+  }, [activeReportTab, loadInvHistory]);
 
   useEffect(() => {
     setAiAnalysisData(null);
@@ -320,7 +333,7 @@ const ReportsPage = () => {
 
   // Auto-open saved AI analysis first; generate a new one only when no saved report exists for the range.
   useEffect(() => {
-    if (revenue.length === 0 || aiAnalysisData || aiLoading || historyLoading) return;
+    if (activeReportTab !== 'revenue' || revenue.length === 0 || aiAnalysisData || aiLoading || historyLoading) return;
 
     // Guard against multiple concurrent triggers for the same data state
     const currentKey = `${days}:${revenue.length}:${aiHistory.length}`;
@@ -333,12 +346,13 @@ const ReportsPage = () => {
       return;
     }
 
-    handleAiAnalysis();
-  }, [revenue, days, aiAnalysisData, aiLoading, historyLoading, aiHistory, handleOpenSavedAnalysis, handleAiAnalysis]);
+    // Do not spend a serverless request/LLM call just by opening Reports.
+    // If there is no saved snapshot, the user can explicitly run analysis.
+  }, [activeReportTab, revenue, days, aiAnalysisData, aiLoading, historyLoading, aiHistory, handleOpenSavedAnalysis]);
 
   // Auto-load inventory AI: prefer saved for range, else generate once
   useEffect(() => {
-    if (invAnalysis || invLoading || invHistoryLoading) return;
+    if (activeReportTab !== 'inventory' || !invHistoryReady.current || invAnalysis || invLoading || invHistoryLoading) return;
     const key = `inv:${days}:${invHistory.length}`;
     if (lastInvAutoKey.current === key) return;
     lastInvAutoKey.current = key;
@@ -349,7 +363,7 @@ const ReportsPage = () => {
       return;
     }
     runInventoryAi();
-  }, [days, invAnalysis, invLoading, invHistoryLoading, invHistory, handleOpenInvReport, runInventoryAi]);
+  }, [activeReportTab, days, invAnalysis, invLoading, invHistoryLoading, invHistory, handleOpenInvReport, runInventoryAi]);
 
   useEffect(() => {
     setInvAnalysis(null);
@@ -1285,6 +1299,22 @@ const ReportsPage = () => {
                     </div>
                   ))}
                 </div>
+                {invAnalysis.forecast_quality && (
+                  <div className="mt-3 grid gap-px border border-slate-200 bg-slate-200 sm:grid-cols-3">
+                    <div className="bg-white px-3 py-2.5">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">WAPE dự báo</p>
+                      <p className="mt-1 text-sm font-black text-blue-700">{invAnalysis.forecast_quality.average_wape === null ? 'N/A' : `${invAnalysis.forecast_quality.average_wape}%`}</p>
+                    </div>
+                    <div className="bg-white px-3 py-2.5">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Bias dự báo</p>
+                      <p className={`mt-1 text-sm font-black ${Math.abs(invAnalysis.forecast_quality.average_bias || 0) > 20 ? 'text-amber-600' : 'text-emerald-700'}`}>{invAnalysis.forecast_quality.average_bias === null ? 'N/A' : `${invAnalysis.forecast_quality.average_bias}%`}</p>
+                    </div>
+                    <div className="bg-white px-3 py-2.5">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">SKU cần duyệt tay</p>
+                      <p className="mt-1 text-sm font-black text-rose-700">{invAnalysis.forecast_quality.high_error_items}</p>
+                    </div>
+                  </div>
+                )}
                 {invAnalysis.kpis.estimated_lost_revenue_7d > 0 && (
                   <p className="mt-2 text-[11px] font-bold text-rose-600">
                     Rủi ro mất DT ~{money(invAnalysis.kpis.estimated_lost_revenue_7d)} / 7 ngày nếu không nhập SKU hết hàng
