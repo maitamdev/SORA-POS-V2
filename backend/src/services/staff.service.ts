@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { emptyToNull, parsePagination } from '../utils/query';
 import { UserRole } from '../types/user.type';
+import { appCache, stableCacheKey } from '../utils/cache';
 
 type Query = Record<string, unknown>;
 type StaffPayload = {
@@ -155,6 +156,7 @@ export class StaffService {
       .single();
 
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(stableCacheKey('auth:user', { id }));
     return sanitizeUser(updated);
   }
 
@@ -167,6 +169,7 @@ export class StaffService {
       .eq('id', id);
 
     if (error) throw new AppError(400, error.message);
+    appCache.deletePrefix(stableCacheKey('auth:user', { id }));
     return null;
   }
 

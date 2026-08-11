@@ -4,6 +4,10 @@ import { env } from '../config/env';
 import { supabase } from '../config/supabase';
 import { JwtPayload, UserRole } from '../types/user.type';
 import { errorResponse } from '../utils/response';
+import { appCache, stableCacheKey } from '../utils/cache';
+
+const AUTH_USER_CACHE_TTL_MS = 15_000;
+type ActiveUser = { id: string; email: string; roles: unknown };
 
 const getRoleName = (roles: unknown): UserRole | null => {
   if (!roles) return null;
@@ -36,21 +40,33 @@ export const authMiddleware = async (
       return;
     }
 
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, email, is_active, roles!inner(name)')
-      .eq('id', decoded.userId)
-      .eq('is_active', true)
-      .single();
+    const cacheKey = stableCacheKey('auth:user', { id: decoded.userId });
+    let user = appCache.get<ActiveUser>(cacheKey);
 
-    if (error && error.code !== 'PGRST116') {
-      errorResponse(res, 'Hệ thống đang quá tải, vui lòng thử lại sau', 500);
-      return;
-    }
+    if (!user) {
+      const result = await supabase
+        .from('users')
+        .select('id, email, is_active, roles!inner(name)')
+        .eq('id', decoded.userId)
+        .eq('is_active', true)
+        .single();
 
-    if ((error && error.code === 'PGRST116') || !user) {
-      errorResponse(res, 'Tài khoản không còn hoạt động hoặc không tồn tại', 401);
-      return;
+      if (result.error && result.error.code !== 'PGRST116') {
+        errorResponse(res, 'Hệ thống đang quá tải, vui lòng thử lại sau', 500);
+        return;
+      }
+
+      if ((result.error && result.error.code === 'PGRST116') || !result.data) {
+        errorResponse(res, 'Tài khoản không còn hoạt động hoặc không tồn tại', 401);
+        return;
+      }
+
+      user = {
+        id: result.data.id,
+        email: result.data.email,
+        roles: result.data.roles,
+      };
+      appCache.set(cacheKey, user, AUTH_USER_CACHE_TTL_MS);
     }
 
     const role = getRoleName(user.roles);

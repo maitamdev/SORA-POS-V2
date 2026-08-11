@@ -61,21 +61,39 @@ test('invalid API requests expose the trace id for support correlation', async (
 
 test('protected API domains reject requests without a bearer token', async () => {
   const protectedPaths = [
+    '/api/auth/me',
     '/api/products',
     '/api/categories',
     '/api/suppliers',
     '/api/customers',
     '/api/orders',
+    '/api/orders/00000000-0000-0000-0000-000000000000/send-email',
     '/api/stock/inventory',
     '/api/stock/summary',
+    '/api/stock/expiry-alerts',
+    '/api/stock/transactions',
+    '/api/stock/import',
+    '/api/stock/adjust',
     '/api/stock/receipts',
     '/api/stock/purchase-orders',
     '/api/reports/dashboard',
+    '/api/reports/revenue',
+    '/api/reports/top-products',
+    '/api/reports/ai-analysis/history',
+    '/api/reports/ai-inventory/history',
+    '/api/ai/restock-analysis',
     '/api/ai/recommendations',
+    '/api/ai/barcode',
+    '/api/ai/description',
+    '/api/ai/category',
+    '/api/ai/category-image',
+    '/api/ai/supplier',
     '/api/staff',
     '/api/settings/operation',
+    '/api/shifts/active',
     '/api/shifts',
     '/api/audit-logs',
+    '/api/payos/status/1',
     '/api/promotions',
   ];
 
@@ -90,6 +108,16 @@ test('authenticated catalog routes never advertise public caching', async () => 
   assert.match(cacheControl, /^private,/);
   assert.doesNotMatch(cacheControl, /public/);
   assert.match(response.headers.get('vary') || '', /Authorization/);
+});
+
+test('health endpoint stays responsive under a small local burst', async () => {
+  const startedAt = performance.now();
+  const responses = await Promise.all(
+    Array.from({ length: 32 }, (_, index) => request(`/api/health?probe=${index}`))
+  );
+
+  assert.ok(responses.every((response) => response.status === 200));
+  assert.ok(performance.now() - startedAt < 2_000);
 });
 
 test('validation runs before external/database work on login', async () => {
