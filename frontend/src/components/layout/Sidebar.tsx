@@ -76,12 +76,6 @@ const menuItems = [
     roles: ['admin', 'manager', 'cashier'],
   },
   {
-    label: 'Đặt hàng NCC',
-    icon: HiOutlineClipboardList,
-    path: '/stock/purchase-orders',
-    roles: ['admin', 'manager'],
-  },
-  {
     label: 'Khách hàng',
     icon: HiOutlineUserGroup,
     path: '/customers',
