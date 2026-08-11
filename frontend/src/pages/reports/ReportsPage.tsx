@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { 
-  HiOutlineTrendingUp as HiTrendUp, 
+  HiOutlineTrendingUp as HiTrendUp,
+  HiOutlineTrendingDown as HiTrendDown,
   HiOutlineCurrencyDollar as HiDollar,
   HiOutlineShoppingCart as HiCart,
   HiOutlineCalculator as HiCalc,
@@ -101,8 +102,8 @@ const CustomTooltip = ({ active, payload }: any) => {
             <span className="text-rose-400 font-bold">{money(cogs)}</span>
           </p>
           <p className="flex justify-between gap-6 border-b border-slate-800 pb-1.5">
-            <span>Lợi nhuận gộp:</span>
-            <span className="text-emerald-400 font-bold">{money(profit)}</span>
+            <span>{profit < 0 ? 'Lỗ gộp:' : 'Lợi nhuận gộp:'}</span>
+            <span className={`${profit < 0 ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>{money(profit)}</span>
           </p>
           <p className="flex justify-between gap-6 pt-0.5">
             <span>Tỉ suất LN:</span>
@@ -711,17 +712,17 @@ const ReportsPage = () => {
         </div>
 
         {/* Card 3: Gross Profit */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
+        <div className={`relative overflow-hidden rounded-2xl border bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md ${totalProfit < 0 ? 'border-rose-300' : 'border-slate-200/80 hover:border-slate-300'}`}>
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase tracking-wider text-slate-400">Lợi nhuận gộp (Profit)</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-              <HiTrendUp className="w-5 h-5" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${totalProfit < 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+              {totalProfit < 0 ? <HiTrendDown className="w-5 h-5" /> : <HiTrendUp className="w-5 h-5" />}
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{money(totalProfit)}</h3>
-            <p className="mt-1 text-[11px] font-bold text-emerald-600 flex items-center gap-1">
-              <span>Tỷ suất lợi nhuận gộp:</span>
+            <h3 className={`text-2xl font-black tracking-tight ${totalProfit < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{money(totalProfit)}</h3>
+            <p className={`mt-1 text-[11px] font-bold flex items-center gap-1 ${totalProfit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              <span>{totalProfit < 0 ? 'Lỗ gộp — cần rà soát giảm giá:' : 'Tỷ suất lợi nhuận gộp:'}</span>
               <span className="font-extrabold">{profitMargin.toFixed(1)}%</span>
             </p>
           </div>
