@@ -3,13 +3,17 @@ import { NotificationService } from '../services/notification.service';
 import { successResponse } from '../utils/response';
 import { asyncHandler } from '../utils/asyncHandler';
 import { env } from '../config/env';
+import { rateLimitMiddleware } from '../middlewares/rateLimit.middleware';
 
 const router = Router();
 
 /**
  * Endpoint tiếp nhận Webhook từ Database Supabase khi có dòng audit_logs mới
  */
-router.post('/supabase-audit', asyncHandler(async (req: Request, res: Response) => {
+router.post(
+  '/supabase-audit',
+  rateLimitMiddleware({ keyPrefix: 'webhook-supabase-audit', windowMs: 60_000, max: 120 }),
+  asyncHandler(async (req: Request, res: Response) => {
   const { record, type, table } = req.body;
   const authorization = req.header('Authorization') || '';
   const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : '';
@@ -34,12 +38,19 @@ router.post('/supabase-audit', asyncHandler(async (req: Request, res: Response) 
   }
 
   if (type === 'INSERT' && table === 'audit_logs' && record) {
-    console.log('[Webhook] New audit log detected via Supabase Webhook:', record);
+    if (env.nodeEnv !== 'production') {
+      console.log('[Webhook] New audit log detected via Supabase Webhook:', {
+        type,
+        table,
+        recordId: typeof record.id === 'string' ? record.id : undefined,
+      });
+    }
     // Gửi thông báo định dạng đẹp lên Telegram
     await NotificationService.sendAuditLogNotification(record);
   }
 
   successResponse(res, null, 'Webhook processed successfully');
-}));
+  }),
+);
 
 export default router;

@@ -16,6 +16,12 @@ import { useAuthStore } from '../stores/auth.store';
 /* ------------------------------------------------------------------ */
 let isSyncing = false;
 
+const notifySyncStateChanged = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('offline_sync_changed'));
+  }
+};
+
 /**
  * Tải products, categories, customers từ API xuống IndexedDB.
  * Gọi 1 lần sau khi đăng nhập thành công hoặc khi app khởi động online.
@@ -37,6 +43,7 @@ export async function syncAllDataToLocal(): Promise<void> {
     console.warn('[OfflineSync] Lỗi đồng bộ dữ liệu xuống local:', err);
   } finally {
     isSyncing = false;
+    notifySyncStateChanged();
   }
 }
 
@@ -63,11 +70,19 @@ export async function syncPendingOrdersToServer(): Promise<{
   try {
     const pendingOrders = await getPendingOrders();
     const currentUserId = useAuthStore.getState().user?.id || null;
-    const ordersToSync = pendingOrders.filter(
-      (o) =>
-        (o.syncStatus === 'pending' || o.syncStatus === 'failed') &&
+    const staleSyncingCutoff = Date.now() - 2 * 60 * 1000;
+    const ordersToSync = pendingOrders.filter((o) => {
+      const isRetryable = o.syncStatus === 'pending' || o.syncStatus === 'failed';
+      const syncStartedAt = o.syncingAt ? new Date(o.syncingAt).getTime() : 0;
+      const isStaleSyncing =
+        o.syncStatus === 'syncing' &&
+        (!Number.isFinite(syncStartedAt) || syncStartedAt <= staleSyncingCutoff);
+
+      return (
+        (isRetryable || isStaleSyncing) &&
         (!o.createdByUserId || o.createdByUserId === currentUserId)
-    );
+      );
+    });
 
     if (ordersToSync.length === 0) return { synced: 0, failed: 0 };
 
@@ -119,6 +134,7 @@ export async function syncPendingOrdersToServer(): Promise<{
     console.error('[OfflineSync] Lỗi nghiêm trọng khi đồng bộ đơn hàng:', err);
   } finally {
     isSyncingOrders = false;
+    notifySyncStateChanged();
   }
 
   return { synced, failed };

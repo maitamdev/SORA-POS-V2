@@ -4,8 +4,12 @@ dotenv.config();
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isLocalDevelopment = nodeEnv === 'development' || nodeEnv === 'test';
 
-if (!process.env.JWT_SECRET && !isLocalDevelopment) {
-  throw new Error('JWT_SECRET is required outside local development');
+if (!isLocalDevelopment) {
+  const requiredProductionKeys = ['JWT_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const missingKeys = requiredProductionKeys.filter((key) => !process.env[key]?.trim());
+  if (missingKeys.length > 0) {
+    throw new Error(`Missing required production environment variables: ${missingKeys.join(', ')}`);
+  }
 }
 
 export const env = {
@@ -33,4 +37,5 @@ export const env = {
   payosChecksumKey: process.env.PAYOS_CHECKSUM_KEY || '',
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
 };

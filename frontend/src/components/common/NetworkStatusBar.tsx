@@ -9,7 +9,7 @@ import { HiOutlineStatusOffline, HiOutlineStatusOnline, HiOutlineCloudUpload } f
  * - Khi online bình thường: ẩn hoàn toàn.
  */
 const NetworkStatusBar = () => {
-  const { isOnline, pendingCount } = useNetworkStatus();
+  const { isOnline, pendingCount, syncingCount, failedCount } = useNetworkStatus();
   const [showReconnected, setShowReconnected] = useState(false);
   const wasOfflineRef = useRef(false);
 
@@ -64,22 +64,52 @@ const NetworkStatusBar = () => {
       <div className="fixed top-0 left-0 right-0 z-[100] animate-slideDown">
         <div className="bg-emerald-500 text-white px-4 py-2.5 flex items-center justify-center gap-3 text-xs font-black tracking-wide shadow-lg shadow-emerald-500/20">
           <HiOutlineStatusOnline className="w-4 h-4 flex-shrink-0" />
-          <span>ĐÃ KẾT NỐI LẠI — Đang đồng bộ dữ liệu...</span>
-          <HiOutlineCloudUpload className="w-4 h-4 flex-shrink-0 animate-bounce" />
+          <span>
+            {syncingCount > 0
+              ? `ĐÃ KẾT NỐI LẠI — Đang đồng bộ ${syncingCount} đơn...`
+              : 'ĐÃ KẾT NỐI LẠI — Dữ liệu đã sẵn sàng'}
+          </span>
+          {syncingCount > 0 && <HiOutlineCloudUpload className="w-4 h-4 flex-shrink-0 animate-bounce" />}
         </div>
       </div>
     );
   }
 
-  // --- Pending Orders Badge (online nhưng còn đơn chờ) ---
-  if (pendingCount > 0) {
+  // --- Syncing Orders Badge (chỉ hiện khi thực sự có request đang chạy) ---
+  if (syncingCount > 0) {
     return (
       <div className="fixed top-0 left-0 right-0 z-[100]">
         <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-center gap-3 text-xs font-black tracking-wide">
           <HiOutlineCloudUpload className="w-4 h-4 flex-shrink-0 animate-pulse" />
           <span>
-            Đang đồng bộ {pendingCount} đơn hàng offline lên hệ thống...
+            Đang đồng bộ {syncingCount} đơn hàng offline lên hệ thống...
           </span>
+        </div>
+      </div>
+    );
+  }
+
+  // Failed jobs remain available for retry, but must not look like an
+  // endlessly running sync operation.
+  if (isOnline && failedCount > 0) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[100]">
+        <div className="bg-amber-500 text-amber-950 px-4 py-2 flex items-center justify-center gap-3 text-xs font-black tracking-wide">
+          <HiOutlineCloudUpload className="w-4 h-4 flex-shrink-0" />
+          <span>{failedCount} đơn offline chưa đồng bộ được — sẽ tự thử lại</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Pending jobs can exist before the sync worker starts. Use neutral copy so
+  // the banner never claims that a request is running when it is not.
+  if (isOnline && pendingCount > 0) {
+    return (
+      <div className="fixed top-0 left-0 right-0 z-[100]">
+        <div className="bg-slate-700 text-white px-4 py-2 flex items-center justify-center gap-3 text-xs font-black tracking-wide">
+          <HiOutlineCloudUpload className="w-4 h-4 flex-shrink-0" />
+          <span>Còn {pendingCount} đơn offline đang chờ xử lý</span>
         </div>
       </div>
     );

@@ -22,7 +22,7 @@ import {
   HiOutlineDownload,
 } from 'react-icons/hi';
 import NotificationCenter from '../common/NotificationCenter';
-import logoUrl from '../../assets/new-logo.png';
+import logoUrl from '../../assets/sorapos-logo.svg';
 
 /**
  * Cấu trúc menu sidebar

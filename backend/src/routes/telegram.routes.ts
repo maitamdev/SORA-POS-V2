@@ -4,6 +4,7 @@ import { NotificationService } from '../services/notification.service';
 import { successResponse } from '../utils/response';
 import { asyncHandler } from '../utils/asyncHandler';
 import { env } from '../config/env';
+import { rateLimitMiddleware } from '../middlewares/rateLimit.middleware';
 
 const router = Router();
 
@@ -26,7 +27,18 @@ const startOfDay = (date = new Date()) => {
 /**
  * Route tiếp nhận webhook tương tác từ Telegram Bot
  */
-router.post('/telegram', asyncHandler(async (req: Request, res: Response) => {
+router.post(
+  '/telegram',
+  rateLimitMiddleware({ keyPrefix: 'webhook-telegram', windowMs: 60_000, max: 120 }),
+  asyncHandler(async (req: Request, res: Response) => {
+  if (env.telegramWebhookSecret) {
+    const providedSecret = req.header('X-Telegram-Bot-Api-Secret-Token') || '';
+    if (providedSecret !== env.telegramWebhookSecret) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+  }
+
   const update = req.body;
   
   if (!update || !update.message) {
@@ -320,6 +332,7 @@ ${orderListText.trim()}
   }
 
   res.status(200).json({ success: true });
-}));
+  }),
+);
 
 export default router;

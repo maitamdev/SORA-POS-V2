@@ -7,6 +7,9 @@ type Bucket = {
 };
 
 const buckets = new Map<string, Bucket>();
+let lastCleanupAt = 0;
+const CLEANUP_INTERVAL_MS = 60_000;
+const MAX_BUCKETS = 10_000;
 
 type RateLimitOptions = {
   windowMs: number;
@@ -17,10 +20,13 @@ type RateLimitOptions = {
 export const rateLimitMiddleware = ({ windowMs, max, keyPrefix }: RateLimitOptions) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     const now = Date.now();
-    if (buckets.size > 10000) {
+    // Keep cleanup off the hot path for normal requests, while still
+    // reclaiming stale IP keys and bounding memory during bursts.
+    if (now - lastCleanupAt >= CLEANUP_INTERVAL_MS || buckets.size >= MAX_BUCKETS) {
       for (const [bucketKey, bucket] of buckets.entries()) {
         if (bucket.resetAt <= now) buckets.delete(bucketKey);
       }
+      lastCleanupAt = now;
     }
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const key = `${keyPrefix}:${ip}`;

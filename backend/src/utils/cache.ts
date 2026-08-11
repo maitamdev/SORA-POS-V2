@@ -5,6 +5,11 @@ type CacheEntry<T> = {
 
 export class MemoryCache {
   private readonly store = new Map<string, CacheEntry<unknown>>();
+  private readonly maxEntries: number;
+
+  constructor(maxEntries = 1000) {
+    this.maxEntries = Math.max(1, maxEntries);
+  }
 
   get<T>(key: string): T | null {
     const entry = this.store.get(key);
@@ -19,9 +24,22 @@ export class MemoryCache {
   }
 
   set<T>(key: string, value: T, ttlMs: number) {
+    const now = Date.now();
+
+    // Query-string based caches should never be allowed to grow without a
+    // bound. Remove expired entries first, then evict the oldest insertion if
+    // the namespace is still full.
+    for (const [entryKey, entry] of this.store.entries()) {
+      if (entry.expiresAt <= now) this.store.delete(entryKey);
+    }
+    if (!this.store.has(key) && this.store.size >= this.maxEntries) {
+      const oldestKey = this.store.keys().next().value as string | undefined;
+      if (oldestKey) this.store.delete(oldestKey);
+    }
+
     this.store.set(key, {
       value,
-      expiresAt: Date.now() + ttlMs,
+      expiresAt: now + Math.max(0, ttlMs),
     });
   }
 

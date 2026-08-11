@@ -48,10 +48,6 @@ export class GoodsReceiptController {
     const { id } = req.params;
     const { pay_amount } = req.body;
 
-    if (pay_amount === undefined || pay_amount === null) {
-      throw new AppError(400, 'Thiếu số tiền thanh toán thêm (pay_amount)');
-    }
-
     const result = await GoodsReceiptService.updatePayment(id, Number(pay_amount), req.user.userId);
     successResponse(res, result, 'Cập nhật thanh toán thành công');
   });

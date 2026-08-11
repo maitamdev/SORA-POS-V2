@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserRole } from '../types/user.type';
 import { authAPI } from '../services/auth.api';
+import { queryCache } from '../utils/queryCache';
 
 const AUTH_SESSION_TTL_MS = 10 * 60 * 60 * 1000;
 
@@ -71,6 +72,9 @@ export const useAuthStore = create<AuthState>()(
             // Ignore errors - logout API is optional
           });
         }
+        // Do not reuse another account's cached catalog/customer/report data
+        // after a logout/login cycle in the same browser tab.
+        queryCache.clear();
         set({
           user: null,
           token: null,

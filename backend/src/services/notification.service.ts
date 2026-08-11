@@ -10,7 +10,6 @@ export class NotificationService {
    */
   static async sendTelegramMessageTo(chatId: string | number, text: string): Promise<boolean> {
     const token = env.telegramBotToken;
-    console.log(`[NotificationService.sendTelegramMessageTo] token: ${token ? 'exists' : 'missing'}, chatId: ${chatId}`);
 
     if (!token || !chatId) {
       console.log('[NotificationService] Telegram credentials missing, skipping.');
@@ -19,25 +18,32 @@ export class NotificationService {
 
     try {
       const url = `https://api.telegram.org/bot${token}/sendMessage`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: String(chatId),
-          text,
-          parse_mode: 'HTML',
-        }),
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            chat_id: String(chatId),
+            text,
+            parse_mode: 'HTML',
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[NotificationService] Failed to send Telegram alert to ${chatId}: ${response.statusText}`, errorText);
-        return false;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[NotificationService] Failed to send Telegram alert to ${chatId}: ${response.statusText}`, errorText);
+          return false;
+        }
+
+        return true;
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return true;
     } catch (error) {
       console.error(`[NotificationService] Error sending Telegram message to ${chatId}:`, error);
       return false;

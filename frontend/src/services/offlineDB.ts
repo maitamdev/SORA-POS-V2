@@ -22,6 +22,8 @@ export interface PendingOrder {
   createdAt: string;
   /** Trạng thái đồng bộ: pending | syncing | failed */
   syncStatus: 'pending' | 'syncing' | 'failed';
+  /** Thời điểm bắt đầu lần đồng bộ hiện tại (dùng để nhặt lại job bị treo) */
+  syncingAt?: string | null;
   /** Thông báo lỗi nếu đồng bộ thất bại */
   syncError?: string | null;
 }
@@ -276,6 +278,29 @@ export async function getPendingOrders(): Promise<PendingOrder[]> {
   return offlineDB.pendingOrders.toArray();
 }
 
+export interface PendingOrderSummary {
+  total: number;
+  pending: number;
+  syncing: number;
+  failed: number;
+}
+
+/** Trả về trạng thái thật của hàng đợi để UI không nhầm failed là đang sync. */
+export async function getPendingOrderSummary(): Promise<PendingOrderSummary> {
+  const [pending, syncing, failed] = await Promise.all([
+    offlineDB.pendingOrders.where('syncStatus').equals('pending').count(),
+    offlineDB.pendingOrders.where('syncStatus').equals('syncing').count(),
+    offlineDB.pendingOrders.where('syncStatus').equals('failed').count(),
+  ]);
+
+  return {
+    pending,
+    syncing,
+    failed,
+    total: pending + syncing + failed,
+  };
+}
+
 /**
  * Đếm số lượng đơn hàng chờ đồng bộ.
  */
@@ -294,7 +319,11 @@ export async function removePendingOrder(id: number): Promise<void> {
  * Đánh dấu đơn hàng đang đồng bộ.
  */
 export async function markOrderSyncing(id: number): Promise<void> {
-  await offlineDB.pendingOrders.update(id, { syncStatus: 'syncing' });
+  await offlineDB.pendingOrders.update(id, {
+    syncStatus: 'syncing',
+    syncingAt: new Date().toISOString(),
+    syncError: null,
+  });
 }
 
 /**
@@ -306,6 +335,7 @@ export async function markOrderFailed(
 ): Promise<void> {
   await offlineDB.pendingOrders.update(id, {
     syncStatus: 'failed',
+    syncingAt: null,
     syncError: error,
   });
 }

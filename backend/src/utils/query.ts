@@ -9,8 +9,10 @@ export const toPositiveInt = (value: unknown, fallback = 1): number => {
 };
 
 export const parsePagination = (query: Record<string, unknown>) => {
-  const page = Math.max(toPositiveInt(query.page, 1), 1);
-  const limit = Math.min(Math.max(toPositiveInt(query.limit, 20), 1), 10000);
+  const page = Math.min(Math.max(toPositiveInt(query.page, 1), 1), 1_000_000);
+  // Keep list endpoints bounded. 10,000 rows per request made it easy to
+  // accidentally turn a normal screen refresh into a database/memory spike.
+  const limit = Math.min(Math.max(toPositiveInt(query.limit, 20), 1), 500);
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 

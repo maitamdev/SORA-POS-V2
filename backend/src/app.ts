@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
-import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
 import routes from './routes';
@@ -84,11 +83,6 @@ app.use(compression({
   threshold: 1024,  // Chỉ nén response > 1KB
   level: 6,         // Cân bằng giữa tốc độ nén và tỉ lệ nén
 }) as any);
-
-// HTTP logger (chỉ hiện trong development)
-if (env.nodeEnv === 'development') {
-  app.use(morgan('dev'));
-}
 
 // Handle favicon requests to prevent polluting terminal logs with 404 warnings
 app.get('/favicon.ico', (req, res) => {

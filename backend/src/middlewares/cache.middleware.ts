@@ -8,9 +8,13 @@ import { Request, Response, NextFunction } from 'express';
 export const httpCacheMiddleware = (maxAgeSeconds = 60, staleWhileRevalidateSeconds = 120) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'GET') {
+      // These routes are mounted behind authMiddleware. A public cache header
+      // allows a browser/CDN to reuse one user's response for another user.
+      // Keep the browser speed-up, but make the response explicitly private.
+      res.setHeader('Vary', 'Authorization, Accept-Encoding');
       res.setHeader(
         'Cache-Control',
-        `public, max-age=${maxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}`
+        `private, max-age=${maxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}`
       );
     }
     next();

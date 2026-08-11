@@ -45,7 +45,7 @@ const idParam = (name = 'id') => ({
 
 const pagingParams = [
   { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1 } },
-  { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100 } },
+  { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 500 } },
   { name: 'search', in: 'query', schema: { type: 'string' } },
   { name: 'is_active', in: 'query', schema: { type: 'boolean' } },
 ];
@@ -85,6 +85,8 @@ export const openApiSpec: OpenApiSpec = {
     { name: 'Settings', description: 'Operational settings' },
     { name: 'Shifts', description: 'Cashier shift sessions' },
     { name: 'Audit', description: 'Enterprise audit trail' },
+    { name: 'Promotions', description: 'Promotion rules and POS validation' },
+    { name: 'Payments', description: 'PayOS payment links and webhooks' },
   ],
   components: {
     securitySchemes: {
@@ -372,6 +374,9 @@ export const openApiSpec: OpenApiSpec = {
     '/orders/{id}/cancel': {
       patch: { tags: ['Orders'], summary: 'Cancel order and optionally restock', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', properties: { note: { type: 'string' }, restock: { type: 'boolean' } } }), responses: { '200': ok() } },
     },
+    '/orders/{id}/send-email': {
+      post: { tags: ['Orders'], summary: 'Send invoice by email', description: 'Roles: admin, manager, cashier', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } }), responses: { '200': ok() } },
+    },
     '/stock/inventory': {
       get: { tags: ['Stock'], summary: 'Inventory list', security: auth, parameters: pagingParams, responses: { '200': ok() } },
     },
@@ -381,6 +386,15 @@ export const openApiSpec: OpenApiSpec = {
     '/stock/transactions': {
       get: { tags: ['Stock'], summary: 'Stock transactions', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
     },
+    '/stock/summary': {
+      get: { tags: ['Stock'], summary: 'Inventory summary', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
+    },
+    '/stock/lookup': {
+      get: { tags: ['Stock'], summary: 'Lookup product by barcode or SKU', security: auth, parameters: [{ name: 'code', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': ok() } },
+    },
+    '/stock/expiry-alerts': {
+      get: { tags: ['Stock'], summary: 'Expiry and batch alerts', description: 'Roles: admin, manager, cashier', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+    },
     '/stock/import': {
       post: { tags: ['Stock'], summary: 'Import stock', description: 'Roles: admin, manager', security: auth, requestBody: refBody('StockImport'), responses: { '200': ok() } },
     },
@@ -389,6 +403,16 @@ export const openApiSpec: OpenApiSpec = {
     },
     '/stock/alerts/{id}/resolve': {
       patch: { tags: ['Stock'], summary: 'Resolve stock alert', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', properties: { note: { type: 'string' } } }), responses: { '200': ok() } },
+    },
+    '/stock/receipts': {
+      get: { tags: ['Stock'], summary: 'List goods receipts', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      post: { tags: ['Stock'], summary: 'Create goods receipt', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', required: ['supplier_id', 'paid_amount', 'items'], properties: { supplier_id: { type: 'string', format: 'uuid' }, paid_amount: { type: 'number', minimum: 0 }, note: { type: 'string', nullable: true }, items: { type: 'array', minItems: 1, maxItems: 500 } } }), responses: { '201': ok('Created') } },
+    },
+    '/stock/receipts/{id}': {
+      get: { tags: ['Stock'], summary: 'Get goods receipt detail', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+    },
+    '/stock/receipts/{id}/payment': {
+      patch: { tags: ['Stock'], summary: 'Add goods receipt payment', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['pay_amount'], properties: { pay_amount: { type: 'number', exclusiveMinimum: 0 } } }), responses: { '200': ok() } },
     },
     '/reports/dashboard': {
       get: { tags: ['Reports'], summary: 'Dashboard report', security: auth, parameters: [{ name: 'date', in: 'query', schema: { type: 'string', format: 'date' } }], responses: { '200': ok() } },
@@ -448,6 +472,16 @@ export const openApiSpec: OpenApiSpec = {
         responses: { '200': ok(), '403': ok('Forbidden') },
       },
     },
+    '/reports/ai-inventory': {
+      post: { tags: ['Reports'], summary: 'Generate and save AI inventory analysis', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 365, default: 30 } } }), responses: { '200': ok('Generated and saved') } },
+    },
+    '/reports/ai-inventory/history': {
+      get: { tags: ['Reports'], summary: 'List saved AI inventory analyses', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+    },
+    '/reports/ai-inventory/{id}': {
+      get: { tags: ['Reports'], summary: 'Get saved AI inventory analysis detail', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+      delete: { tags: ['Reports'], summary: 'Delete saved AI inventory analysis', description: 'Roles: admin only', security: auth, parameters: [idParam()], responses: { '200': ok(), '403': ok('Forbidden') } },
+    },
     '/ai/recommendations': {
       get: { tags: ['AI'], summary: 'List AI recommendations', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
     },
@@ -463,20 +497,35 @@ export const openApiSpec: OpenApiSpec = {
     '/ai/suggest-category': {
       post: { tags: ['AI'], summary: 'Suggest product category', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', properties: { name: { type: 'string' }, description: { type: 'string' } } }), responses: { '200': ok() } },
     },
+    '/ai/restock-analysis': {
+      get: { tags: ['AI'], summary: 'Analyze restock needs', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
+    },
+    '/ai/identify-product/{barcode}': {
+      get: { tags: ['AI'], summary: 'Identify product from barcode', description: 'Roles: admin, manager, cashier', security: auth, parameters: [{ name: 'barcode', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': ok() } },
+    },
+    '/ai/suggest-category-image': {
+      post: { tags: ['AI'], summary: 'Suggest category image', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', required: ['categoryName'], properties: { categoryName: { type: 'string' } } }), responses: { '200': ok() } },
+    },
+    '/ai/suggest-supplier': {
+      post: { tags: ['AI'], summary: 'Suggest supplier information', description: 'Roles: admin, manager', security: auth, requestBody: jsonBody({ type: 'object', required: ['supplierName'], properties: { supplierName: { type: 'string' } } }), responses: { '200': ok() } },
+    },
     '/staff': {
       get: { tags: ['Staff'], summary: 'List staff', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
-      post: { tags: ['Staff'], summary: 'Create staff', description: 'Roles: admin, manager', security: auth, requestBody: refBody('StaffCreate'), responses: { '201': ok('Created') } },
+      post: { tags: ['Staff'], summary: 'Create staff', description: 'Roles: admin only', security: auth, requestBody: refBody('StaffCreate'), responses: { '201': ok('Created') } },
     },
     '/staff/{id}': {
-      put: { tags: ['Staff'], summary: 'Update staff', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: refBody('StaffUpdate'), responses: { '200': ok() } },
-      delete: { tags: ['Staff'], summary: 'Deactivate staff', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+      put: { tags: ['Staff'], summary: 'Update staff', description: 'Roles: admin only', security: auth, parameters: [idParam()], requestBody: refBody('StaffUpdate'), responses: { '200': ok() } },
+      delete: { tags: ['Staff'], summary: 'Deactivate staff', description: 'Roles: admin only', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+    },
+    '/staff/{id}/report': {
+      get: { tags: ['Staff'], summary: 'Get staff daily report', description: 'Roles: admin, manager', security: auth, parameters: [idParam(), { name: 'date', in: 'query', required: true, schema: { type: 'string', format: 'date' } }], responses: { '200': ok() } },
     },
     '/settings/operation': {
-      get: { tags: ['Settings'], summary: 'Get operation settings', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
-      put: { tags: ['Settings'], summary: 'Update operation settings', description: 'Roles: admin, manager', security: auth, requestBody: refBody('OperationSettings'), responses: { '200': ok() } },
+      get: { tags: ['Settings'], summary: 'Get operation settings', description: 'Authenticated users', security: auth, responses: { '200': ok() } },
+      put: { tags: ['Settings'], summary: 'Update operation settings', description: 'Roles: admin only', security: auth, requestBody: refBody('OperationSettings'), responses: { '200': ok() } },
     },
     '/settings/operation/defaults': {
-      get: { tags: ['Settings'], summary: 'Operation setting defaults', description: 'Roles: admin, manager', security: auth, responses: { '200': ok() } },
+      get: { tags: ['Settings'], summary: 'Operation setting defaults', description: 'Authenticated users', security: auth, responses: { '200': ok() } },
     },
     '/shifts': {
       get: { tags: ['Shifts'], summary: 'List shift sessions', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
@@ -500,8 +549,47 @@ export const openApiSpec: OpenApiSpec = {
     '/shifts/{id}/close': {
       post: { tags: ['Shifts'], summary: 'Manager closes a cashier shift', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: refBody('ShiftClose'), responses: { '200': ok() } },
     },
+    '/shifts/{id}/cancel': {
+      post: { tags: ['Shifts'], summary: 'Cancel an opened shift', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', properties: { reason: { type: 'string', nullable: true } } }), responses: { '200': ok() } },
+    },
+    '/shifts/active/cash-drawer': {
+      post: { tags: ['Shifts'], summary: 'Record active cash drawer transaction', description: 'Roles: cashier', security: auth, requestBody: jsonBody({ type: 'object', required: ['type', 'amount'], properties: { type: { type: 'string', enum: ['cash_in', 'cash_out'] }, amount: { type: 'number', exclusiveMinimum: 0 }, reason: { type: 'string', nullable: true } } }), responses: { '201': ok() } },
+    },
+    '/shifts/{id}/cash-drawer': {
+      post: { tags: ['Shifts'], summary: 'Record manager cash drawer transaction', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['type', 'amount'], properties: { type: { type: 'string', enum: ['cash_in', 'cash_out'] }, amount: { type: 'number', exclusiveMinimum: 0 }, reason: { type: 'string', nullable: true } } }), responses: { '201': ok() } },
+    },
     '/audit-logs': {
       get: { tags: ['Audit'], summary: 'List audit logs', description: 'Roles: admin, manager. Requires database/enterprise_pos_core.sql.', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+    },
+    '/promotions': {
+      get: { tags: ['Promotions'], summary: 'List promotions', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      post: { tags: ['Promotions'], summary: 'Create promotion', description: 'Roles: admin, manager', security: auth, responses: { '201': ok('Created') } },
+    },
+    '/promotions/{id}': {
+      get: { tags: ['Promotions'], summary: 'Get promotion', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+      put: { tags: ['Promotions'], summary: 'Update promotion', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+      delete: { tags: ['Promotions'], summary: 'Delete promotion', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+    },
+    '/promotions/validate': {
+      post: { tags: ['Promotions'], summary: 'Validate promotion code', security: auth, responses: { '200': ok() } },
+    },
+    '/promotions/auto': {
+      post: { tags: ['Promotions'], summary: 'Find automatic promotions', security: auth, responses: { '200': ok() } },
+    },
+    '/payos/create': {
+      post: { tags: ['Payments'], summary: 'Create PayOS payment link', description: 'Roles: admin, manager, cashier', security: auth, responses: { '200': ok() } },
+    },
+    '/payos/status/{orderCode}': {
+      get: { tags: ['Payments'], summary: 'Get PayOS payment status', description: 'Roles: admin, manager, cashier', security: auth, parameters: [{ name: 'orderCode', in: 'path', required: true, schema: { type: 'integer' } }], responses: { '200': ok() } },
+    },
+    '/payos/webhook': {
+      post: { tags: ['Payments'], summary: 'Receive PayOS webhook', responses: { '200': ok(), '400': ok('Invalid webhook') } },
+    },
+    '/webhooks/supabase-audit': {
+      post: { tags: ['Audit'], summary: 'Receive Supabase audit webhook', responses: { '200': ok(), '401': ok('Unauthorized') } },
+    },
+    '/webhooks/telegram': {
+      post: { tags: ['Payments'], summary: 'Receive Telegram bot webhook', responses: { '200': ok(), '401': ok('Unauthorized') } },
     },
   },
 };

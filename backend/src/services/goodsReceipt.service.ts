@@ -51,6 +51,19 @@ export class GoodsReceiptService {
       expiry_date: String(item.expiry_date || '').trim(),
     }));
 
+    const totalAmount = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+      0,
+    );
+    const paidAmount = Number(input.paid_amount || 0);
+
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+      throw new AppError(400, 'Số tiền đã thanh toán không hợp lệ');
+    }
+    if (paidAmount > totalAmount) {
+      throw new AppError(400, 'Số tiền đã thanh toán không được vượt quá tổng phiếu nhập');
+    }
+
     for (const item of normalizedItems) {
       if (item.quantity <= 0) throw new AppError(400, 'Số lượng nhập phải lớn hơn 0');
       if (item.unit_price < 0) throw new AppError(400, 'Giá nhập không được nhỏ hơn 0');
@@ -67,7 +80,7 @@ export class GoodsReceiptService {
       receipt_number: receiptNumber,
       supplier_id: input.supplier_id || null,
       note: input.note || null,
-      paid_amount: Number(input.paid_amount || 0),
+      paid_amount: paidAmount,
       items: normalizedItems,
     };
 

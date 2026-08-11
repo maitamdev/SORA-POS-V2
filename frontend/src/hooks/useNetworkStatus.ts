@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPendingOrderCount } from '../services/offlineDB';
+import { getPendingOrderSummary } from '../services/offlineDB';
 
 /**
  * Custom hook theo dõi trạng thái kết nối mạng real-time.
@@ -11,11 +11,15 @@ import { getPendingOrderCount } from '../services/offlineDB';
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
+  const [syncingCount, setSyncingCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
 
   const refreshPendingCount = useCallback(async () => {
     try {
-      const count = await getPendingOrderCount();
-      setPendingCount(count);
+      const summary = await getPendingOrderSummary();
+      setPendingCount(summary.total);
+      setSyncingCount(summary.syncing);
+      setFailedCount(summary.failed);
     } catch {
       // IndexedDB chưa sẵn sàng
     }
@@ -27,6 +31,7 @@ export function useNetworkStatus() {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('offline_sync_changed', refreshPendingCount);
 
     // Refresh pending count lúc mount + mỗi khi online status thay đổi
     refreshPendingCount();
@@ -34,6 +39,7 @@ export function useNetworkStatus() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offline_sync_changed', refreshPendingCount);
     };
   }, [refreshPendingCount]);
 
@@ -43,5 +49,5 @@ export function useNetworkStatus() {
     return () => clearInterval(interval);
   }, [refreshPendingCount]);
 
-  return { isOnline, pendingCount, refreshPendingCount };
+  return { isOnline, pendingCount, syncingCount, failedCount, refreshPendingCount };
 }
