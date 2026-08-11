@@ -5,7 +5,6 @@ import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './routes/ProtectedRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { useAuthStore } from './stores/auth.store';
-import { syncAllDataToLocal } from './services/offlineSync';
 
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
@@ -55,7 +54,12 @@ function App() {
     if (!isAuthenticated) return;
 
     const timer = setTimeout(() => {
-      syncAllDataToLocal();
+      // Offline storage is not needed to paint the first authenticated screen.
+      // Load it after the shell is interactive so Dexie and catalog sync do not
+      // inflate the Vercel first-request bundle.
+      import('./services/offlineSync')
+        .then(({ syncAllDataToLocal }) => syncAllDataToLocal())
+        .catch((error) => console.warn('[OfflineSync] Không thể tải trình đồng bộ:', error));
     }, 2000);
 
     return () => clearTimeout(timer);

@@ -52,8 +52,11 @@ export default function CreateReceiptPage() {
 
     const toastId = toast.loading(`Đang tìm sản phẩm có mã: ${code}...`);
     try {
-      const response = await catalogAPI.products.list({ search: code, is_active: true, limit: 5 });
-      const dbMatch = response.data.data.items.find((p: Product) => p.barcode === code || p.sku === code);
+      // Barcode/SKU is an exact lookup. Avoid the paginated fuzzy product search
+      // here: scanners should resolve in one small request even when the catalog
+      // grows to thousands of products.
+      const response = await catalogAPI.products.lookup(code);
+      const dbMatch = response.data.data;
 
       if (dbMatch) {
         handleAddItem(dbMatch);

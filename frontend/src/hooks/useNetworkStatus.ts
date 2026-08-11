@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPendingOrderSummary } from '../services/offlineDB';
+
+type OfflineDatabaseModule = typeof import('../services/offlineDB');
+let offlineDatabaseModule: Promise<OfflineDatabaseModule> | null = null;
+
+const loadOfflineDatabase = () => {
+  offlineDatabaseModule ??= import('../services/offlineDB');
+  return offlineDatabaseModule;
+};
 
 /**
  * Custom hook theo dõi trạng thái kết nối mạng real-time.
@@ -16,6 +23,7 @@ export function useNetworkStatus() {
 
   const refreshPendingCount = useCallback(async () => {
     try {
+      const { getPendingOrderSummary } = await loadOfflineDatabase();
       const summary = await getPendingOrderSummary();
       setPendingCount(summary.total);
       setSyncingCount(summary.syncing);

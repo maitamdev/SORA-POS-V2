@@ -2,8 +2,6 @@ import { memo, Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
-import { startAutoSync, stopAutoSync } from '../../services/offlineSync';
-import { startRealtimeSubscriptions, stopRealtimeSubscriptions } from '../../services/realtimeService';
 import { useAuthStore } from '../../stores/auth.store';
 import { HiOutlineCalendar } from 'react-icons/hi';
 
@@ -100,12 +98,34 @@ const MainLayout = () => {
 
   // Khởi chạy auto-sync + realtime subscriptions khi mount
   useEffect(() => {
-    startAutoSync();
-    startRealtimeSubscriptions();
+    let disposed = false;
+    let offlineSync: typeof import('../../services/offlineSync') | null = null;
+    let realtime: typeof import('../../services/realtimeService') | null = null;
+
+    // These services are operational enhancements, not render prerequisites.
+    // Defer their sizeable dependencies until the authenticated shell is visible.
+    Promise.all([
+      import('../../services/offlineSync'),
+      import('../../services/realtimeService'),
+    ])
+      .then(([offlineModule, realtimeModule]) => {
+        if (disposed) {
+          offlineModule.stopAutoSync();
+          realtimeModule.stopRealtimeSubscriptions();
+          return;
+        }
+
+        offlineSync = offlineModule;
+        realtime = realtimeModule;
+        offlineSync.startAutoSync();
+        realtime.startRealtimeSubscriptions();
+      })
+      .catch((error) => console.warn('[Runtime] Không thể tải dịch vụ nền:', error));
 
     return () => {
-      stopAutoSync();
-      stopRealtimeSubscriptions();
+      disposed = true;
+      offlineSync?.stopAutoSync();
+      realtime?.stopRealtimeSubscriptions();
     };
   }, []);
 
