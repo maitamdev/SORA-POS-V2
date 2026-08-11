@@ -64,3 +64,32 @@ test('replenishment counts only committed purchase orders as incoming supply', (
   assert.match(service, /new Set\(\['approved', 'partially_received', 'ordered', 'in_transit'\]\)/);
   assert.doesNotMatch(service, /new Set\(\['draft', 'pending', 'approved'/);
 });
+
+test('rolling-origin backtest reports zero error for stable demand', () => {
+  const metrics = replenishmentMath.calculateForecastBacktest(Array.from({ length: 90 }, () => 10));
+
+  assert.equal(metrics.samples, 54);
+  assert.equal(metrics.mae, 0);
+  assert.equal(metrics.wape, 0);
+  assert.equal(metrics.bias, 0);
+  assert.equal(metrics.accuracy, 100);
+});
+
+test('rolling-origin backtest exposes under-forecast bias when demand starts late', () => {
+  const metrics = replenishmentMath.calculateForecastBacktest([
+    ...Array.from({ length: 83 }, () => 0),
+    ...Array.from({ length: 7 }, () => 10),
+  ]);
+
+  assert.ok(metrics.wape !== null && metrics.wape >= 90);
+  assert.ok(metrics.bias !== null && metrics.bias <= -90);
+  assert.equal(metrics.accuracy, 0);
+});
+
+test('backtest does not claim accuracy without enough history', () => {
+  const metrics = replenishmentMath.calculateForecastBacktest(Array.from({ length: 36 }, () => 5));
+
+  assert.equal(metrics.samples, 0);
+  assert.equal(metrics.wape, null);
+  assert.equal(metrics.accuracy, null);
+});

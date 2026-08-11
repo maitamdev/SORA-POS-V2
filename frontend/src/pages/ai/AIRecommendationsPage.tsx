@@ -338,6 +338,35 @@ const AIRecommendationsPage = () => {
         </div>
       )}
 
+      {analysis?.forecast_quality && (
+        <section className="grid gap-px border border-slate-200 bg-slate-200 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-white p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Độ chính xác dự báo</p>
+            <p className="mt-2 text-xl font-black text-blue-700">
+              {analysis.forecast_quality.average_wape === null ? 'N/A' : `${analysis.forecast_quality.average_wape}%`}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">WAPE trung bình trên {analysis.forecast_quality.measured_items} SKU</p>
+          </div>
+          <div className="bg-white p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Độ lệch dự báo</p>
+            <p className={`mt-2 text-xl font-black ${Math.abs(analysis.forecast_quality.average_bias || 0) > 20 ? 'text-amber-600' : 'text-emerald-700'}`}>
+              {analysis.forecast_quality.average_bias === null ? 'N/A' : `${analysis.forecast_quality.average_bias}%`}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">Dương: dễ nhập dư · âm: dễ nhập thiếu</p>
+          </div>
+          <div className="bg-white p-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Sai số cao</p>
+            <p className="mt-2 text-xl font-black text-rose-700">{analysis.forecast_quality.high_error_items}</p>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">SKU WAPE trên 45%, bắt buộc duyệt tay</p>
+          </div>
+          <div className="bg-slate-950 p-4 text-white">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-300">Phương pháp</p>
+            <p className="mt-2 text-sm font-black">Rolling-origin 7 ngày</p>
+            <p className="mt-1 text-[10px] font-medium leading-relaxed text-slate-400">Số lượng nhập do engine định lượng tính; AI chỉ diễn giải, không tự ý thay đổi số lượng.</p>
+          </div>
+        </section>
+      )}
+
       {/* KPI CARDS */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
         <div className="report-card border-l-4 border-rose-500 bg-white p-4 shadow-sm">
@@ -440,6 +469,11 @@ const AIRecommendationsPage = () => {
                       {item.data_quality && item.data_quality !== 'ready' && (
                         <span className="border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
                           {dataQualityLabel[item.data_quality]}
+                        </span>
+                      )}
+                      {item.forecast_metrics?.wape !== null && item.forecast_metrics?.wape !== undefined && (
+                        <span className={`border px-1.5 py-0.5 text-[9px] font-bold ${item.forecast_metrics.wape > 45 ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                          WAPE {item.forecast_metrics.wape}%
                         </span>
                       )}
                     </div>

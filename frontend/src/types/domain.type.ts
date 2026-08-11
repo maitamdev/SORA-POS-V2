@@ -137,6 +137,14 @@ export interface AIRecommendation {
   products?: Product;
 }
 
+export interface ForecastMetrics {
+  samples: number;
+  mae: number | null;
+  wape: number | null;
+  bias: number | null;
+  accuracy: number | null;
+}
+
 export interface RestockAnalysisItem {
   id: string;
   sku: string;
@@ -160,6 +168,7 @@ export interface RestockAnalysisItem {
   demand_stddev?: number;
   sales_days_90d?: number;
   sales_trend?: 'up' | 'down' | 'stable';
+  forecast_metrics?: ForecastMetrics;
   forecast_confidence?: 'high' | 'medium' | 'low';
   forecast_method?: 'weighted_velocity' | 'insufficient_demand';
   lead_time_days?: number;
@@ -212,6 +221,13 @@ export interface RestockAnalysis {
     default_target_cover_days: number;
     policy_table_available: boolean;
     incoming_orders_available: boolean;
+  };
+  forecast_quality?: {
+    measured_items: number;
+    average_wape: number | null;
+    average_bias: number | null;
+    high_error_items: number;
+    method: 'rolling_origin_7d';
   };
 }
 

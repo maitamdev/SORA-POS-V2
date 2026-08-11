@@ -4,6 +4,18 @@ export type ReplenishmentPriority = 'high' | 'medium' | 'low';
 export type ReplenishmentStatus = 'out_of_stock' | 'low_stock' | 'needs_restock' | 'healthy';
 export type ForecastConfidence = 'high' | 'medium' | 'low';
 
+export type ForecastMetrics = {
+  samples: number;
+  /** Mean absolute error in units per day. */
+  mae: number | null;
+  /** Weighted absolute percentage error, expressed as 0..100. */
+  wape: number | null;
+  /** Signed forecast bias, expressed as -100..100. Positive means over-forecast. */
+  bias: number | null;
+  /** A display-friendly score derived from WAPE, expressed as 0..100. */
+  accuracy: number | null;
+};
+
 type ProductRow = {
   id: string;
   sku: string;
@@ -42,6 +54,7 @@ type SalesProfile = {
   standardDeviation: number;
   salesDays90: number;
   trend: 'up' | 'down' | 'stable';
+  backtest: ForecastMetrics;
 };
 
 type BatchProfile = {
@@ -61,6 +74,7 @@ export type ReplenishmentItem = ProductRow & {
   demand_stddev: number;
   sales_days_90d: number;
   sales_trend: 'up' | 'down' | 'stable';
+  forecast_metrics: ForecastMetrics;
   forecast_confidence: ForecastConfidence;
   forecast_method: 'weighted_velocity' | 'insufficient_demand';
   target_stock: number;
@@ -105,6 +119,13 @@ export type ReplenishmentAnalysis = {
     policy_table_available: boolean;
     incoming_orders_available: boolean;
   };
+  forecast_quality: {
+    measured_items: number;
+    average_wape: number | null;
+    average_bias: number | null;
+    high_error_items: number;
+    method: 'rolling_origin_7d';
+  };
   warnings: string[];
   summary: {
     total_products: number;
@@ -123,13 +144,15 @@ export type ReplenishmentAnalysis = {
   ai_provider: 'deterministic-v2';
 };
 
-const ENGINE_VERSION = 'replenishment-v2.0';
+const ENGINE_VERSION = 'replenishment-v2.1-backtested';
 const SALES_WINDOW_DAYS = 90;
 const DEFAULT_LEAD_TIME_DAYS = 3;
 const DEFAULT_SERVICE_LEVEL = 0.95;
 const DEFAULT_REVIEW_PERIOD_DAYS = 7;
 const DEFAULT_ORDER_MULTIPLE = 1;
 const DEFAULT_MOQ = 1;
+const BACKTEST_HORIZON_DAYS = 7;
+const BACKTEST_MIN_HISTORY_DAYS = 30;
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 const priorityWeight: Record<ReplenishmentPriority, number> = {
@@ -156,6 +179,61 @@ const roundUpToMultiple = (value: number, multiple: number) => {
   if (value <= 0) return 0;
   const safeMultiple = Math.max(1, Math.ceil(multiple));
   return Math.ceil(value / safeMultiple) * safeMultiple;
+};
+
+const emptyForecastMetrics = (): ForecastMetrics => ({
+  samples: 0,
+  mae: null,
+  wape: null,
+  bias: null,
+  accuracy: null,
+});
+
+const forecastFromHistory = (history: number[]) => {
+  if (history.length === 0) return 0;
+  const average = (windowDays: number) => {
+    const values = history.slice(-Math.min(windowDays, history.length));
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+  return Number((average(7) * 0.45 + average(30) * 0.4 + average(90) * 0.15).toFixed(4));
+};
+
+const calculateForecastBacktest = (
+  values: number[],
+  horizonDays = BACKTEST_HORIZON_DAYS,
+  minHistoryDays = BACKTEST_MIN_HISTORY_DAYS,
+): ForecastMetrics => {
+  if (values.length < minHistoryDays + horizonDays) return emptyForecastMetrics();
+
+  let absoluteError = 0;
+  let signedError = 0;
+  let actualTotal = 0;
+  let samples = 0;
+
+  for (let origin = minHistoryDays; origin + horizonDays <= values.length; origin += 1) {
+    const forecastDaily = forecastFromHistory(values.slice(0, origin));
+    for (let offset = 0; offset < horizonDays; offset += 1) {
+      const actual = Math.max(0, Number(values[origin + offset] || 0));
+      const error = forecastDaily - actual;
+      absoluteError += Math.abs(error);
+      signedError += error;
+      actualTotal += actual;
+    }
+    samples += 1;
+  }
+
+  if (samples === 0) return emptyForecastMetrics();
+  const totalDays = samples * horizonDays;
+  const mae = absoluteError / totalDays;
+  const wape = actualTotal > 0 ? (absoluteError / actualTotal) * 100 : null;
+  const bias = actualTotal > 0 ? (signedError / actualTotal) * 100 : null;
+  return {
+    samples,
+    mae: Number(mae.toFixed(4)),
+    wape: wape === null ? null : Number(wape.toFixed(2)),
+    bias: bias === null ? null : Number(bias.toFixed(2)),
+    accuracy: wape === null ? null : Number(clamp(100 - wape, 0, 100).toFixed(2)),
+  };
 };
 
 const calculateOrderQuantity = (hasDemand: boolean, inventoryPosition: number, reorderPoint: number, targetStock: number, moq: number, orderMultiple: number) => {
@@ -214,22 +292,26 @@ const buildLocalInsight = (item: Pick<ReplenishmentItem,
   | 'forecast_confidence'
   | 'manual_review'
   | 'data_quality'
+  | 'forecast_metrics'
   | 'unit'
 >, targetCoverDays: number) => {
   const unit = item.unit || 'đơn vị';
   const stockDays = item.stock_days === null ? 'chưa đủ dữ liệu' : `${item.stock_days} ngày`;
   const confidence = item.forecast_confidence === 'high' ? 'cao' : item.forecast_confidence === 'medium' ? 'trung bình' : 'thấp';
   const trend = item.sales_trend === 'up' ? 'đang tăng' : item.sales_trend === 'down' ? 'đang giảm' : 'ổn định';
+  const backtest = item.forecast_metrics.wape === null
+    ? 'chưa đủ mẫu backtest'
+    : `WAPE ${item.forecast_metrics.wape}%${item.forecast_metrics.bias === null ? '' : `, bias ${item.forecast_metrics.bias}%`}`;
 
   if (item.manual_review && item.data_quality === 'insufficient_demand') {
     return `Chưa tự động đề xuất nhập vì chưa có đủ dữ liệu bán. Tồn khả dụng hiện tại ${item.available_quantity} ${unit}; cần xác nhận nhu cầu, mùa vụ và mức tồn tối thiểu trước khi đặt hàng.`;
   }
 
   if (item.recommended_quantity > 0) {
-    return `Đề xuất nhập ${item.recommended_quantity} ${unit}. Tồn khả dụng ${item.available_quantity} ${unit}, hàng đang về ${item.incoming_quantity} ${unit}, tốc độ dự báo ${item.average_daily_sales.toFixed(2)}/${unit}/ngày và còn khoảng ${stockDays}. Mục tiêu là ${item.target_stock} ${unit} cho ${targetCoverDays} ngày cover; độ tin cậy dự báo ${confidence}, lead time mặc định ${item.lead_time_days} ngày.`;
+    return `Đề xuất nhập ${item.recommended_quantity} ${unit}. Tồn khả dụng ${item.available_quantity} ${unit}, hàng đang về ${item.incoming_quantity} ${unit}, tốc độ dự báo ${item.average_daily_sales.toFixed(2)}/${unit}/ngày và còn khoảng ${stockDays}. Mục tiêu là ${item.target_stock} ${unit} cho ${targetCoverDays} ngày cover; độ tin cậy ${confidence}, backtest ${backtest}, lead time ${item.lead_time_days} ngày.`;
   }
 
-  return `Chưa cần nhập thêm. Tồn khả dụng ${item.available_quantity} ${unit}, điểm đặt hàng ${item.reorder_point} ${unit}, còn khoảng ${stockDays}; nhu cầu ${trend} và độ tin cậy dự báo ${confidence}.`;
+  return `Chưa cần nhập thêm. Tồn khả dụng ${item.available_quantity} ${unit}, điểm đặt hàng ${item.reorder_point} ${unit}, còn khoảng ${stockDays}; nhu cầu ${trend}, độ tin cậy ${confidence}, backtest ${backtest}.`;
 };
 
 export class InventoryReplenishmentService {
@@ -337,6 +419,7 @@ export class InventoryReplenishmentService {
         standardDeviation: 0,
         salesDays90: 0,
         trend: 'stable',
+        backtest: emptyForecastMetrics(),
       });
       daily.set(id, new Map());
     });
@@ -392,10 +475,11 @@ export class InventoryReplenishmentService {
       profile.avg30 = profile.sold30 / 30;
       profile.avg7 = profile.sold7 / 7;
       profile.salesDays90 = values.filter((value) => value > 0).length;
+      profile.backtest = calculateForecastBacktest(values);
 
       const variance = values.reduce((sum, value) => sum + Math.pow(value - profile.avg30, 2), 0) / 30;
       profile.standardDeviation = Math.sqrt(Math.max(variance, 0));
-      profile.forecastDaily = Number((profile.avg7 * 0.45 + profile.avg30 * 0.4 + profile.avg90 * 0.15).toFixed(4));
+      profile.forecastDaily = forecastFromHistory(values);
 
       if (profile.avg30 > 0) {
         const change = profile.avg7 / profile.avg30 - 1;
@@ -449,24 +533,29 @@ export class InventoryReplenishmentService {
     // order-up-to target for the moment a replenishment decision is triggered.
     const recommendedQuantity = calculateOrderQuantity(hasDemand, inventoryPosition, reorderPoint, targetStock, moq, orderMultiple);
     const stockDays = forecastDaily > 0 ? Number((availableQuantity / forecastDaily).toFixed(1)) : null;
+    const backtest = sales.backtest;
+    const backtestWape = backtest.wape;
+    const hasMeasuredBacktest = backtest.samples >= 8 && backtestWape !== null;
+    const confidence: ForecastConfidence = !hasDemand || !hasMeasuredBacktest
+      ? 'low'
+      : sales.salesDays90 >= 56 && backtestWape <= 25 && Math.abs(backtest.bias || 0) <= 20
+        ? 'high'
+        : sales.salesDays90 >= 28 && backtestWape <= 45 && Math.abs(backtest.bias || 0) <= 30
+          ? 'medium'
+          : 'low';
     const dataQuality: ReplenishmentItem['data_quality'] = !optionalData.policyAvailable || !policy
       ? 'missing_policy'
       : !hasDemand
         ? 'insufficient_demand'
-        : sales.salesDays90 < 28
+        : !hasMeasuredBacktest || sales.salesDays90 < 28
           ? 'low_confidence'
           : 'ready';
-    const confidence: ForecastConfidence = sales.salesDays90 >= 56 && hasDemand
-      ? 'high'
-      : sales.salesDays90 >= 28 && hasDemand
-        ? 'medium'
-        : 'low';
     let alertStatus: ReplenishmentStatus = 'healthy';
     if (availableQuantity <= 0) alertStatus = 'out_of_stock';
     else if (availableQuantity <= minStock) alertStatus = 'low_stock';
     else if (hasDemand && inventoryPosition <= reorderPoint) alertStatus = 'needs_restock';
 
-    const manualReview = !hasDemand || (dataQuality === 'low_confidence' && alertStatus !== 'healthy');
+    const manualReview = !hasDemand || (confidence === 'low' && alertStatus !== 'healthy');
 
     let priority: ReplenishmentPriority = 'low';
     if (hasDemand && (alertStatus === 'out_of_stock' || (stockDays !== null && stockDays <= leadTimeDays))) priority = 'high';
@@ -477,6 +566,11 @@ export class InventoryReplenishmentService {
     if (!optionalData.incomingAvailable) assumptions.push('Chưa có dữ liệu đơn mua đang về');
     if (!optionalData.batchAvailable) assumptions.push('Chưa đọc được tồn theo lô/HSD');
     if (!hasDemand) assumptions.push('Chưa có đủ dữ liệu bán trong 90 ngày');
+    if (!hasMeasuredBacktest) assumptions.push('Chưa đủ dữ liệu để đo độ chính xác dự báo bằng backtest');
+    else {
+      assumptions.push(`Backtest ${backtest.samples} mẫu: MAE ${backtest.mae} đơn vị/ngày, WAPE ${backtest.wape}%`);
+      if (backtest.bias !== null && Math.abs(backtest.bias) > 20) assumptions.push(`Dự báo có bias ${backtest.bias}%, cần duyệt thủ công`);
+    }
     if (batch.expiringSoonQuantity > 0) assumptions.push(`${batch.expiringSoonQuantity} ${product.unit || 'đơn vị'} sắp hết hạn trong 14 ngày`);
 
     const estimatedLostRevenue7d = hasDemand
@@ -505,6 +599,7 @@ export class InventoryReplenishmentService {
       demand_stddev: Number(sales.standardDeviation.toFixed(2)),
       sales_days_90d: sales.salesDays90,
       sales_trend: sales.trend,
+      forecast_metrics: backtest,
       forecast_confidence: confidence,
       forecast_method: hasDemand ? 'weighted_velocity' : 'insufficient_demand',
       target_stock: targetStock,
@@ -580,7 +675,7 @@ export class InventoryReplenishmentService {
         product,
         sales.get(product.id) || {
           sold7: 0, sold30: 0, sold90: 0, avg7: 0, avg30: 0, avg90: 0,
-          forecastDaily: 0, standardDeviation: 0, salesDays90: 0, trend: 'stable',
+          forecastDaily: 0, standardDeviation: 0, salesDays90: 0, trend: 'stable', backtest: emptyForecastMetrics(),
         },
         policies.map.get(product.id),
         batches.map.get(product.id) || { expiredQuantity: 0, expiringSoonQuantity: 0 },
@@ -594,6 +689,16 @@ export class InventoryReplenishmentService {
         || b.recommended_quantity - a.recommended_quantity
         || b.average_daily_sales - a.average_daily_sales);
 
+    const measuredMetrics = items
+      .map((item) => item.forecast_metrics)
+      .filter((metrics) => metrics.wape !== null && metrics.bias !== null);
+    const averageWape = measuredMetrics.length > 0
+      ? Number((measuredMetrics.reduce((sum, metrics) => sum + Number(metrics.wape), 0) / measuredMetrics.length).toFixed(2))
+      : null;
+    const averageBias = measuredMetrics.length > 0
+      ? Number((measuredMetrics.reduce((sum, metrics) => sum + Number(metrics.bias), 0) / measuredMetrics.length).toFixed(2))
+      : null;
+
     return {
       engine_version: ENGINE_VERSION,
       generated_at: new Date().toISOString(),
@@ -606,6 +711,13 @@ export class InventoryReplenishmentService {
         default_target_cover_days: normalizedTargetDays,
         policy_table_available: policies.available,
         incoming_orders_available: incoming.available,
+      },
+      forecast_quality: {
+        measured_items: measuredMetrics.length,
+        average_wape: averageWape,
+        average_bias: averageBias,
+        high_error_items: measuredMetrics.filter((metrics) => Number(metrics.wape) > 45).length,
+        method: 'rolling_origin_7d',
       },
       warnings,
       summary: {
@@ -631,5 +743,7 @@ export const replenishmentMath = {
   roundUpToMultiple,
   calculateOrderQuantity,
   zScoreForServiceLevel,
+  forecastFromHistory,
+  calculateForecastBacktest,
   calculateSafetyStock: (standardDeviation: number, leadTimeDays: number, reviewPeriodDays: number, serviceLevel = DEFAULT_SERVICE_LEVEL) => Math.max(0, Math.ceil(zScoreForServiceLevel(serviceLevel) * Math.max(0, standardDeviation) * Math.sqrt(Math.max(1, leadTimeDays + reviewPeriodDays)))),
 };
