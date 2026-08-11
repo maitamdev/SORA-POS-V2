@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { HiOutlineStatusOffline, HiOutlineStatusOnline, HiOutlineCloudUpload } from 'react-icons/hi';
 
@@ -11,25 +11,28 @@ import { HiOutlineStatusOffline, HiOutlineStatusOnline, HiOutlineCloudUpload } f
 const NetworkStatusBar = () => {
   const { isOnline, pendingCount } = useNetworkStatus();
   const [showReconnected, setShowReconnected] = useState(false);
-  const [wasOffline, setWasOffline] = useState(false);
+  const wasOfflineRef = useRef(false);
 
   // Theo dõi trạng thái chuyển đổi offline → online
   useEffect(() => {
     if (!isOnline) {
-      setWasOffline(true);
+      wasOfflineRef.current = true;
       setShowReconnected(false);
-    } else if (wasOffline && isOnline) {
-      // Vừa online trở lại
-      setShowReconnected(true);
-      setWasOffline(false);
+      return;
+    }
 
-      const timer = setTimeout(() => {
+    if (wasOfflineRef.current) {
+      // Vừa online trở lại
+      wasOfflineRef.current = false;
+      setShowReconnected(true);
+
+      const timer = window.setTimeout(() => {
         setShowReconnected(false);
       }, 4000);
 
-      return () => clearTimeout(timer);
+      return () => window.clearTimeout(timer);
     }
-  }, [isOnline, wasOffline]);
+  }, [isOnline]);
 
   // Khi online bình thường và không có gì cần hiển thị → ẩn
   if (isOnline && !showReconnected && pendingCount === 0) {
