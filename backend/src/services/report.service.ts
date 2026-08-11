@@ -3,6 +3,8 @@ import { supabase } from '../config/supabase';
 import { env } from '../config/env';
 import { appCache, stableCacheKey } from '../utils/cache';
 import { parsePagination } from '../utils/query';
+import { InventoryReplenishmentService } from './inventoryReplenishment.service';
+import { z } from 'zod';
 
 
 const getVietnamTime = (dateInput: Date | string = new Date()) => {
@@ -34,6 +36,15 @@ const parseLocalDate = (dateStr: string) => {
 };
 
 type AnalysisHistoryQuery = Record<string, unknown>;
+
+const aiRevenueNarrativeSchema = z.object({
+  health_score: z.number().finite().optional(),
+  summary: z.string().trim().min(1).max(4000).optional(),
+  insights: z.array(z.string().trim().min(1).max(1400)).min(3).max(5).optional(),
+  recommendations: z.array(z.string().trim().min(1).max(1400)).min(3).max(5).optional(),
+});
+
+const clampScore = (value: number) => Math.round(Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0)));
 
 export class ReportService {
   static async dashboard(dateStr?: string, days = 7) {
@@ -634,9 +645,65 @@ export class ReportService {
     //  SYSTEM INSTRUCTION — Enterprise Financial Analyst
     // ═══════════════════════════════════════════════════════════════════
 
-    if (!env.groqApiKey) {
-      throw new AppError(400, 'Groq API Key chưa được cấu hình ở Backend');
-    }
+    const deterministicCharts = [
+      {
+        title: 'Cơ cấu doanh thu theo danh mục',
+        type: 'pie' as const,
+        data: category_sales.slice(0, 12).map((item) => ({ name: item.name, value: Number(item.value || 0) })),
+      },
+      {
+        title: 'Biến động doanh thu theo ngày',
+        type: 'bar' as const,
+        data: revenueTrend.slice(-14).map((item) => ({ name: fmtDate(item.date), value: Number(item.revenue || 0) })),
+      },
+      {
+        title: 'Lợi nhuận gộp theo ngày (VND)',
+        type: 'line' as const,
+        data: revenueTrend.slice(-14).map((item) => ({ name: fmtDate(item.date), value: Number(item.profit || 0) })),
+      },
+      {
+        title: 'Top 5 sản phẩm theo doanh thu',
+        type: 'bar' as const,
+        data: topProductsRaw.slice(0, 5).map((item) => ({ name: item.product_name, value: Number(item.revenue || 0) })),
+      },
+      {
+        title: 'Cơ cấu phương thức thanh toán',
+        type: 'pie' as const,
+        data: payment_stats.map((item) => ({ name: item.name, value: Number(item.percentage || 0) })),
+      },
+    ];
+
+    const marginScore = clampScore(profitMargin <= 0 ? 0 : (profitMargin / 35) * 100);
+    const growthScore = wowGrowth === null ? 50 : clampScore(50 + wowGrowth * 2);
+    const stabilityScore = clampScore(100 - revenueVolatility);
+    const diversificationScore = clampScore(100 - Math.max(0, top2Share - 35) * 1.5);
+    const operationScore = clampScore((activeDays.length / Math.max(days, 1)) * 100);
+    const deterministicHealthScore = clampScore(
+      marginScore * 0.3 + growthScore * 0.25 + stabilityScore * 0.2 + diversificationScore * 0.15 + operationScore * 0.1,
+    );
+    const growthLabel = wowGrowth === null ? 'chưa đủ dữ liệu so sánh WoW' : `${wowGrowth >= 0 ? '+' : ''}${pct(wowGrowth)} WoW`;
+    const localAnalysis = {
+      health_score: deterministicHealthScore,
+      summary: `Hiệu quả kinh doanh kỳ này ở mức ${deterministicHealthScore >= 70 ? 'tốt' : deterministicHealthScore >= 40 ? 'cần cải thiện' : 'cảnh báo'}. Doanh thu đạt ${money(totalRevenue)} từ ${totalOrders} đơn, biên lợi nhuận gộp ${pct(profitMargin)} và giá trị đơn trung bình ${money(averageOrderVal)}. ${growthLabel}; có ${zeroDays.length}/${days} ngày không phát sinh doanh thu. Rủi ro chính là mức tập trung top 2 sản phẩm ${pct(top2Share)} và khả năng biến động doanh thu ${pct(revenueVolatility)}.`,
+      insights: [
+        `Doanh thu đạt ${money(totalRevenue)} với ${totalOrders} đơn; AOV ${money(averageOrderVal)} phản ánh giá trị giao dịch bình quân trong kỳ.`,
+        `Biên lợi nhuận gộp ${pct(profitMargin)} trên COGS ${money(totalCogs)}; ${profitMargin >= 25 ? 'mức biên đang hỗ trợ vận hành' : 'cần ưu tiên rà soát giá vốn và chính sách giá'}.`,
+        `${growthLabel}; doanh thu bình quân ngày có hoạt động là ${money(avgDailyRevenue)}, với độ biến động ${pct(revenueVolatility)}.`,
+        `Top 2 sản phẩm đóng góp ${pct(top2Share)} doanh thu; mức tập trung được đánh giá ${concentrationRisk.toLowerCase()}, cần theo dõi rủi ro phụ thuộc.`,
+        `${zeroDays.length} ngày không có doanh thu trong ${days} ngày; tỷ lệ ngày hoạt động đạt ${(activeDays.length / Math.max(days, 1) * 100).toFixed(0)}%.`,
+      ],
+      recommendations: [
+        `[CAO] Theo dõi biên lợi nhuận hàng tuần; mục tiêu giữ Gross Margin tối thiểu ${Math.max(25, Math.round(profitMargin)).toFixed(0)}% trong 30 ngày tới.`,
+        `[CAO] Tập trung tăng doanh thu ở nhóm sản phẩm ngoài top 2; mục tiêu giảm tỷ trọng top 2 từ ${pct(top2Share)} xuống dưới ${Math.max(40, Math.round(top2Share - 5))}%.`,
+        `[TRUNG BÌNH] Xử lý ${zeroDays.length} ngày không doanh thu bằng lịch bán hàng, combo và nhắc tồn kho; đo số đơn/ngày và tỷ lệ ngày hoạt động.`,
+        `[TRUNG BÌNH] Rà soát ${payment_stats.find((item) => item.percentage === Math.max(...payment_stats.map((payment) => payment.percentage)))?.name || 'phương thức thanh toán'} đang chiếm tỷ trọng cao để tối ưu phí và đối soát.`,
+        `[DÀI HẠN] Thiết lập ngưỡng theo dõi WoW và Gross Margin trong báo cáo định kỳ; kích hoạt cảnh báo khi điểm sức khỏe xuống dưới 60/100.`,
+      ],
+      charts: deterministicCharts,
+      ai_provider: 'local-rules',
+    };
+    let parsedAnalysis: typeof localAnalysis = localAnalysis;
+    let aiProvider = 'local-rules';
 
     const systemInstruction = `Bạn là Trưởng phòng Kiểm soát Tài chính (Financial Controller) tại một tập đoàn bán lẻ, với 15+ năm kinh nghiệm phân tích P&L, quản trị doanh thu và tối ưu vận hành cửa hàng.
 
@@ -754,41 +821,51 @@ ${revenueTrendList}
 
 Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc yêu cầu. Đảm bảo health_score phản ánh khách quan, insights phân tích sâu với root cause, recommendations khả thi với KPI cụ thể, và biểu đồ dùng đúng số liệu thực tế.`;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemInstruction },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 4000,
-      }),
-    });
+    if (env.groqApiKey) {
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.groqApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemInstruction },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 4000,
+          }),
+        });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new AppError(500, `Lỗi khi gọi Groq API: ${errText}`);
-    }
-
-    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const analysisResult = data.choices?.[0]?.message?.content?.trim();
-    if (!analysisResult) {
-      throw new AppError(500, 'Không nhận được kết quả phân tích từ Groq API');
-    }
-
-    let parsedAnalysis;
-    try {
-      parsedAnalysis = JSON.parse(analysisResult);
-    } catch (error) {
-      console.error('Lỗi parse JSON từ AI:', analysisResult);
-      throw new AppError(500, 'AI trả về dữ liệu không đúng định dạng JSON');
+        if (response.ok) {
+          const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+          const analysisResult = data.choices?.[0]?.message?.content?.trim();
+          if (analysisResult) {
+            const candidate = JSON.parse(analysisResult) as unknown;
+            const validated = aiRevenueNarrativeSchema.safeParse(candidate);
+            if (validated.success) {
+              parsedAnalysis = {
+                ...localAnalysis,
+                summary: validated.data.summary || localAnalysis.summary,
+                insights: validated.data.insights?.slice(0, 5) || localAnalysis.insights,
+                recommendations: validated.data.recommendations?.slice(0, 5) || localAnalysis.recommendations,
+                ai_provider: 'groq',
+              };
+              aiProvider = 'groq';
+            } else {
+              console.warn('[aiAnalysis] Groq response failed schema validation; keeping deterministic analysis.');
+            }
+          }
+        } else {
+          console.warn(`[aiAnalysis] Groq returned HTTP ${response.status}; keeping deterministic analysis.`);
+        }
+      } catch (error) {
+        console.error('[aiAnalysis] Groq fallback to deterministic analysis:', error);
+      }
     }
 
     const generatedAt = new Date().toISOString();
@@ -812,7 +889,16 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
         revenue_volatility: Number(revenueVolatility.toFixed(2)),
         wow_growth: wowGrowth === null ? null : Number(wowGrowth.toFixed(2)),
         top2_share: Number(top2Share.toFixed(2)),
+        health_score: deterministicHealthScore,
+        score_breakdown: {
+          margin: marginScore,
+          growth: growthScore,
+          stability: stabilityScore,
+          diversification: diversificationScore,
+          operation: operationScore,
+        },
       },
+      analysis_source: aiProvider,
       generated_at: generatedAt,
     };
 
@@ -848,6 +934,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
       analysis: parsedAnalysis,
       generated_at: generatedAt,
       days,
+      ai_provider: aiProvider,
       saved_report: savedAnalysis
     };
   }
@@ -927,6 +1014,168 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
   }
 
   /** Build inventory intelligence metrics (deterministic — charts/tables use this). */
+  /** Canonical inventory report projection backed by the same replenishment engine as /ai/restock-analysis. */
+  private static async buildInventoryMetricsV2(days: number) {
+    const replenishment = await InventoryReplenishmentService.analyze(days);
+    const today = startOfDay();
+    const rangeStart = new Date(today);
+    rangeStart.setDate(rangeStart.getDate() - (days - 1));
+
+    const relationName = (value: unknown) => {
+      if (Array.isArray(value)) return String((value[0] as { name?: string } | undefined)?.name || '');
+      return String((value as { name?: string } | null | undefined)?.name || '');
+    };
+
+    type ReportRow = {
+      id: string;
+      name: string;
+      sku: string;
+      unit: string;
+      stock_quantity: number;
+      min_stock_level: number;
+      cost_price: number;
+      sell_price: number;
+      category: string;
+      supplier: string;
+      stock_value: number;
+      retail_value: number;
+      sold_qty: number;
+      sold_revenue: number;
+      avg_daily_sales: number;
+      sales_speed_recent: number;
+      sales_trend: 'up' | 'down' | 'stable';
+      stock_days: number | null;
+      recommended_qty: number;
+      restock_cost: number;
+      status: 'out_of_stock' | 'low_stock' | 'needs_restock' | 'dead_stock' | 'overstock' | 'healthy';
+      priority: 'critical' | 'high' | 'medium' | 'low';
+    };
+
+    const rows: ReportRow[] = replenishment.items.map((item) => {
+      const soldQty = Math.max(0, Math.round((item.sales_speed_90d || 0) * replenishment.sales_window_days));
+      const stockValue = Math.round(item.stock_quantity * Number(item.cost_price || 0));
+      const retailValue = Math.round(item.stock_quantity * Number(item.sell_price || 0));
+      const status: ReportRow['status'] = item.alert_status !== 'healthy'
+        ? item.alert_status
+        : soldQty === 0 && stockValue > 0
+          ? 'dead_stock'
+          : item.stock_days !== null && item.stock_days > replenishment.target_days * 3
+            ? 'overstock'
+            : 'healthy';
+      const priority: ReportRow['priority'] = status === 'out_of_stock' && item.average_daily_sales > 0
+        ? 'critical'
+        : item.priority;
+
+      return {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        unit: item.unit,
+        stock_quantity: item.stock_quantity,
+        min_stock_level: item.min_stock_level,
+        cost_price: Number(item.cost_price || 0),
+        sell_price: Number(item.sell_price || 0),
+        category: relationName(item.categories) || 'Chưa phân loại',
+        supplier: relationName(item.suppliers) || 'Chưa liên kết',
+        stock_value: stockValue,
+        retail_value: retailValue,
+        sold_qty: soldQty,
+        sold_revenue: Math.round(soldQty * Number(item.sell_price || 0)),
+        avg_daily_sales: item.average_daily_sales,
+        sales_speed_recent: item.sales_speed_7d,
+        sales_trend: item.sales_trend,
+        stock_days: item.stock_days,
+        recommended_qty: item.recommended_quantity,
+        restock_cost: item.restock_cost,
+        status,
+        priority,
+      };
+    });
+
+    const outOfStock = rows.filter((row) => row.status === 'out_of_stock').length;
+    const lowStock = rows.filter((row) => row.status === 'low_stock').length;
+    const needsRestock = rows.filter((row) => row.status === 'needs_restock').length;
+    const deadStock = rows.filter((row) => row.status === 'dead_stock').length;
+    const overstock = rows.filter((row) => row.status === 'overstock').length;
+    const safe = rows.filter((row) => row.status === 'healthy').length;
+    const totalStockValue = rows.reduce((sum, row) => sum + row.stock_value, 0);
+    const totalRetailValue = rows.reduce((sum, row) => sum + row.retail_value, 0);
+    const deadStockRows = rows.filter((row) => row.status === 'dead_stock').sort((a, b) => b.stock_value - a.stock_value).slice(0, 15);
+    const deadStockValue = rows.filter((row) => row.status === 'dead_stock').reduce((sum, row) => sum + row.stock_value, 0);
+    const restockPlan = rows
+      .filter((row) => row.recommended_qty > 0 && ['out_of_stock', 'low_stock', 'needs_restock'].includes(row.status))
+      .sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.priority] - ({ critical: 0, high: 1, medium: 2, low: 3 }[b.priority]) || b.recommended_qty - a.recommended_qty))
+      .slice(0, 20);
+    const risingDemand = rows.filter((row) => row.sales_trend === 'up' && row.sold_qty > 0).sort((a, b) => b.sales_speed_recent - a.sales_speed_recent).slice(0, 12);
+    const fallingDemand = rows.filter((row) => row.sales_trend === 'down' && row.sold_qty > 0).sort((a, b) => a.sales_speed_recent - b.sales_speed_recent).slice(0, 10);
+    const demandMismatch = rows.filter((row) => row.sales_trend === 'up' && ['out_of_stock', 'low_stock', 'needs_restock'].includes(row.status)).sort((a, b) => b.avg_daily_sales - a.avg_daily_sales).slice(0, 10);
+    const topStockValue = [...rows].sort((a, b) => b.stock_value - a.stock_value).slice(0, 10);
+
+    const categoryMap = new Map<string, { name: string; product_count: number; low_count: number; stock_value: number; sold_qty: number }>();
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    for (const item of replenishment.items) {
+      const id = item.category_id || 'uncategorized';
+      const name = relationName(item.categories) || 'Chưa phân loại';
+      const row = rowById.get(item.id);
+      const category = categoryMap.get(id) || { name, product_count: 0, low_count: 0, stock_value: 0, sold_qty: 0 };
+      category.product_count += 1;
+      category.low_count += row && ['out_of_stock', 'low_stock', 'needs_restock'].includes(row.status) ? 1 : 0;
+      category.stock_value += row?.stock_value || 0;
+      category.sold_qty += row?.sold_qty || 0;
+      categoryMap.set(id, category);
+    }
+
+    const totalProducts = Math.max(rows.length, 1);
+    const availabilityScore = Math.max(0, 100 - (outOfStock / totalProducts) * 50 - (lowStock / totalProducts) * 30);
+    const capitalScore = totalStockValue > 0
+      ? Math.max(0, 100 - (deadStockValue / totalStockValue) * 100)
+      : 70;
+    const turnoverScore = rows.filter((row) => row.sold_qty > 0).length / totalProducts * 100;
+    const mismatchPenalty = Math.min(30, demandMismatch.length * 4);
+    const healthScore = Math.round(Math.min(100, Math.max(0, availabilityScore * 0.4 + capitalScore * 0.25 + turnoverScore * 0.25 + (100 - mismatchPenalty) * 0.1)));
+    const statusDistribution = [
+      { name: 'Hết hàng', value: outOfStock, key: 'out_of_stock' },
+      { name: 'Tồn thấp', value: lowStock, key: 'low_stock' },
+      { name: 'Sắp thiếu', value: needsRestock, key: 'needs_restock' },
+      { name: 'Hàng tồn lâu', value: deadStock, key: 'dead_stock' },
+      { name: 'An toàn', value: safe, key: 'healthy' },
+    ].filter((entry) => entry.value > 0);
+
+    return {
+      days,
+      target_days: replenishment.target_days,
+      period_start: getLocalDateString(rangeStart),
+      period_end: getLocalDateString(today),
+      kpis: {
+        total_products: rows.length,
+        out_of_stock: outOfStock,
+        low_stock: lowStock,
+        needs_restock: needsRestock,
+        dead_stock: deadStock,
+        overstock,
+        safe,
+        total_stock_value: Math.round(totalStockValue),
+        total_retail_value: Math.round(totalRetailValue),
+        estimated_restock_cost: replenishment.summary.estimated_restock_cost,
+        estimated_lost_revenue_7d: replenishment.summary.estimated_lost_revenue_7d,
+        health_score: healthScore,
+        score_breakdown: {
+          availability: Math.round(availabilityScore),
+          capital_efficiency: Math.round(capitalScore),
+          turnover: Math.round(turnoverScore),
+        },
+      },
+      status_distribution: statusDistribution,
+      category_breakdown: Array.from(categoryMap.entries()).map(([id, value]) => ({ id, ...value })).sort((a, b) => b.stock_value - a.stock_value),
+      restock_plan: restockPlan,
+      dead_stock: deadStockRows,
+      rising_demand: risingDemand,
+      falling_demand: fallingDemand,
+      top_stock_value: topStockValue,
+      demand_mismatch: demandMismatch,
+    };
+  }
+
   private static async buildInventoryMetrics(days: number) {
     const targetDays = 14;
     const today = startOfDay();
@@ -1276,7 +1525,7 @@ Phân tích toàn diện dữ liệu trên và trả về JSON theo cấu trúc 
 
   static async aiInventoryAnalysis(days = 30, generatedBy?: string) {
     const safeDays = Math.min(Math.max(Number(days) || 30, 7), 90);
-    const metrics = await this.buildInventoryMetrics(safeDays);
+    const metrics = await this.buildInventoryMetricsV2(safeDays);
     const charts = this.buildInventoryCharts(metrics);
     const local = this.buildLocalInventoryNarrative(metrics);
     const money = (v: number) => `${Math.round(v || 0).toLocaleString('vi-VN')} VND`;

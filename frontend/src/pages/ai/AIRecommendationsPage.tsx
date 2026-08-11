@@ -42,6 +42,25 @@ const statusColorClass: Record<string, string> = {
   rejected: 'bg-red-100 text-red-600 border-red-200',
 };
 
+const confidenceLabel: Record<string, string> = {
+  high: 'Tin cậy cao',
+  medium: 'Tin cậy vừa',
+  low: 'Cần kiểm tra',
+};
+
+const confidenceClass: Record<string, string> = {
+  high: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  medium: 'border-blue-200 bg-blue-50 text-blue-700',
+  low: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
+const dataQualityLabel: Record<string, string> = {
+  ready: 'Dữ liệu đủ',
+  low_confidence: 'Dữ liệu hạn chế',
+  insufficient_demand: 'Chưa đủ nhu cầu',
+  missing_policy: 'Dùng mặc định',
+};
+
 const formatNumber = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 const money = (value: number) => `${Math.round(value || 0).toLocaleString('vi-VN')}đ`;
 
@@ -200,6 +219,9 @@ const AIRecommendationsPage = () => {
   const summary = analysis?.summary;
 
   const totalEstimatedCost = useMemo(() => {
+    if (typeof analysis?.summary.estimated_restock_cost === 'number') {
+      return analysis.summary.estimated_restock_cost;
+    }
     return (analysis?.items || [])
       .filter(i => i.alert_status !== 'healthy')
       .reduce((sum, item) => {
@@ -263,8 +285,61 @@ const AIRecommendationsPage = () => {
         </div>
       </header>
 
+      <section className="grid grid-cols-1 gap-0 border border-slate-200 bg-white lg:grid-cols-[1.4fr_1fr]">
+        <div className="border-b border-slate-200 border-l-4 border-l-blue-600 px-5 py-4 lg:border-b-0 lg:border-r">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center bg-blue-600 text-white">
+              <FiZap className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">Quyết định nhập hàng</p>
+                <span className="border border-blue-200 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-blue-700">
+                  {analysis?.engine_version || 'replenishment-v2'}
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-bold text-slate-900">Số lượng do hệ thống tính, AI chỉ giải thích</p>
+              <p className="mt-1 max-w-2xl text-[11px] font-medium leading-relaxed text-slate-500">
+                Công thức dùng tốc độ bán, lead time, tồn an toàn, hàng đang về và quy cách nhập. Các mặt hàng thiếu dữ liệu sẽ được đánh dấu để quản lý duyệt thủ công.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-slate-200 bg-slate-50/60">
+          <div className="px-4 py-4">
+            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Tổng cần nhập</p>
+            <p className="mt-2 text-xl font-black tabular-nums text-blue-700">{formatNumber(summary?.total_recommended_quantity || 0)}</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">đơn vị</p>
+          </div>
+          <div className="px-4 py-4">
+            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Ngân sách dự kiến</p>
+            <p className="mt-2 text-sm font-black tabular-nums text-slate-900">{money(totalEstimatedCost)}</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">giá vốn</p>
+          </div>
+          <div className="px-4 py-4">
+            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Cần xem xét</p>
+            <p className="mt-2 text-xl font-black tabular-nums text-amber-600">{summary?.manual_review_items || 0}</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-slate-500">SKU</p>
+          </div>
+        </div>
+      </section>
+
+      {analysis?.warnings && analysis.warnings.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-2.5">
+            <FiAlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">Cần hoàn thiện dữ liệu để tăng độ chính xác</p>
+              <ul className="mt-1 space-y-0.5 text-[11px] font-medium text-amber-800">
+                {analysis.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPI CARDS */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
         <div className="report-card border-l-4 border-rose-500 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-red-500 tracking-wider">Hết hàng</p>
           <p className="mt-2 text-2xl font-bold text-red-700">{summary?.out_of_stock || 0}</p>
@@ -300,6 +375,11 @@ const AIRecommendationsPage = () => {
             </span>
           </div>
           <p className="text-[10px] text-blue-400 font-medium mt-0.5">tăng / giảm</p>
+        </div>
+        <div className="report-card border-l-4 border-rose-400 bg-white p-4 shadow-sm">
+          <p className="text-[10px] font-bold uppercase text-rose-600 tracking-wider">Rủi ro mất doanh thu</p>
+          <p className="mt-2 text-sm font-black tabular-nums text-rose-700">{money(summary?.estimated_lost_revenue_7d || 0)}</p>
+          <p className="text-[10px] text-rose-400 font-medium mt-0.5">ước tính 7 ngày</p>
         </div>
         <div className="report-card border-l-4 border-slate-400 bg-white p-4 shadow-sm">
           <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Chi phí nhập</p>
@@ -351,6 +431,18 @@ const AIRecommendationsPage = () => {
                   <td className="px-4 py-3.5">
                     <p className="font-bold text-slate-800 text-xs">{item.name}</p>
                     <p className="mt-0.5 text-[10px] font-medium text-slate-400">{item.sku}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {item.forecast_confidence && (
+                        <span className={`border px-1.5 py-0.5 text-[9px] font-bold ${confidenceClass[item.forecast_confidence]}`}>
+                          {confidenceLabel[item.forecast_confidence]}
+                        </span>
+                      )}
+                      {item.data_quality && item.data_quality !== 'ready' && (
+                        <span className="border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                          {dataQualityLabel[item.data_quality]}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3.5">
                     <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold ${alertColorClass[item.alert_status] || 'bg-slate-200 text-slate-600'}`}>
@@ -363,7 +455,15 @@ const AIRecommendationsPage = () => {
                   <td className="px-3 py-3.5 text-center">
                     <TrendBadge trend={item.sales_trend} />
                   </td>
-                  <td className="px-3 py-3.5 text-right font-bold text-slate-800 text-xs tabular-nums">{formatNumber(item.stock_quantity)}</td>
+                  <td className="px-3 py-3.5 text-right text-xs tabular-nums">
+                    <span className="font-black text-slate-800">{formatNumber(item.stock_quantity)}</span>
+                    {item.available_quantity !== undefined && item.available_quantity !== item.stock_quantity && (
+                      <span className="block text-[9px] font-bold text-blue-600">khả dụng {formatNumber(item.available_quantity)}</span>
+                    )}
+                    {item.incoming_quantity !== undefined && item.incoming_quantity > 0 && (
+                      <span className="block text-[9px] font-bold text-emerald-600">đang về +{formatNumber(item.incoming_quantity)}</span>
+                    )}
+                  </td>
                   <td className="px-3 py-3.5 text-right font-medium text-slate-500 text-xs tabular-nums">{formatNumber(item.min_stock_level)}</td>
                   <td className="px-3 py-3.5">
                     <StockDaysBar stockDays={item.stock_days} targetDays={analysis?.target_days || targetDays} />
@@ -374,10 +474,23 @@ const AIRecommendationsPage = () => {
                       <span className="block text-[9px] text-slate-400 font-medium">(7d: {Number(item.sales_speed_7d).toFixed(1)})</span>
                     )}
                   </td>
-                  <td className="px-3 py-3.5 text-right font-bold text-blue-700 text-xs tabular-nums">{formatNumber(item.recommended_quantity)}</td>
+                  <td className="px-3 py-3.5 text-right text-xs tabular-nums">
+                    <span className="font-black text-blue-700">{formatNumber(item.recommended_quantity)}</span>
+                    {item.restock_cost !== undefined && item.restock_cost > 0 && (
+                      <span className="block text-[9px] font-bold text-slate-400">{money(item.restock_cost)}</span>
+                    )}
+                    {item.manual_review && (
+                      <span className="mt-1 block border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">Duyệt tay</span>
+                    )}
+                  </td>
                   <td className="max-w-sm px-4 py-3.5">
                     <div className="bg-slate-50/80 rounded-lg p-2.5 border border-slate-100">
                       {renderFormattedText(item.ai_insight)}
+                      {item.assumptions && item.assumptions.length > 0 && (
+                        <div className="mt-2 border-t border-slate-200 pt-2 text-[10px] font-semibold text-slate-500">
+                          <span className="font-black text-slate-700">Giả định:</span> {item.assumptions.join(' · ')}
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>

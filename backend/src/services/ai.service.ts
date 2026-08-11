@@ -2,6 +2,7 @@ import { env } from '../config/env';
 import { AppError } from '../utils/AppError';
 import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
+import { InventoryReplenishmentService, ReplenishmentItem } from './inventoryReplenishment.service';
 import dns from 'node:dns';
 import { promisify } from 'node:util';
 
@@ -406,64 +407,12 @@ Sử dụng Markdown:
   }
 
   static async analyzeRestock(targetDays = 14, productId?: string) {
-    const normalizedTargetDays = this.normalizeTargetDays(targetDays);
-    let query = supabase
-      .from('products')
-      .select('id, sku, name, stock_quantity, min_stock_level, unit, cost_price, sell_price, category_id, supplier_id, categories(name), suppliers(name)')
-      .eq('is_active', true);
-
-    if (productId) query = query.eq('id', productId);
-
-    const { data: products, error } = await query;
-    if (error) throw new AppError(500, error.message);
-
-    const candidates = (products || []) as Candidate[];
-
-    // Fetch latest pending/approved recommendations to map saved insights
-    const { data: savedRecs } = await supabase
-      .from('ai_recommendations')
-      .select('product_id, ai_insight')
-      .in('status', ['pending', 'approved'])
-      .order('created_at', { ascending: false });
-
-    const savedRecsMap = new Map<string, string>();
-    if (savedRecs) {
-      for (const rec of savedRecs) {
-        if (rec.product_id && rec.ai_insight && !savedRecsMap.has(rec.product_id)) {
-          savedRecsMap.set(rec.product_id, rec.ai_insight);
-        }
-      }
-    }
-
-    const salesMetricsMap = await this.getProductSalesMetrics(
-      candidates.map((product) => product.id)
-    );
-
-    const items = candidates
-      .map((product) => this.toAnalysisItem(
-        product,
-        salesMetricsMap.get(product.id) || { speed30d: 0, speed7d: 0, trend: 'stable' },
-        normalizedTargetDays,
-        savedRecsMap.get(product.id)
-      ))
-      .sort((a, b) => {
-        const priorityCompare = priorityWeight[a.priority] - priorityWeight[b.priority];
-        if (priorityCompare !== 0) return priorityCompare;
-        return b.recommended_quantity - a.recommended_quantity;
-      });
-
-    return {
-      target_days: normalizedTargetDays,
-      sales_window_days: 30,
-      summary: this.buildSummary(items),
-      items,
-      ai_provider: this.aiProviderName(),
-    };
+    return InventoryReplenishmentService.analyze(targetDays, productId);
   }
 
 
-  private static async saveRecommendation(item: RestockAnalysisItem, userId?: string) {
-    const payload = {
+  private static async saveRecommendation(item: ReplenishmentItem, userId?: string) {
+    const basePayload = {
       product_id: item.id,
       current_stock: item.stock_quantity,
       min_stock_level: item.min_stock_level,
@@ -474,6 +423,18 @@ Sử dụng Markdown:
       ai_insight: item.ai_insight,
       status: 'pending',
       created_by: userId || null,
+    };
+    const extendedPayload = {
+      ...basePayload,
+      engine_version: 'replenishment-v2.0',
+      forecast_confidence: item.forecast_confidence,
+      inventory_position: item.inventory_position,
+      lead_time_days: item.lead_time_days,
+      reorder_point: item.reorder_point,
+      safety_stock: item.safety_stock,
+      incoming_quantity: item.incoming_quantity,
+      data_quality: item.data_quality,
+      snapshot: item,
     };
 
     // Tìm gợi ý cũ (pending hoặc rejected) để thay thế thay vì tạo mới
@@ -488,13 +449,18 @@ Sử dụng Markdown:
 
     if (findError) throw new AppError(500, findError.message);
 
-    const query = existing
-      ? supabase.from('ai_recommendations').update(payload).eq('id', existing.id)
-      : supabase.from('ai_recommendations').insert(payload);
+    const save = async (payload: Record<string, unknown>) => {
+      const query = existing
+        ? supabase.from('ai_recommendations').update(payload).eq('id', existing.id)
+        : supabase.from('ai_recommendations').insert(payload);
+      return query.select('*, products(id, sku, name, unit, stock_quantity)').single();
+    };
 
-    const { data: recommendation, error } = await query
-      .select('*, products(id, sku, name, unit, stock_quantity)')
-      .single();
+    let { data: recommendation, error } = await save(extendedPayload);
+    if (error && /column|schema cache|does not exist/i.test(error.message)) {
+      // Backward-compatible until inventory_replenishment_v2.sql is applied.
+      ({ data: recommendation, error } = await save(basePayload));
+    }
 
     if (error) throw new AppError(400, error.message);
     return recommendation;
@@ -503,10 +469,12 @@ Sử dụng Markdown:
   static async generateRecommendations(targetDays = 14, userId?: string, productId?: string) {
     const analysis = await this.analyzeRestock(targetDays, productId);
     const actionableItems = analysis.items.filter(
-      (item) => item.alert_status !== 'healthy' || Boolean(productId)
+      (item) => (item.alert_status !== 'healthy' && (item.recommended_quantity > 0 || item.manual_review)) || Boolean(productId)
     );
 
     const created = [];
+    let aiNarrativeCalls = 0;
+    const maxAiNarrativeCalls = 12;
     for (const item of actionableItems) {
       const now = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
       const stockDaysLeft = item.average_daily_sales > 0
@@ -546,7 +514,7 @@ Sử dụng Markdown:
       const sellThroughDays = speed30d > 0 
         ? Math.ceil(item.recommended_quantity / speed30d) 
         : null;
-      const stockAfterImport = item.stock_quantity + item.recommended_quantity;
+      const stockAfterImport = item.inventory_position + item.recommended_quantity;
       const statusText =
         item.alert_status === 'out_of_stock'
           ? 'HẾT HÀNG'
@@ -556,7 +524,20 @@ Sử dụng Markdown:
               ? 'SẮP THIẾU'
               : 'AN TOÀN';
 
+      const replenishmentContext = [
+        `Available stock: ${item.available_quantity} ${item.unit}`,
+        `Incoming stock: ${item.incoming_quantity} ${item.unit}`,
+        `Inventory position: ${item.inventory_position} ${item.unit}`,
+        `Lead time: ${item.lead_time_days} days`,
+        `Safety stock: ${item.safety_stock} ${item.unit}`,
+        `Reorder point: ${item.reorder_point} ${item.unit}`,
+        `Forecast confidence: ${item.forecast_confidence}`,
+        `Data quality: ${item.data_quality}`,
+        item.assumptions.length > 0 ? `Assumptions: ${item.assumptions.join('; ')}` : '',
+      ].filter(Boolean).join(' | ');
+
       const prompt = [
+        `REPLENISHMENT ENGINE INPUT: ${replenishmentContext}`,
         `═══ BÁO CÁO PHÂN TÍCH SẢN PHẨM ═══`,
         `Thời điểm: ${now}`,
         ``,
@@ -604,7 +585,9 @@ Sử dụng Markdown:
         `Nếu thiếu dữ liệu mùa vụ hoặc lead time, nói rõ "chưa có dữ liệu" và đưa giả định bảo thủ.`,
       ].filter(Boolean).join('\n');
 
-      const aiInsight = (await this.groqInsight(prompt)) || item.ai_insight;
+      const aiInsight = env.groqApiKey && aiNarrativeCalls < maxAiNarrativeCalls
+        ? ((aiNarrativeCalls += 1), (await this.groqInsight(prompt)) || item.ai_insight)
+        : item.ai_insight;
       created.push(await this.saveRecommendation({ ...item, ai_insight: aiInsight }, userId));
     }
 

@@ -155,7 +155,33 @@ export interface RestockAnalysisItem {
   reason: string;
   ai_insight: string;
   sales_speed_7d?: number;
+  sales_speed_30d?: number;
+  sales_speed_90d?: number;
+  demand_stddev?: number;
+  sales_days_90d?: number;
   sales_trend?: 'up' | 'down' | 'stable';
+  forecast_confidence?: 'high' | 'medium' | 'low';
+  forecast_method?: 'weighted_velocity' | 'insufficient_demand';
+  lead_time_days?: number;
+  review_period_days?: number;
+  safety_stock?: number;
+  reorder_point?: number;
+  inventory_position?: number;
+  on_hand_quantity?: number;
+  available_quantity?: number;
+  incoming_quantity?: number;
+  reserved_quantity?: number;
+  expired_quantity?: number;
+  expiring_soon_quantity?: number;
+  target_cover_days?: number;
+  moq?: number;
+  order_multiple?: number;
+  service_level?: number;
+  restock_cost?: number;
+  estimated_lost_revenue_7d?: number;
+  manual_review?: boolean;
+  data_quality?: 'ready' | 'low_confidence' | 'insufficient_demand' | 'missing_policy';
+  assumptions?: string[];
 }
 
 export interface RestockAnalysis {
@@ -169,9 +195,24 @@ export interface RestockAnalysis {
     healthy: number;
     total_recommended_quantity: number;
     urgent_items: number;
+    low_confidence_items?: number;
+    manual_review_items?: number;
+    estimated_restock_cost?: number;
+    estimated_lost_revenue_7d?: number;
   };
   items: RestockAnalysisItem[];
   ai_provider: string;
+  engine_version?: string;
+  generated_at?: string;
+  warnings?: string[];
+  policy?: {
+    default_lead_time_days: number;
+    default_service_level: number;
+    default_review_period_days: number;
+    default_target_cover_days: number;
+    policy_table_available: boolean;
+    incoming_orders_available: boolean;
+  };
 }
 
 export interface BarcodeProductSuggestion {
