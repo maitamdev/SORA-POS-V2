@@ -69,16 +69,12 @@ dialog,
   border-radius: 24px 0 0 24px !important;
 }
 
-.order-detail-card {
-  border-radius: 16px !important;
+.receipt-paper {
+  border-radius: 4px !important;
 }
 
 .order-detail-control {
   border-radius: 10px !important;
-}
-
-.order-detail-chip {
-  border-radius: 9999px !important;
 }
 
 @media (max-width: 639px) {

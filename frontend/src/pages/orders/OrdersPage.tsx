@@ -3,12 +3,13 @@ import toast from 'react-hot-toast';
 import {
   FiCalendar, FiRefreshCw, FiUser, FiX,
   FiEye, FiTrash2, FiFileText, FiCheck,
-  FiAlertCircle, FiClock, FiSearch, FiCreditCard,
-  FiCheckCircle, FiMail, FiPackage, FiPhone
+  FiAlertCircle, FiSearch, FiCreditCard,
+  FiCheckCircle, FiMail
 } from 'react-icons/fi';
 import { orderAPI } from '../../services/order.api';
 import { Order } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
+import { usePOSStore } from '../../stores/pos.store';
 
 const money = (value: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -63,6 +64,7 @@ const paymentStyles = {
 
 const OrdersPage = () => {
   const { user } = useAuthStore();
+  const operationSettings = usePOSStore((s) => s.operationSettings);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
@@ -590,211 +592,212 @@ const OrdersPage = () => {
           />
 
           <div className="pointer-events-none fixed inset-y-0 right-0 flex w-full justify-end">
-            <aside className="order-detail-shell pointer-events-auto flex h-full w-full max-w-[560px] flex-col border-l border-slate-200 bg-slate-50 shadow-[-18px_0_50px_rgba(15,23,42,0.16)] animate-slideLeft">
-              {/* Header */}
-              <div className="shrink-0 border-b border-slate-200 border-t-4 border-blue-600 bg-white px-5 pb-4 pt-3 text-slate-950 sm:px-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600">
-                      <FiFileText size={19} />
+              <aside className="order-detail-shell pointer-events-auto flex h-full w-full max-w-[520px] flex-col border-l border-slate-200 bg-slate-100 shadow-[-18px_0_50px_rgba(15,23,42,0.14)] animate-slideLeft">
+                {/* Header */}
+                <div className="shrink-0 border-b border-slate-200 border-t-4 border-blue-600 bg-white px-4 py-3 text-slate-950 sm:px-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`order-detail-control flex h-10 w-10 shrink-0 items-center justify-center border ${selected.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
+                        {selected.status === 'completed' ? <FiCheckCircle size={19} /> : <FiAlertCircle size={19} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-black uppercase tracking-[0.16em] ${selected.status === 'completed' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {selected.status === 'completed' ? 'Thanh toán thành công' : 'Hóa đơn đã hủy'}
+                        </p>
+                        <h2 id="order-detail-title" className="mt-0.5 text-sm font-black text-slate-950">Hóa đơn bán hàng</h2>
+                        <p className="mt-0.5 truncate font-mono text-[10px] font-semibold text-slate-500">{selected.order_number}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Hóa đơn bán lẻ</p>
-                      <h2 id="order-detail-title" className="mt-1 text-xl font-black tracking-tight text-slate-950">Chi tiết hóa đơn</h2>
-                      <p className="mt-1 truncate font-mono text-[11px] font-semibold text-slate-500">{selected.order_number}</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(null)}
+                      aria-label="Đóng chi tiết hóa đơn"
+                      className="order-detail-control inline-flex h-9 w-9 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+                    >
+                      <FiX size={17} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(null)}
-                    aria-label="Đóng chi tiết hóa đơn"
-                    className="order-detail-control inline-flex h-9 w-9 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
-                  >
-                    <FiX size={17} />
-                  </button>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-                    <FiClock size={13} className="text-blue-600" />
-                    <span>{formatDate(selected.created_at)}</span>
+                {/* Email action follows the checkout receipt layout. */}
+                <div className="shrink-0 border-b border-slate-200 bg-blue-50/50 px-4 py-3 sm:px-5">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="order-detail-control flex h-7 w-7 shrink-0 items-center justify-center border border-blue-100 bg-white text-blue-600">
+                      <FiMail size={13} />
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-700">Gửi email hóa đơn</p>
                   </div>
-                  <span className={`order-detail-chip inline-flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${selected.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${selected.status === 'completed' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                    {selected.status === 'completed' ? 'Thành công' : 'Đã hủy'}
-                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      aria-label="Email nhận hóa đơn"
+                      placeholder="Nhập email nhận hóa đơn..."
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      className="order-detail-control h-9 min-w-0 flex-1 border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!emailInput.trim()) {
+                          toast.error('Vui lòng nhập email');
+                          return;
+                        }
+                        setIsSending(true);
+                        try {
+                          await orderAPI.sendInvoiceEmail(selected.id, emailInput);
+                          toast.success('Đã gửi email hóa đơn thành công!');
+                        } catch (err: any) {
+                          toast.error(err.response?.data?.message || 'Gửi email thất bại');
+                        } finally {
+                          setIsSending(false);
+                        }
+                      }}
+                      disabled={isSending}
+                      className="order-detail-control inline-flex h-9 min-w-[64px] items-center justify-center gap-1.5 bg-blue-600 px-3 text-[11px] font-black text-white transition hover:bg-blue-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSending ? <FiRefreshCw className="animate-spin" size={13} /> : <FiMail size={13} />}
+                      <span>{isSending ? 'Đang gửi' : 'Gửi'}</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Body */}
-              <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6">
-                {detailLoading ? (
-                  <div className="animate-pulse space-y-4">
-                    <div className="order-detail-card h-48 border border-slate-200 bg-white" />
-                    <div className="order-detail-card h-64 border border-slate-200 bg-white" />
-                    <div className="order-detail-card h-40 border border-blue-100 bg-blue-50/70" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <section className="order-detail-card border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Giao dịch</p>
-                          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-950">Biên nhận bán lẻ</h3>
-                          <p className="mt-1 text-xs font-semibold text-slate-500">Thông tin đơn hàng và khách mua</p>
-                        </div>
-                        <div className={`order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border ${selected.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
-                          {selected.status === 'completed' ? <FiCheckCircle size={22} /> : <FiAlertCircle size={22} />}
+                {/* Body: compact version of the checkout receipt. */}
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 px-3 py-4 sm:px-5">
+                  {detailLoading ? (
+                    <div className="mx-auto max-w-[460px] animate-pulse space-y-3">
+                      <div className="receipt-paper h-32 border border-slate-200 bg-white" />
+                      <div className="receipt-paper h-52 border border-slate-200 bg-white" />
+                      <div className="receipt-paper h-40 border border-slate-200 bg-slate-50" />
+                    </div>
+                  ) : (
+                    <article className="receipt-paper mx-auto max-w-[460px] overflow-hidden border border-slate-300 bg-white shadow-[0_4px_18px_rgba(15,23,42,0.08)]">
+                      <div className="p-5 pb-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <h1 className="text-lg font-bold uppercase leading-none tracking-tight text-slate-900">{operationSettings.storeName || 'SORA MART'}</h1>
+                            <div className="mt-2 space-y-0.5">
+                              {operationSettings.branchName && <p className="text-[10px] font-medium text-slate-500">{operationSettings.branchName}</p>}
+                              {operationSettings.address && <p className="text-[10px] font-medium text-slate-500">{operationSettings.address}</p>}
+                              {operationSettings.hotline && <p className="text-[10px] font-medium text-slate-500">SĐT: {operationSettings.hotline}</p>}
+                              {operationSettings.taxCode && <p className="text-[10px] font-medium text-slate-500">MST: {operationSettings.taxCode}</p>}
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <h3 className="text-lg font-bold uppercase leading-none tracking-wider text-slate-900">HÓA ĐƠN</h3>
+                            <p className="mt-1 max-w-[132px] truncate font-mono text-[10px] font-semibold text-slate-700">{selected.order_number}</p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+                      <div className="mx-5 grid grid-cols-3 gap-3 border-y border-slate-300 py-3">
                         <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Khách hàng</p>
-                          <p className="mt-1 truncate text-sm font-black text-slate-900">{selected.customers?.name || 'Khách lẻ'}</p>
+                          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Khách hàng</p>
+                          <p className="truncate text-[11px] font-bold text-slate-800">{selected.customers?.name || 'Khách lẻ'}</p>
+                          {selected.customers?.phone && <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{selected.customers.phone}</p>}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thanh toán</p>
-                          <p className="mt-1 truncate text-sm font-black text-slate-900">{paymentLabels[getPaymentMethod(selected)]}</p>
+                          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Thu ngân</p>
+                          <p className="truncate text-[11px] font-bold text-slate-800">{selected.users?.full_name || 'Quản trị hệ thống'}</p>
                         </div>
-                        {selected.customers?.phone && (
-                          <div className="min-w-0">
-                            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400"><FiPhone size={11} /> Điện thoại</p>
-                            <p className="mt-1 text-sm font-black text-slate-900">{selected.customers.phone}</p>
+                        <div className="min-w-0 text-right">
+                          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Ngày giờ</p>
+                          <p className="text-[10px] font-bold leading-snug text-slate-800">{formatDate(selected.created_at)}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-1 overflow-x-auto">
+                        <table className="w-full min-w-[390px] border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-300">
+                              <th className="w-[44%] bg-slate-50 px-5 py-2.5 text-left text-[9px] font-bold uppercase tracking-wider text-slate-600">Sản phẩm</th>
+                              <th className="w-[12%] bg-slate-50 px-2 py-2.5 text-center text-[9px] font-bold uppercase tracking-wider text-slate-600">SL</th>
+                              <th className="w-[22%] bg-slate-50 px-2 py-2.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">Đơn giá</th>
+                              <th className="w-[22%] bg-slate-50 px-5 py-2.5 text-right text-[9px] font-bold uppercase tracking-wider text-slate-600">Thành tiền</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selected.order_details?.map((item, index) => (
+                              <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} border-b border-slate-100`}>
+                                <td className="px-5 py-2.5">
+                                  <p className="break-words text-[11px] font-semibold leading-tight text-slate-800">{item.product_name}</p>
+                                </td>
+                                <td className="px-2 py-2.5 text-center text-[11px] font-semibold text-slate-700">{item.quantity}</td>
+                                <td className="whitespace-nowrap px-2 py-2.5 text-right text-[11px] text-slate-600">{money(item.unit_price)}</td>
+                                <td className="whitespace-nowrap px-5 py-2.5 text-right text-[11px] font-bold text-slate-900">{money(item.subtotal)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex justify-end px-5 py-4">
+                        <div className="w-60 space-y-1.5">
+                          <div className="flex justify-between gap-4 text-[11px]">
+                            <span className="font-semibold text-slate-500">Tạm tính:</span>
+                            <span className="font-bold text-slate-700">{money(selected.total_amount || 0)}</span>
+                          </div>
+                          {selected.discount_amount > 0 && (
+                            <div className="flex justify-between gap-4 text-[11px]">
+                              <span className="font-semibold text-slate-500">Chiết khấu:</span>
+                              <span className="font-bold text-red-600">-{money(selected.discount_amount)}</span>
+                            </div>
+                          )}
+                          <div className="mt-1 flex items-center justify-between gap-4 border-t border-slate-300 pt-2">
+                            <span className="text-sm font-bold text-slate-900">Tổng cộng:</span>
+                            <span className="text-base font-bold text-slate-900">{money(selected.final_amount)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mx-5 border-t border-slate-300 py-3.5 space-y-1.5">
+                        <div className="flex justify-between gap-4 text-[11px]">
+                          <span className="font-semibold text-slate-500">Phương thức thanh toán:</span>
+                          <span className="text-right font-bold text-slate-800">{getPaymentMethod(selected) === 'transfer' ? 'Chuyển khoản QR' : paymentLabels[getPaymentMethod(selected)]}</span>
+                        </div>
+                        {getPaymentMethod(selected) === 'cash' && Number(selected.payments?.[0]?.received_amount || 0) > 0 && (
+                          <div className="flex justify-between gap-4 text-[11px]">
+                            <span className="font-semibold text-slate-500">Khách đưa:</span>
+                            <span className="font-bold text-slate-800">{money(Number(selected.payments?.[0]?.received_amount || 0))}</span>
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mã hóa đơn</p>
-                          <p className="mt-1 truncate font-mono text-[11px] font-bold text-slate-700">{selected.order_number}</p>
-                        </div>
+                        {getPaymentMethod(selected) === 'cash' && Number(selected.payments?.[0]?.change_amount || 0) > 0 && (
+                          <div className="flex justify-between gap-4 text-[11px]">
+                            <span className="font-semibold text-slate-500">Tiền thừa:</span>
+                            <span className="font-bold text-emerald-700">{money(Number(selected.payments?.[0]?.change_amount || 0))}</span>
+                          </div>
+                        )}
                       </div>
 
                       {selected.note && (
-                        <div className="mt-4 border-l-2 border-blue-500 bg-blue-50/70 px-3 py-2.5">
-                          <p className="text-[10px] font-black uppercase tracking-wider text-blue-700">Ghi chú</p>
-                          <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-700">"{selected.note}"</p>
+                        <div className="mx-5 mb-3 border border-slate-200 bg-slate-50 px-3 py-2">
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Ghi chú</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-700">"{selected.note}"</p>
                         </div>
                       )}
-                    </section>
 
-                    <section className="order-detail-card border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                      <div className="flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Chi tiết đơn</p>
-                          <h3 className="mt-1 text-lg font-black tracking-tight text-slate-950">Danh sách hàng hóa</h3>
-                        </div>
-                        <span className="order-detail-chip shrink-0 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">
-                          {selected.order_details?.length || 0} món
-                        </span>
+                      <div className="border-t border-slate-200 bg-slate-50/60 px-4 py-4 text-center">
+                        <p className="text-[11px] font-bold text-slate-700">{operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!'}</p>
+                        <p className="mt-0.5 text-[10px] font-medium text-slate-500">Hẹn gặp lại quý khách!</p>
+                        <p className="mt-3 text-[8px] font-bold uppercase tracking-wider text-slate-400">Powered by Sora POS</p>
                       </div>
-
-                      <div className="mt-4 space-y-2">
-                        {selected.order_details?.map((item, index) => (
-                          <div key={item.id} className="order-detail-card flex items-center gap-3 border border-slate-200 bg-slate-50/70 p-3 transition hover:border-blue-200 hover:bg-blue-50/40">
-                            <div className="order-detail-control flex h-9 w-9 shrink-0 items-center justify-center border border-blue-100 bg-white font-mono text-[10px] font-black text-blue-600">
-                              {String(index + 1).padStart(2, '0')}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-black leading-tight text-slate-900">{item.product_name}</p>
-                              <p className="mt-1 flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
-                                <FiPackage size={11} /> {item.quantity} x {money(item.unit_price)}
-                              </p>
-                            </div>
-                            <p className="shrink-0 text-right font-mono text-sm font-black text-slate-950">{money(item.subtotal)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className="order-detail-card border border-blue-100 bg-blue-50/70 p-5 text-slate-900 shadow-[0_10px_24px_rgba(37,99,235,0.06)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">Thanh toán</p>
-                          <h3 className="mt-1 text-lg font-black tracking-tight">Tóm tắt giao dịch</h3>
-                        </div>
-                        <FiCreditCard className="text-blue-600" size={22} />
-                      </div>
-
-                      <div className="mt-5 space-y-3 text-xs font-semibold">
-                        <div className="flex items-center justify-between gap-4 text-slate-500">
-                          <span>Tổng tiền hàng</span>
-                          <span className="font-mono font-bold text-slate-700">{money(selected.total_amount || 0)}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4 text-slate-500">
-                          <span>Chiết khấu / Giảm giá</span>
-                          <span className="font-mono font-bold text-rose-600">-{money(selected.discount_amount || 0)}</span>
-                        </div>
-                        <div className="flex items-end justify-between gap-4 border-t border-blue-100 pt-4">
-                          <span className="font-black text-slate-800">Khách thanh toán</span>
-                          <span className="font-mono text-xl font-black text-blue-700">{money(selected.final_amount)}</span>
-                        </div>
-                      </div>
-                    </section>
-
-                    <p className="pb-1 text-center text-[11px] font-semibold text-slate-400">Cảm ơn quý khách đã mua hàng tại Sora POS.</p>
-                  </div>
-                )}
-              </div>
+                    </article>
+                  )}
+                </div>
 
               {/* Footer Actions */}
-              <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="order-detail-control flex h-9 w-9 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600">
-                    <FiMail size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-slate-900">Gửi hóa đơn qua email</p>
-                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">Hóa đơn sẽ được gửi đến khách hàng.</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="relative min-w-0 flex-1">
-                    <FiMail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input
-                      type="email"
-                      placeholder="Nhập email khách hàng..."
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      className="order-detail-control h-11 w-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!emailInput.trim()) {
-                        toast.error('Vui lòng nhập email');
-                        return;
-                      }
-                      setIsSending(true);
-                      try {
-                        await orderAPI.sendInvoiceEmail(selected.id, emailInput);
-                        toast.success('Đã gửi email hóa đơn thành công!');
-                      } catch (err: any) {
-                        toast.error(err.response?.data?.message || 'Gửi email thất bại');
-                      } finally {
-                        setIsSending(false);
-                      }
-                    }}
-                    disabled={isSending}
-                    className="order-detail-control inline-flex h-11 min-w-[78px] items-center justify-center gap-1.5 bg-blue-600 px-4 text-xs font-black text-white transition hover:bg-blue-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isSending ? <FiRefreshCw className="animate-spin" size={14} /> : <FiMail size={14} />}
-                    <span>{isSending ? 'Đang gửi' : 'Gửi'}</span>
-                  </button>
-                </div>
-
-                {selected.status !== 'cancelled' && user?.role !== 'cashier' && (
+              {selected.status !== 'cancelled' && user?.role !== 'cashier' && (
+                <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-5">
                   <button
                     type="button"
                     onClick={() => cancel(selected)}
-                    className="order-detail-control mt-3 inline-flex h-10 w-full items-center justify-center gap-2 border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 transition hover:bg-rose-100 active:translate-y-px"
+                    className="order-detail-control inline-flex h-10 w-full items-center justify-center gap-2 border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 transition hover:bg-rose-100 active:translate-y-px"
                   >
                     <FiTrash2 size={14} />
                     Yêu cầu hủy hóa đơn này
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </aside>
           </div>
         </div>
