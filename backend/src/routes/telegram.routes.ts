@@ -31,6 +31,11 @@ router.post(
   '/telegram',
   rateLimitMiddleware({ keyPrefix: 'webhook-telegram', windowMs: 60_000, max: 120 }),
   asyncHandler(async (req: Request, res: Response) => {
+  if (env.nodeEnv === 'production' && !env.telegramWebhookSecret) {
+    res.status(503).json({ success: false, message: 'TELEGRAM_WEBHOOK_SECRET is not configured' });
+    return;
+  }
+
   if (env.telegramWebhookSecret) {
     const providedSecret = req.header('X-Telegram-Bot-Api-Secret-Token') || '';
     if (providedSecret !== env.telegramWebhookSecret) {
