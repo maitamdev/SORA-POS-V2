@@ -155,6 +155,7 @@ const priorityLabelInv: Record<string, string> = {
 
 const ReportsPage = () => {
   const navigate = useNavigate();
+  const [activeReportTab, setActiveReportTab] = useState<'revenue' | 'inventory'>('revenue');
   const [days, setDays] = useState(30);
   const [revenue, setRevenue] = useState<RevenuePoint[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
@@ -592,10 +593,14 @@ const ReportsPage = () => {
       {/* HEADER SECTION */}
       <header className="-order-20 flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Thống kê doanh thu</h1>
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
+            {activeReportTab === 'revenue' ? 'Báo cáo doanh thu' : 'Báo cáo tồn kho'}
+          </h1>
           <p className="text-xs font-semibold text-slate-500 mt-1 flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Báo cáo tài chính doanh nghiệp: Doanh thu, Giá vốn hàng bán (COGS), Lợi nhuận và Lợi nhuận gộp
+            {activeReportTab === 'revenue'
+              ? 'Theo dõi doanh thu, giá vốn hàng bán (COGS), lợi nhuận và hiệu quả bán hàng.'
+              : 'Theo dõi sức khỏe tồn kho, tốc độ bán, kế hoạch nhập và hàng tồn lâu.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -613,19 +618,51 @@ const ReportsPage = () => {
             </select>
           </div>
 
-          {/* Export button */}
-          <button
-            onClick={handleExportToCsv}
-            className="flex items-center gap-2 h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/10 transition-all active:scale-[0.98]"
-          >
-            <HiOutlineDownload className="w-4 h-4" />
-            <span>Xuất CSV</span>
-          </button>
+          {activeReportTab === 'revenue' && (
+            <button
+              onClick={handleExportToCsv}
+              className="flex items-center gap-2 h-11 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/10 transition-all active:scale-[0.98]"
+            >
+              <HiOutlineDownload className="w-4 h-4" />
+              <span>Xuất CSV</span>
+            </button>
+          )}
         </div>
       </header>
 
+      <nav className="report-card flex w-full flex-wrap items-center gap-1 border border-slate-200 bg-white p-1 shadow-sm" role="tablist" aria-label="Loại báo cáo">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeReportTab === 'revenue'}
+          onClick={() => setActiveReportTab('revenue')}
+          className={`report-control inline-flex min-h-10 flex-1 items-center justify-center gap-2 px-4 text-xs font-black transition sm:flex-none ${
+            activeReportTab === 'revenue'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+          }`}
+        >
+          <HiTrendUp className="h-4 w-4" />
+          Báo cáo doanh thu
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeReportTab === 'inventory'}
+          onClick={() => setActiveReportTab('inventory')}
+          className={`report-control inline-flex min-h-10 flex-1 items-center justify-center gap-2 px-4 text-xs font-black transition sm:flex-none ${
+            activeReportTab === 'inventory'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+          }`}
+        >
+          <FiPackage className="h-4 w-4" />
+          Báo cáo tồn kho
+        </button>
+      </nav>
+
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={`${activeReportTab === 'revenue' ? '' : 'hidden'} grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4`}>
         {/* Card 1: Revenue */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-slate-300">
           <div className="flex items-center justify-between">
@@ -694,7 +731,7 @@ const ReportsPage = () => {
       </div>
 
       {/* AI REVENUE REPORT ASSISTANT — AUTO-LOADED */}
-      <section className="report-panel border-t-4 border-blue-600 bg-white p-6 shadow-sm">
+      <section className={`${activeReportTab === 'revenue' ? '' : 'hidden'} report-panel border-t-4 border-blue-600 bg-white p-6 shadow-sm`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
@@ -1001,7 +1038,7 @@ const ReportsPage = () => {
       </section>
 
       {/* CHARTS AND LISTS SECTION */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className={`${activeReportTab === 'revenue' ? '' : 'hidden'} grid grid-cols-1 gap-6 lg:grid-cols-3`}>
         {/* REVENUE VS COGS VS PROFIT CHART */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
           <div>
@@ -1156,7 +1193,7 @@ const ReportsPage = () => {
       </section>
 
       {/* ═══════════════ AI BÁO CÁO KHO (ENTERPRISE) ═══════════════ */}
-      <section className="report-panel -order-10 overflow-hidden border border-slate-200 bg-white shadow-sm">
+      <section className={`${activeReportTab === 'inventory' ? '' : 'hidden'} report-panel -order-10 overflow-hidden border border-slate-200 bg-white shadow-sm`}>
         <div className="flex flex-col gap-3 border-t-4 border-blue-600 border-b border-slate-200 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="report-card flex h-11 w-11 items-center justify-center bg-blue-50 text-blue-600">
