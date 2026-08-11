@@ -453,7 +453,7 @@ const StaffPage = () => {
               }}
             >
               <div className="app-modal-panel w-full max-w-xl overflow-hidden border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="staff-modal-title">
-                <div className="border-t-4 border-blue-600 px-5 pb-4 pt-4 sm:px-6">
+                <div className="px-5 pb-4 pt-4 sm:px-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-blue-50 text-blue-600">
