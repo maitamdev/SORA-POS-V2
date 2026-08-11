@@ -58,7 +58,7 @@ export class ReportService {
       revenueTrend,
       categoryAndPaymentRawData,
       recentOrdersResult,
-      alertsResult,
+      stockProductsResult,
       topProductsRaw
     ] = await Promise.all([
       // Task 1: Fetch summary orders for today and yesterday
@@ -101,13 +101,13 @@ export class ReportService {
         .order('created_at', { ascending: false })
         .limit(5),
 
-      // Task 6: Fetch low stock products list
+      // Task 6: Fetch actual product stock so the dashboard does not depend on stale stock_alerts rows
       supabase
-        .from('stock_alerts')
-        .select('current_stock, min_stock_level, status, products(id, name, image_url)')
-        .in('status', ['low_stock', 'out_of_stock'])
-        .order('current_stock', { ascending: true })
-        .limit(4),
+        .from('products')
+        .select('id, name, image_url, stock_quantity, min_stock_level')
+        .eq('is_active', true)
+        .order('stock_quantity', { ascending: true })
+        .limit(1000),
 
       // Task 7: Fetch top products (raw list of IDs)
       this.topProducts(days, 5, today)
@@ -119,12 +119,15 @@ export class ReportService {
     if (stockCounts[1].error) throw new AppError(500, stockCounts[1].error.message);
     if (categoryAndPaymentRawData.error) throw new AppError(500, categoryAndPaymentRawData.error.message);
     if (recentOrdersResult.error) throw new AppError(500, recentOrdersResult.error.message);
-    if (alertsResult.error) throw new AppError(500, alertsResult.error.message);
+    if (stockProductsResult.error) throw new AppError(500, stockProductsResult.error.message);
 
     const orders = summaryOrdersData.data || [];
     const rangeOrders = categoryAndPaymentRawData.data || [];
     const recentOrders = recentOrdersResult.data || [];
-    const alerts = alertsResult.data || [];
+    const stockProducts = stockProductsResult.data || [];
+    const lowStockProducts = stockProducts.filter(
+      (product) => Number(product.stock_quantity || 0) <= Number(product.min_stock_level || 0),
+    );
 
     const todayCompletedOrders = orders.filter(
       (o) => o.status === 'completed' && o.created_at >= today.toISOString()
@@ -307,15 +310,15 @@ export class ReportService {
       };
     });
 
-    // Dependent Task 5 parsing: Low stock alert products
-    const low_stock_products = alerts.map((a) => {
-      const p = a.products as any;
+    // Dependent Task 5 parsing: Low stock products from actual inventory
+    const low_stock_products = lowStockProducts.slice(0, 4).map((product) => {
+      const stock = Number(product.stock_quantity || 0);
       return {
-        id: p?.id || '',
-        name: p?.name || 'Sản phẩm không tên',
-        stock: a.current_stock,
-        alert_status: a.current_stock === 0 ? 'Rất thấp' : a.current_stock <= 5 ? 'Rất thấp' : 'Thấp',
-        image_url: p?.image_url || '/assets/logo.png',
+        id: product.id,
+        name: product.name || 'Sản phẩm không tên',
+        stock,
+        alert_status: stock <= 0 ? 'Hết hàng' : 'Tồn thấp',
+        image_url: product.image_url || '/assets/logo.png',
       };
     });
 
@@ -343,7 +346,8 @@ export class ReportService {
         today_orders_growth: todayOrdersGrowth,
         today_sold_products: todaySoldProducts,
         today_sold_growth: todaySoldGrowth,
-        low_stock_count: stockCounts[0].count || 0,
+        // Bao gồm cả tồn thấp và hết hàng, giống cách trang Kho tính KPI.
+        low_stock_count: lowStockProducts.length,
         new_low_stock_count: stockCounts[1].count || 0,
         today_cogs: todayCogs,
         today_profit: todayProfit,
