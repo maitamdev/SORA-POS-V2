@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { HiOutlineEye, HiOutlineEyeOff, HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi';
 import { loginSchema, LoginFormData } from '../../validations/login.schema';
 import { useAuthStore } from '../../stores/auth.store';
-import logoUrl from '../../assets/sorapos-logo.svg';
+import logoUrl from '../../assets/new-logo.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();
