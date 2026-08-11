@@ -20,6 +20,32 @@ CREATE INDEX IF NOT EXISTS idx_product_batches_product_id ON public.product_batc
 CREATE INDEX IF NOT EXISTS idx_product_batches_expiry_date ON public.product_batches(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_product_batches_quantity ON public.product_batches(quantity);
 
+-- Merge duplicate rows created by older imports before enforcing the lot key.
+WITH grouped AS (
+  SELECT MIN(id) AS survivor_id, product_id, batch_number, expiry_date,
+    SUM(original_quantity)::integer AS original_quantity,
+    SUM(quantity)::integer AS quantity
+  FROM public.product_batches
+  GROUP BY product_id, batch_number, expiry_date
+)
+UPDATE public.product_batches b
+SET original_quantity = g.original_quantity,
+    quantity = g.quantity,
+    updated_at = NOW()
+FROM grouped g
+WHERE b.id = g.survivor_id;
+
+WITH ranked AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY product_id, batch_number, expiry_date ORDER BY created_at, id) AS row_number
+  FROM public.product_batches
+)
+DELETE FROM public.product_batches b
+USING ranked r
+WHERE b.id = r.id AND r.row_number > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_product_batches_product_batch_expiry
+  ON public.product_batches(product_id, batch_number, expiry_date);
+
 -- Add updated_at trigger
 DROP TRIGGER IF EXISTS update_product_batches_updated_at ON public.product_batches;
 CREATE TRIGGER update_product_batches_updated_at BEFORE UPDATE ON public.product_batches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -67,7 +93,7 @@ BEGIN
     RAISE EXCEPTION 'Receipt number is required';
   END IF;
 
-  -- Create temporary table for validation & processing, parsing expiry_date & batch_number
+  -- Create temporary table for validation & processing. Lô và HSD là bắt buộc.
   DROP TABLE IF EXISTS pg_temp.goods_receipt_items;
   
   CREATE TEMP TABLE goods_receipt_items ON COMMIT DROP AS
@@ -75,8 +101,8 @@ BEGIN
     product_id,
     quantity,
     unit_price,
-    COALESCE(NULLIF(expiry_date, '')::date, CURRENT_DATE + INTERVAL '1 year') AS expiry_date,
-    COALESCE(NULLIF(trim(batch_number), ''), 'BAT-' || to_char(now(), 'YYYYMMDD') || '-' || substring(gen_random_uuid()::text, 1, 8)) AS batch_number
+    NULLIF(expiry_date, '')::date AS expiry_date,
+    NULLIF(trim(batch_number), '') AS batch_number
   FROM jsonb_to_recordset(COALESCE(p_payload->'items', '[]'::jsonb)) AS item(product_id uuid, quantity integer, unit_price numeric, expiry_date text, batch_number text);
 
   SELECT COUNT(*) INTO v_item_count FROM goods_receipt_items;
@@ -87,9 +113,9 @@ BEGIN
   -- Validate inputs
   IF EXISTS (
     SELECT 1 FROM pg_temp.goods_receipt_items 
-    WHERE quantity <= 0 OR unit_price < 0
+    WHERE quantity <= 0 OR unit_price < 0 OR expiry_date IS NULL OR expiry_date < CURRENT_DATE OR batch_number IS NULL
   ) THEN
-    RAISE EXCEPTION 'Số lượng nhập phải lớn hơn 0 và giá nhập không được nhỏ hơn 0';
+    RAISE EXCEPTION 'Mỗi dòng nhập phải có số lượng, giá, số lô và HSD hợp lệ';
   END IF;
 
   -- Calculate total amount
@@ -146,26 +172,34 @@ BEGIN
   FROM pg_temp.goods_receipt_items;
 
   -- Update products stock & cost price and insert stock transactions + product batches
-  FOR v_product IN
+  -- Lock từng sản phẩm trong vòng lặp để nhiều dòng cùng sản phẩm vẫn cộng dồn chính xác.
+  FOR v_item IN
     SELECT
       i.product_id,
       i.quantity,
       i.unit_price,
       i.expiry_date,
-      i.batch_number,
-      p.stock_quantity
+      i.batch_number
     FROM pg_temp.goods_receipt_items i
-    JOIN public.products p ON p.id = i.product_id
-    FOR UPDATE OF p
   LOOP
-    v_previous_stock := v_product.stock_quantity;
-    v_new_stock := v_previous_stock + v_product.quantity;
+    SELECT id, stock_quantity
+    INTO v_product
+    FROM public.products
+    WHERE id = v_item.product_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Product was not found';
+    END IF;
+
+    v_previous_stock := COALESCE(v_product.stock_quantity, 0);
+    v_new_stock := v_previous_stock + v_item.quantity;
 
     -- Update product total stock
     UPDATE public.products
     SET stock_quantity = v_new_stock,
-        cost_price = v_product.unit_price
-    WHERE id = v_product.product_id;
+        cost_price = v_item.unit_price
+    WHERE id = v_item.product_id;
 
     -- Insert into product_batches for tracking expiration dates
     INSERT INTO public.product_batches(
@@ -176,12 +210,17 @@ BEGIN
       quantity
     )
     VALUES (
-      v_product.product_id,
-      v_product.batch_number,
-      v_product.expiry_date,
-      v_product.quantity,
-      v_product.quantity
-    );
+      v_item.product_id,
+      v_item.batch_number,
+      v_item.expiry_date,
+      v_item.quantity,
+      v_item.quantity
+    )
+    ON CONFLICT (product_id, batch_number, expiry_date)
+    DO UPDATE SET
+      quantity = public.product_batches.quantity + EXCLUDED.quantity,
+      original_quantity = public.product_batches.original_quantity + EXCLUDED.original_quantity,
+      updated_at = NOW();
 
     -- Insert stock transaction
     INSERT INTO public.stock_transactions(
@@ -195,18 +234,18 @@ BEGIN
       user_id
     )
     VALUES (
-      v_product.product_id,
+      v_item.product_id,
       'import',
-      v_product.quantity,
+      v_item.quantity,
       v_previous_stock,
       v_new_stock,
       v_receipt_id,
-      'Nhập kho theo phiếu ' || v_receipt_number || ' (Lô: ' || v_product.batch_number || ', HSD: ' || to_char(v_product.expiry_date, 'DD/MM/YYYY') || ')',
+      'Nhập kho theo phiếu ' || v_receipt_number || ' (Lô: ' || v_item.batch_number || ', HSD: ' || to_char(v_item.expiry_date, 'DD/MM/YYYY') || ')',
       p_user_id
     );
 
     -- Sync stock alert in transaction
-    PERFORM public.sync_stock_alert_in_tx(v_product.product_id);
+      PERFORM public.sync_stock_alert_in_tx(v_item.product_id);
   END LOOP;
 
   -- Write audit log

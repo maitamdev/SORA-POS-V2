@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="92" viewBox="0 0 360 92" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">SORA-POS</title>
+  <desc id="desc">SORA-POS logo for inventory and retail management</desc>
+  <defs>
+    <linearGradient id="mark" x1="12" y1="8" x2="77" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D9BEF" />
+      <stop offset="1" stop-color="#5EC5EE" />
+    </linearGradient>
+    <linearGradient id="shelf" x1="24" y1="38" x2="62" y2="63" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9F9FF" />
+      <stop offset="1" stop-color="#BDEBFA" />
+    </linearGradient>
+    <filter id="softShadow" x="0" y="0" width="94" height="94" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0C4A78" flood-opacity="0.18" />
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <rect x="5" y="6" width="78" height="78" rx="21" fill="url(#mark)" />
+    <path d="M17 35.5 44 18l27 17.5" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M22 35h44v29H22z" fill="url(#shelf)" stroke="#fff" stroke-width="2.5" />
+    <path d="M22 48h44M22 58h44" stroke="#268BCE" stroke-width="2.3" />
+    <path d="M34 35v29M47 35v29" stroke="#268BCE" stroke-width="2.3" />
+    <path d="M18 66.5h52" stroke="#fff" stroke-width="3.8" stroke-linecap="round" />
+    <path d="m53 48 8-4 8 4-8 4-8-4Z" fill="#FFC83D" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" />
+    <path d="M61 48v8M53 48v8l8 4 8-4v-8" fill="#FFC83D" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" />
+    <circle cx="68.5" cy="18" r="4" fill="#FFC83D" />
+  </g>
+
+  <text x="104" y="54" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800" letter-spacing="-0.9">
+    <tspan fill="#102B53">SORA</tspan><tspan fill="#329FDE">-POS</tspan>
+  </text>
+  <rect x="105" y="63" width="54" height="3" rx="1.5" fill="#329FDE" />
+</svg>

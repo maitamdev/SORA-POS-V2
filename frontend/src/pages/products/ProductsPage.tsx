@@ -74,7 +74,7 @@ const ProductsPage = () => {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState(categoryParam);
-  const [stockStatus, setStockStatus] = useState('all'); // all, in_stock, low_stock, out_of_stock
+  const [stockStatus, setStockStatus] = useState('all'); // all, in_stock, low_stock, out_of_stock, missing_barcode
   const [sortBy, setSortBy] = useState('newest');
 
   // Pagination states
@@ -291,6 +291,8 @@ const ProductsPage = () => {
       items = items.filter(p => p.stock_quantity > 0 && p.stock_quantity <= p.min_stock_level);
     } else if (stockStatus === 'out_of_stock') {
       items = items.filter(p => p.stock_quantity <= 0);
+    } else if (stockStatus === 'missing_barcode') {
+      items = items.filter(p => !p.barcode?.trim());
     }
 
     // Apply sorting
@@ -840,8 +842,14 @@ const ProductsPage = () => {
     fileInput.click();
   };
 
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter((pageNumber) => pageNumber === 1 || pageNumber === totalPages || Math.abs(pageNumber - page) <= 1);
+
   return (
-    <div className="flex flex-col 2xl:flex-row gap-4 2xl:gap-6 bg-slate-50 font-sans text-slate-800">
+    <div className="space-y-5 bg-slate-50 font-sans text-slate-800">
+      {false && (
+        <div className="hidden">
       
       {/* LEFT CONTENT AREA */}
       <div className="flex-1 space-y-5 min-w-0 overflow-hidden">
@@ -1660,6 +1668,269 @@ const ProductsPage = () => {
         </div>
 
       </aside>
+
+        </div>
+      )}
+
+      {/* REDESIGNED PRODUCT WORKSPACE */}
+      <section className="w-full space-y-5">
+        <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Kho hàng / Sản phẩm</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Quản lý sản phẩm</h1>
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              Thêm và cập nhật sản phẩm, quản lý giá bán, mã vạch và tồn kho.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canManageProducts && (
+              <button
+                type="button"
+                onClick={handleImportExcelClick}
+                className="inline-flex h-10 items-center gap-2 border border-blue-200 bg-white px-4 text-sm font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-50"
+              >
+                <HiOutlineUpload className="h-4 w-4" />
+                Nhập từ Excel
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex h-10 items-center gap-2 border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            >
+              <HiOutlineDownload className="h-4 w-4" />
+              Xuất dữ liệu
+            </button>
+            {canManageProducts && (
+              <button
+                type="button"
+                onClick={handleCreateClick}
+                className="inline-flex h-10 items-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <HiOutlinePlus className="h-4 w-4" />
+                Thêm sản phẩm
+              </button>
+            )}
+          </div>
+        </header>
+
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {([
+            { label: 'Tổng sản phẩm', value: stats.total, note: 'Đang quản lý trong catalog', icon: HiOutlineCube },
+            { label: 'Sản phẩm đang bán', value: stats.active, note: 'Đang hiển thị trên POS', icon: HiOutlineEye },
+            { label: 'Sắp hết hàng', value: stats.lowStock, note: 'Đã chạm mức tồn tối thiểu', icon: HiOutlineExclamationCircle },
+            { label: 'Hết hàng', value: stats.outStock, note: 'Cần nhập thêm hàng', icon: HiOutlineFolder },
+          ] as const).map((card) => {
+            const Icon = card.icon;
+            return (
+              <article key={card.label} className="min-h-[132px] border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">{card.label}</p>
+                  <span className="flex h-8 w-8 items-center justify-center bg-slate-100 text-slate-500">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                </div>
+                <p className="mt-3 text-2xl font-black tracking-tight text-slate-950">{card.value.toLocaleString('vi-VN')}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">{card.note}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="border border-slate-200 bg-white shadow-sm">
+          <div className="grid gap-3 p-4 xl:grid-cols-[minmax(280px,1.5fr)_minmax(160px,1fr)_minmax(160px,1fr)_minmax(160px,1fr)_auto]">
+            <label className="relative block">
+              <HiOutlineSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                id="product-search-input"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Tìm tên, SKU, mã vạch"
+                className="h-11 w-full border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </label>
+            <select
+              value={selectedCategoryId}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="all">Tất cả danh mục</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+            <select
+              value={stockStatus}
+              onChange={(e) => {
+                setStockStatus(e.target.value);
+                setPage(1);
+              }}
+              className="h-11 border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="all">Tất cả tồn kho</option>
+              <option value="in_stock">Còn hàng</option>
+              <option value="low_stock">Sắp hết hàng</option>
+              <option value="out_of_stock">Hết hàng</option>
+              <option value="missing_barcode">Chưa có mã vạch</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-11 border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="newest">Mới cập nhật</option>
+              <option value="price-asc">Giá thấp đến cao</option>
+              <option value="price-desc">Giá cao đến thấp</option>
+              <option value="stock-asc">Tồn kho thấp đến cao</option>
+              <option value="stock-desc">Tồn kho cao đến thấp</option>
+            </select>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters((value) => !value)}
+                className={`inline-flex h-11 items-center gap-2 border px-3 text-sm font-bold transition ${showAdvancedFilters ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                title="Bộ lọc nâng cao"
+              >
+                <HiOutlineFilter className="h-4 w-4" />
+                <span className="hidden 2xl:inline">Bộ lọc</span>
+              </button>
+              <div className="flex h-11 items-center border border-slate-200 p-1">
+                <button type="button" onClick={() => setViewMode('table')} className={`flex h-9 w-9 items-center justify-center ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`} aria-label="Hiển thị dạng bảng">
+                  <HiOutlineViewList className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => setViewMode('grid')} className={`flex h-9 w-9 items-center justify-center ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`} aria-label="Hiển thị dạng lưới">
+                  <HiOutlineViewGrid className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="relative" ref={settingsRef}>
+                <button type="button" onClick={() => setShowTableSettings((value) => !value)} className={`flex h-11 w-11 items-center justify-center border transition ${showTableSettings ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`} aria-label="Tùy chỉnh bảng">
+                  <HiOutlineCog className="h-4 w-4" />
+                </button>
+                {showTableSettings && (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-72 border border-slate-200 bg-white p-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <p className="text-xs font-black uppercase tracking-wider text-slate-700">Tùy chỉnh bảng</p>
+                      <button type="button" onClick={() => { setVisibleColumns({ image: true, sku: true, name: true, category: true, sell_price: true, cost_price: true, stock: true, min_stock: true, status: true }); setTableDensity('normal'); }} className="text-[11px] font-bold text-blue-600 hover:text-blue-800">Mặc định</button>
+                    </div>
+                    <p className="mb-2 mt-3 text-[10px] font-black uppercase tracking-wider text-slate-400">Cột hiển thị</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[['image', 'Ảnh'], ['sku', 'SKU'], ['name', 'Tên'], ['category', 'Danh mục'], ['sell_price', 'Giá bán'], ['cost_price', 'Giá nhập'], ['stock', 'Tồn kho'], ['min_stock', 'Mức tối thiểu'], ['status', 'Trạng thái']].map(([key, label]) => (
+                        <label key={key} className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-600">
+                          <input type="checkbox" checked={visibleColumns[key]} onChange={() => toggleColumn(key)} className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mb-2 mt-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Mật độ</p>
+                    <div className="grid grid-cols-3 gap-1 border border-slate-200 p-1">
+                      {(['compact', 'normal', 'comfortable'] as const).map((density) => (
+                        <button key={density} type="button" onClick={() => setTableDensity(density)} className={`py-1.5 text-[11px] font-bold ${tableDensity === density ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                          {density === 'compact' ? 'Gọn' : density === 'normal' ? 'Chuẩn' : 'Thoáng'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-6 border-t border-slate-100 px-4">
+            {[
+              ['all', 'Tất cả'],
+              ['low_stock', 'Sắp hết hàng'],
+              ['out_of_stock', 'Hết hàng'],
+              ['missing_barcode', 'Chưa có mã vạch'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { setStockStatus(value); setPage(1); }}
+                className={`relative py-3 text-sm font-bold transition ${stockStatus === value ? 'text-blue-700' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                {label}
+                {stockStatus === value && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-blue-600" />}
+              </button>
+            ))}
+          </div>
+
+          {showAdvancedFilters && (
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">Trạng thái bán</span>
+                {([['all', 'Tất cả'], [true, 'Đang bán'], [false, 'Ngừng bán']] as const).map(([value, label]) => (
+                  <label key={String(value)} className="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+                    <input type="radio" name="product-active-filter" checked={filterActiveStatus === value} onChange={() => { setFilterActiveStatus(value); setPage(1); }} className="text-blue-600 focus:ring-blue-500" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <button type="button" onClick={() => { setSearch(''); setSelectedCategoryId('all'); setStockStatus('all'); setSortBy('newest'); setFilterActiveStatus('all'); setPage(1); }} className="self-start text-xs font-bold text-blue-700 hover:text-blue-900 sm:self-auto">Xóa bộ lọc</button>
+            </div>
+          )}
+        </div>
+
+        {viewMode === 'table' ? (
+          <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] border-collapse text-left">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                    {visibleColumns.image && <th className={`${densityPaddingTh} w-16 px-4 text-center`}>Ảnh</th>}
+                    {visibleColumns.name && <th className={`${densityPaddingTh} min-w-[240px] px-3`}>Sản phẩm</th>}
+                    {visibleColumns.sku && <th className={`${densityPaddingTh} min-w-[150px] px-3`}>SKU / Mã vạch</th>}
+                    {visibleColumns.category && <th className={`${densityPaddingTh} min-w-[140px] px-3`}>Danh mục</th>}
+                    {visibleColumns.sell_price && <th className={`${densityPaddingTh} min-w-[120px] px-3 text-right`}>Giá bán</th>}
+                    {visibleColumns.cost_price && <th className={`${densityPaddingTh} min-w-[120px] px-3 text-right`}>Giá nhập</th>}
+                    {visibleColumns.stock && <th className={`${densityPaddingTh} min-w-[140px] px-3`}>Tồn kho</th>}
+                    {visibleColumns.status && <th className={`${densityPaddingTh} min-w-[130px] px-3`}>Trạng thái</th>}
+                    {canManageProducts && <th className={`${densityPaddingTh} w-24 px-4 text-right`}>Thao tác</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayedProducts.length === 0 ? (
+                    <tr><td colSpan={Math.max(1, visibleColCount)} className="px-6 py-16 text-center"><HiOutlineCube className="mx-auto h-9 w-9 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-500">Hiện chưa có sản phẩm phù hợp với bộ lọc</p><p className="mt-1 text-xs text-slate-400">Thử đổi từ khóa hoặc trạng thái tồn kho.</p></td></tr>
+                  ) : displayedProducts.map((product) => {
+                    const outOfStock = product.stock_quantity <= 0;
+                    const lowStock = !outOfStock && product.stock_quantity <= product.min_stock_level;
+                    return (
+                      <tr key={product.id} className="group transition hover:bg-blue-50/30">
+                        {visibleColumns.image && <td className={`${densityPadding} px-4 text-center`}><div className="mx-auto flex h-11 w-11 items-center justify-center overflow-hidden border border-slate-200 bg-white p-1"><img src={getProductImage(product)} alt={product.name} className="max-h-full max-w-full object-contain" loading="lazy" /></div></td>}
+                        {visibleColumns.name && <td className={`${densityPadding} px-3`}><p className="max-w-[280px] truncate text-sm font-extrabold text-slate-900" title={product.name}>{product.name}</p><p className="mt-1 text-xs font-medium text-slate-400">Đơn vị: {product.unit || 'Chưa nhập'}</p></td>}
+                        {visibleColumns.sku && <td className={`${densityPadding} px-3`}><p className="text-sm font-bold text-slate-700">{product.sku}</p><p className="mt-1 text-xs font-medium text-slate-400">{product.barcode || 'Chưa có mã vạch'}</p></td>}
+                        {visibleColumns.category && <td className={`${densityPadding} px-3 text-sm font-semibold text-slate-600`}>{product.categories?.name || 'Chưa phân loại'}</td>}
+                        {visibleColumns.sell_price && <td className={`${densityPadding} px-3 text-right text-sm font-black text-slate-900`}>{money(product.sell_price)}</td>}
+                        {visibleColumns.cost_price && <td className={`${densityPadding} px-3 text-right text-sm font-semibold text-slate-500`}>{money(product.cost_price)}</td>}
+                        {visibleColumns.stock && <td className={`${densityPadding} px-3`}><p className={`text-sm font-black ${outOfStock ? 'text-red-600' : lowStock ? 'text-amber-600' : 'text-slate-800'}`}>{product.stock_quantity} <span className="font-medium text-slate-400">/ tối thiểu {product.min_stock_level}</span></p><span className={`mt-1 inline-flex px-2 py-1 text-[10px] font-black ${outOfStock ? 'bg-red-50 text-red-700' : lowStock ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{outOfStock ? 'Hết hàng' : lowStock ? 'Sắp hết' : 'Còn hàng'}</span></td>}
+                        {visibleColumns.status && <td className={`${densityPadding} px-3`}><span className={`inline-flex px-2 py-1 text-[10px] font-black ${product.is_active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>{product.is_active ? 'Đang bán' : 'Ngừng bán'}</span></td>}
+                        {canManageProducts && <td className={`${densityPadding} px-4`}><div className="flex items-center justify-end gap-1"><button type="button" onClick={() => handleEditClick(product)} className="flex h-8 w-8 items-center justify-center text-slate-400 transition hover:bg-blue-50 hover:text-blue-700" title="Sửa sản phẩm"><HiOutlinePencil className="h-4 w-4" /></button><button type="button" onClick={() => handleDeleteClick(product)} className="flex h-8 w-8 items-center justify-center text-slate-400 transition hover:bg-red-50 hover:text-red-600" title="Xóa sản phẩm"><HiOutlineTrash className="h-4 w-4" /></button></div></td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {displayedProducts.length === 0 ? <div className="col-span-full border border-slate-200 bg-white px-6 py-16 text-center"><HiOutlineCube className="mx-auto h-9 w-9 text-slate-300" /><p className="mt-3 text-sm font-bold text-slate-500">Hiện chưa có sản phẩm phù hợp với bộ lọc</p></div> : displayedProducts.map((product) => {
+              const outOfStock = product.stock_quantity <= 0;
+              const lowStock = !outOfStock && product.stock_quantity <= product.min_stock_level;
+              return <article key={product.id} className="group border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"><div className="relative flex h-44 items-center justify-center border border-slate-100 bg-slate-50 p-4"><img src={getProductImage(product)} alt={product.name} className="max-h-full max-w-full object-contain transition group-hover:scale-105" loading="lazy" />{canManageProducts && <div className="absolute right-2 top-2 flex gap-1"><button type="button" onClick={() => handleEditClick(product)} className="flex h-8 w-8 items-center justify-center bg-white text-slate-500 shadow-sm hover:text-blue-700" title="Sửa sản phẩm"><HiOutlinePencil className="h-4 w-4" /></button><button type="button" onClick={() => handleDeleteClick(product)} className="flex h-8 w-8 items-center justify-center bg-white text-slate-500 shadow-sm hover:text-red-600" title="Xóa sản phẩm"><HiOutlineTrash className="h-4 w-4" /></button></div>}</div><p className="mt-4 line-clamp-2 min-h-[40px] text-sm font-extrabold text-slate-900">{product.name}</p><p className="mt-2 text-xs font-medium text-slate-400">SKU: {product.sku}</p><div className="mt-3 flex items-end justify-between gap-3"><p className="text-lg font-black text-blue-700">{money(product.sell_price)}</p><span className={`px-2 py-1 text-[10px] font-black ${outOfStock ? 'bg-red-50 text-red-700' : lowStock ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{outOfStock ? 'Hết hàng' : lowStock ? 'Sắp hết' : `${product.stock_quantity} còn`}</span></div></article>;
+            })}
+          </div>
+        )}
+
+        <footer className="flex flex-col gap-3 border-t border-slate-200 pt-4 text-xs font-semibold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2"><span>Hiển thị</span><select value={limit} onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }} className="h-8 border border-slate-200 bg-white px-2 font-bold text-slate-700 outline-none"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select><span>sản phẩm/trang</span></div>
+          <div className="flex items-center gap-1"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1} className="flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-lg text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">‹</button>{pageNumbers.map((pageNumber) => <button type="button" key={pageNumber} onClick={() => setPage(pageNumber)} className={`flex h-8 min-w-8 items-center justify-center border px-2 font-bold ${page === pageNumber ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>{pageNumber}</button>)}<button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={page >= totalPages} className="flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-lg text-slate-600 disabled:cursor-not-allowed disabled:opacity-40">›</button></div>
+          <p>Hiển thị {totalItems === 0 ? 0 : (page - 1) * limit + 1} - {Math.min(page * limit, totalItems)} trên {totalItems} sản phẩm</p>
+        </footer>
+      </section>
 
       {/* 4. ADD / EDIT PRODUCT MODAL FORM */}
       {showModal && canManageProducts && (

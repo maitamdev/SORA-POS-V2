@@ -125,15 +125,6 @@ const POSHeader = ({ onBarcodeSubmit }: POSHeaderProps) => {
             Ca của tôi
           </Link>
         )}
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-100">
-          <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
-            {getUserInitials(user)}
-          </div>
-          <div className="hidden md:block leading-tight">
-            <p className="text-xs font-black text-slate-800">{user?.full_name || 'Nhân viên'}</p>
-            <p className="text-[10px] font-bold text-slate-400">{getRoleLabel(user?.role)}</p>
-          </div>
-        </div>
       </div>
     </header>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth.store';
 import {
@@ -22,7 +22,7 @@ import {
   HiOutlineDownload,
 } from 'react-icons/hi';
 import NotificationCenter from '../common/NotificationCenter';
-import logoUrl from '../../assets/logo.png';
+import logoUrl from '../../assets/new-logo.png';
 
 /**
  * Cấu trúc menu sidebar
@@ -144,24 +144,20 @@ const Sidebar = () => {
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="h-16 flex items-center px-5 border-b border-slate-800/40">
-        <div className="flex items-center gap-2.5 flex-1">
+      <div className="py-4 flex items-center px-4 border-b border-slate-200">
+        <div className="flex items-center min-w-0 flex-1">
           <img
             src={logoUrl}
-            alt="Sora POS Logo"
-            className="w-11 h-11 object-contain scale-[1.3]"
+            alt="SORA-POS"
+            className="w-[190px] h-auto object-contain object-left"
           />
-          <div>
-            <h1 className="text-white font-bold text-sm tracking-tight leading-none">Sora POS</h1>
-            <p className="text-slate-500 text-[10px] font-medium mt-0.5 uppercase tracking-wider">Quản lý bán hàng</p>
-          </div>
         </div>
         {/* Notification Bell */}
         <NotificationCenter />
         {/* Close button for mobile */}
         <button
           onClick={() => setMobileOpen(false)}
-          className="lg:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors ml-1"
+          className="lg:hidden w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors ml-1"
         >
           <HiOutlineX className="w-5 h-5" />
         </button>
@@ -184,7 +180,7 @@ const Sidebar = () => {
                   className={`sidebar-link ${isActive ? 'active' : ''}`}
                 >
                   <Icon className="w-[18px] h-[18px] flex-shrink-0" />
-                  <span className="text-[11px] font-medium tracking-wide uppercase">{item.label}</span>
+                  <span className="text-[12px] font-semibold tracking-normal">{item.label}</span>
                 </Link>
               </li>
             );
@@ -193,10 +189,29 @@ const Sidebar = () => {
       </nav>
 
       {/* User Info + Logout */}
-      <div className="border-t border-slate-800/40 p-4">
+      <div className="border-t border-slate-200 p-4 space-y-3">
+        {/* User Profile */}
+        {user && (
+          <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-slate-50">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-sm flex-shrink-0">
+              {(() => {
+                if (!user.full_name) return 'U';
+                const parts = user.full_name.trim().split(' ');
+                if (parts.length >= 2) {
+                  return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+                }
+                return user.full_name.substring(0, 2).toUpperCase();
+              })()}
+            </div>
+            <div className="leading-none min-w-0">
+              <p className="text-[12px] font-bold text-slate-800 truncate">{user.full_name || 'Người dùng'}</p>
+            </div>
+          </div>
+        )}
+        {/* Logout Button */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-all duration-200"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
         >
           <HiOutlineLogout className="w-3.5 h-3.5" />
           <span>Đăng xuất</span>
@@ -210,7 +225,7 @@ const Sidebar = () => {
       {/* Mobile hamburger button - shown only on small screens */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-sidebar-bg text-white rounded-lg flex items-center justify-center shadow-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
+        className="lg:hidden fixed top-3 left-3 z-[60] w-10 h-10 bg-white text-slate-800 rounded-lg flex items-center justify-center shadow-lg border border-slate-200 hover:bg-slate-100 transition-colors"
         aria-label="Mở menu"
       >
         <HiOutlineMenu className="w-5 h-5" />
@@ -227,7 +242,7 @@ const Sidebar = () => {
       {/* Sidebar - desktop: fixed visible, mobile: slide-in */}
       <aside
         className={`
-          w-64 h-screen bg-sidebar-bg flex flex-col fixed left-0 top-0 border-r border-slate-800/40
+          w-64 h-screen bg-white flex flex-col fixed left-0 top-0 border-r border-slate-200
           transition-transform duration-300 ease-in-out
           lg:translate-x-0 lg:z-50
           ${mobileOpen ? 'translate-x-0 z-[80]' : '-translate-x-full z-[80]'}

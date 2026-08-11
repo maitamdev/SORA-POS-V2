@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError';
 import { appCache } from '../utils/cache';
 import { JwtPayload } from '../types/user.type';
 import { CatalogService } from './catalog.service';
+import { PromotionService } from './promotion.service';
 
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
@@ -19,6 +20,7 @@ type CreateOrderInput = {
   shift_code?: string;
   discount_amount?: number;
   manual_discount_amount?: number;
+  promotion_ids?: string[];
   used_points?: number;
   note?: string | null;
   payment?: {
@@ -51,7 +53,7 @@ export class OrderService {
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('orders')
-      .select('*, customers(id, name, phone), users!orders_user_id_fkey(id, full_name)', { count: 'exact' })
+      .select('*, customers(id, name, phone), users!orders_user_id_fkey(id, full_name), payments(method, amount)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -108,6 +110,20 @@ export class OrderService {
 
     appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
     appCache.deletePrefix('report:dashboard');
+
+    const promotionIds = Array.from(new Set(
+      (Array.isArray(input.promotion_ids) ? input.promotion_ids : [])
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ));
+    if (promotionIds.length > 0) {
+      await Promise.all(
+        promotionIds.map((promotionId) =>
+          PromotionService.incrementUsage(promotionId).catch((incrementError) => {
+            console.error(`[OrderService.create] Không thể cập nhật lượt dùng khuyến mãi ${promotionId}:`, incrementError);
+          })
+        )
+      );
+    }
 
     // Đồng bộ cảnh báo tồn kho & gửi thông báo Telegram cho các sản phẩm trong hóa đơn
     if (input.items && Array.isArray(input.items)) {

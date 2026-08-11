@@ -14,6 +14,8 @@ export class StockService {
     newStock?: number | null;
     userId: string;
     note?: string | null;
+    batchNumber?: string | null;
+    expiryDate?: string | null;
   }) {
     const { data: transactionId, error } = await supabase.rpc('apply_stock_change', {
       p_product_id: params.productId,
@@ -22,6 +24,8 @@ export class StockService {
       p_new_stock: params.newStock ?? null,
       p_user_id: params.userId,
       p_note: params.note || null,
+      p_batch_number: params.batchNumber || null,
+      p_expiry_date: params.expiryDate || null,
     });
 
     if (error) {
@@ -112,13 +116,36 @@ export class StockService {
    * Trước đây: đọc stock → tính newStock ở JS → ghi lại → 2 request đồng thời
    * có thể ghi đè nhau. Giờ dùng `stock_quantity + quantity` trực tiếp trong SQL.
    */
-  static async importStock(productId: string, quantity: number, userId: string, note?: string | null): Promise<any> {
+  static async importStock(
+    productId: string,
+    quantity: number,
+    userId: string,
+    note?: string | null,
+    batchNumber?: string | null,
+    expiryDate?: string | null
+  ): Promise<any> {
+    const normalizedBatch = String(batchNumber || '').trim();
+    const normalizedExpiry = String(expiryDate || '').trim();
+    if (!normalizedBatch || !/^\d{4}-\d{2}-\d{2}$/.test(normalizedExpiry)) {
+      throw new AppError(400, 'Nhập kho cần có số lô và hạn sử dụng hợp lệ');
+    }
+    const expiryDateObject = new Date(`${normalizedExpiry}T00:00:00Z`);
+    if (
+      !Number.isFinite(expiryDateObject.getTime()) ||
+      expiryDateObject.toISOString().slice(0, 10) !== normalizedExpiry ||
+      normalizedExpiry < new Date().toISOString().split('T')[0]
+    ) {
+      throw new AppError(400, 'Hạn sử dụng phải từ hôm nay trở đi');
+    }
+
     const atomicTransaction = await this.applyStockChangeRpc({
       productId,
       mode: 'import',
       quantity,
       userId,
       note,
+      batchNumber: normalizedBatch,
+      expiryDate: normalizedExpiry,
     });
     if (atomicTransaction) {
       appCache.deletePrefix(PRODUCT_CACHE_PREFIX);
@@ -155,33 +182,40 @@ export class StockService {
     // Nếu optimistic lock fail (ai đó đã cập nhật stock trước), retry
     if (!updated) {
       console.warn('[StockService.importStock] Optimistic lock conflict, retrying...');
-      return this.importStock(productId, quantity, userId, note);
+      return this.importStock(productId, quantity, userId, note, normalizedBatch, normalizedExpiry);
     }
 
-    // Sync to product_batches
-    const { data: latestBatch } = await supabase
+    // Sync đúng lô nhập, không cộng dồn vào lô có HSD khác
+    const { data: existingBatch, error: batchLookupError } = await supabase
       .from('product_batches')
       .select('*')
       .eq('product_id', productId)
-      .order('expiry_date', { ascending: false })
-      .limit(1)
+      .eq('batch_number', normalizedBatch)
+      .eq('expiry_date', normalizedExpiry)
       .maybeSingle();
 
-    if (latestBatch) {
-      await supabase
+    if (batchLookupError) throw new AppError(400, batchLookupError.message);
+
+    if (existingBatch) {
+      const { error: updateBatchError } = await supabase
         .from('product_batches')
-        .update({ quantity: Number(latestBatch.quantity) + quantity })
-        .eq('id', latestBatch.id);
+        .update({
+          quantity: Number(existingBatch.quantity) + quantity,
+          original_quantity: Number(existingBatch.original_quantity) + quantity,
+        })
+        .eq('id', existingBatch.id);
+      if (updateBatchError) throw new AppError(400, updateBatchError.message);
     } else {
-      await supabase
+      const { error: insertBatchError } = await supabase
         .from('product_batches')
         .insert({
           product_id: productId,
-          batch_number: 'BAT-IMPORTED',
-          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          batch_number: normalizedBatch,
+          expiry_date: normalizedExpiry,
           original_quantity: quantity,
           quantity: quantity,
         });
+      if (insertBatchError) throw new AppError(400, insertBatchError.message);
     }
 
     const { data: transaction, error: transactionError } = await supabase

@@ -10,16 +10,19 @@ import { Product, Supplier } from '../../types/domain.type';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 interface SelectedItem {
+  lineId: string;
   product: Product;
   quantity: number;
   unit_price: number;
-  expiry_date?: string;
-  batch_number?: string;
+  expiry_date: string;
+  batch_number: string;
 }
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 };
+
+const createLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export default function CreateReceiptPage() {
   const navigate = useNavigate();
@@ -123,6 +126,8 @@ export default function CreateReceiptPage() {
   // Calculate totals
   const totalAmount = selectedItems.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
   const remainingAmount = Math.max(totalAmount - paidAmount, 0);
+  const today = new Date().toISOString().split('T')[0];
+  const hasIncompleteLot = selectedItems.some((item) => !item.batch_number.trim() || !item.expiry_date || item.expiry_date < today || item.quantity <= 0);
 
   // Auto-set paid amount to total if user wants to pay in full
   const handlePayInFull = () => {
@@ -130,67 +135,42 @@ export default function CreateReceiptPage() {
   };
 
   const handleAddItem = (product: Product) => {
-    // Check if already selected
-    const existingIndex = selectedItems.findIndex((item) => item.product.id === product.id);
-    if (existingIndex > -1) {
-      const nextItems = [...selectedItems];
-      nextItems[existingIndex].quantity += 1;
-      setSelectedItems(nextItems);
-    } else {
-      const today = new Date();
-      const formattedDate = today.toISOString().split('T')[0].replace(/-/g, '');
-      const randomSuffix = Math.floor(100 + Math.random() * 900);
-      setSelectedItems([
-        ...selectedItems,
-        {
-          product,
-          quantity: 1,
-          unit_price: product.cost_price || 0, // Giá nhập cũ làm mặc định
-          expiry_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Mặc định 1 năm
-          batch_number: `BAT-${product.sku || 'NPP'}-${formattedDate}-${randomSuffix}`,
-        },
-      ]);
-    }
+    // Mỗi lần thêm tạo một dòng lô riêng. Cùng sản phẩm có thể có nhiều HSD.
+    setSelectedItems((currentItems) => [
+      ...currentItems,
+      {
+        lineId: createLineId(),
+        product,
+        quantity: 1,
+        unit_price: product.cost_price || 0,
+        expiry_date: '',
+        batch_number: '',
+      },
+    ]);
     setSearchQuery('');
     setShowDropdown(false);
   };
 
-  const handleUpdateQty = (productId: string, qty: number) => {
+  const handleUpdateQty = (lineId: string, qty: number) => {
     if (qty <= 0) return;
-    setSelectedItems(
-      selectedItems.map((item) =>
-        item.product.id === productId ? { ...item, quantity: qty } : item
-      )
-    );
+    setSelectedItems((items) => items.map((item) => item.lineId === lineId ? { ...item, quantity: qty } : item));
   };
 
-  const handleUpdatePrice = (productId: string, price: number) => {
+  const handleUpdatePrice = (lineId: string, price: number) => {
     if (price < 0) return;
-    setSelectedItems(
-      selectedItems.map((item) =>
-        item.product.id === productId ? { ...item, unit_price: price } : item
-      )
-    );
+    setSelectedItems((items) => items.map((item) => item.lineId === lineId ? { ...item, unit_price: price } : item));
   };
 
-  const handleUpdateExpiry = (productId: string, expiry: string) => {
-    setSelectedItems(
-      selectedItems.map((item) =>
-        item.product.id === productId ? { ...item, expiry_date: expiry } : item
-      )
-    );
+  const handleUpdateExpiry = (lineId: string, expiry: string) => {
+    setSelectedItems((items) => items.map((item) => item.lineId === lineId ? { ...item, expiry_date: expiry } : item));
   };
 
-  const handleUpdateBatch = (productId: string, batchNumber: string) => {
-    setSelectedItems(
-      selectedItems.map((item) =>
-        item.product.id === productId ? { ...item, batch_number: batchNumber } : item
-      )
-    );
+  const handleUpdateBatch = (lineId: string, batchNumber: string) => {
+    setSelectedItems((items) => items.map((item) => item.lineId === lineId ? { ...item, batch_number: batchNumber } : item));
   };
 
-  const handleRemoveItem = (productId: string) => {
-    setSelectedItems(selectedItems.filter((item) => item.product.id !== productId));
+  const handleRemoveItem = (lineId: string) => {
+    setSelectedItems((items) => items.filter((item) => item.lineId !== lineId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,6 +185,12 @@ export default function CreateReceiptPage() {
       return;
     }
 
+    const incompleteLine = selectedItems.find((item) => !item.batch_number.trim() || !item.expiry_date || item.expiry_date < today || item.quantity <= 0);
+    if (incompleteLine) {
+      toast.error('Vui lòng nhập số lô và HSD hợp lệ cho từng dòng hàng');
+      return;
+    }
+
     setSubmitLoading(true);
     try {
       const payload = {
@@ -216,7 +202,7 @@ export default function CreateReceiptPage() {
           quantity: item.quantity,
           unit_price: item.unit_price,
           expiry_date: item.expiry_date,
-          batch_number: item.batch_number?.trim() || null,
+          batch_number: item.batch_number.trim(),
         })),
       };
 
@@ -231,9 +217,9 @@ export default function CreateReceiptPage() {
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10">
+    <div className="w-full max-w-[1600px] mx-auto space-y-5 animate-fadeIn pb-10">
       {/* Header */}
-      <header className="flex items-center gap-4 border-b border-slate-200 pb-5">
+      <header className="flex items-start gap-4 border-b border-slate-200 pb-4">
         <button
           onClick={() => navigate('/stock?tab=receipts')}
           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition"
@@ -241,9 +227,9 @@ export default function CreateReceiptPage() {
           <FiArrowLeft size={18} />
         </button>
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-800">Tạo Phiếu Nhập Kho</h1>
+          <h1 className="text-2xl sm:text-[30px] font-black tracking-tight text-slate-950">Tạo phiếu nhập kho</h1>
           <p className="text-xs sm:text-sm font-medium text-slate-500">
-            Tạo đợt nhập hàng mới để cập nhật giá nhập và số lượng tồn kho sản phẩm.
+            Ghi nhận hàng nhập theo từng lô để tồn kho và cảnh báo HSD luôn chính xác.
           </p>
         </div>
       </header>
@@ -258,7 +244,7 @@ export default function CreateReceiptPage() {
           {/* Left Panel: Product Selection & Cart Table */}
           <div className="space-y-6">
             {/* Search Input Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 relative">
+            <div className="border border-slate-300 bg-white p-5 shadow-sm space-y-4 relative">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-black text-slate-700">Tìm sản phẩm nhập kho</span>
                 {isScannerConnected ? (
@@ -318,8 +304,19 @@ export default function CreateReceiptPage() {
             </div>
 
             {/* Selected Items Table Card */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-              <h3 className="text-sm font-black uppercase text-slate-700">Hàng hóa nhập kho</h3>
+            <div className="border border-slate-300 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wide text-slate-800">Hàng hóa nhập kho</h3>
+                  <p className="mt-1 text-xs font-medium text-slate-500">Mỗi dòng là một lô. Cùng sản phẩm có thể nhập nhiều HSD khác nhau.</p>
+                </div>
+                <span className="border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-blue-700">{selectedItems.length} dòng lô</span>
+              </div>
+              {hasIncompleteLot && selectedItems.length > 0 && (
+                <div className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                  Bổ sung số lô và HSD cho tất cả dòng hàng trước khi xác nhận.
+                </div>
+              )}
 
               {selectedItems.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 font-bold border-2 border-dashed border-slate-100 rounded-xl">
@@ -341,8 +338,8 @@ export default function CreateReceiptPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
-                      {selectedItems.map((item) => (
-                        <tr key={item.product.id} className="hover:bg-slate-50/20 transition">
+                        {selectedItems.map((item) => (
+                        <tr key={item.lineId} className="hover:bg-blue-50/30 transition">
                           <td className="px-4 py-3">
                             <p className="font-bold text-slate-900 line-clamp-1">{item.product.name}</p>
                             <p className="text-[10px] font-semibold text-slate-400">SKU: {item.product.sku}</p>
@@ -353,7 +350,7 @@ export default function CreateReceiptPage() {
                               type="number"
                               min={1}
                               value={item.quantity}
-                              onChange={(e) => handleUpdateQty(item.product.id, parseInt(e.target.value) || 0)}
+                              onChange={(e) => handleUpdateQty(item.lineId, parseInt(e.target.value) || 0)}
                               className="w-16 h-9 rounded-lg border border-slate-200 text-center font-bold text-slate-700 outline-none focus:border-slate-400"
                             />
                           </td>
@@ -362,7 +359,7 @@ export default function CreateReceiptPage() {
                               type="number"
                               min={0}
                               value={item.unit_price}
-                              onChange={(e) => handleUpdatePrice(item.product.id, parseFloat(e.target.value) || 0)}
+                              onChange={(e) => handleUpdatePrice(item.lineId, parseFloat(e.target.value) || 0)}
                               className="w-24 h-9 rounded-lg border border-slate-200 text-right pr-2 font-bold text-slate-700 outline-none focus:border-slate-400"
                             />
                           </td>
@@ -372,7 +369,7 @@ export default function CreateReceiptPage() {
                               required
                               placeholder="Số lô"
                               value={item.batch_number || ''}
-                              onChange={(e) => handleUpdateBatch(item.product.id, e.target.value)}
+                              onChange={(e) => handleUpdateBatch(item.lineId, e.target.value)}
                               className="w-28 h-9 rounded-lg border border-slate-200 px-2 font-bold text-slate-700 outline-none focus:border-slate-400 text-center"
                             />
                           </td>
@@ -380,8 +377,9 @@ export default function CreateReceiptPage() {
                             <input
                               type="date"
                               required
+                              min={today}
                               value={item.expiry_date || ''}
-                              onChange={(e) => handleUpdateExpiry(item.product.id, e.target.value)}
+                              onChange={(e) => handleUpdateExpiry(item.lineId, e.target.value)}
                               className="w-36 h-9 rounded-lg border border-slate-200 px-2 text-center font-bold text-slate-700 outline-none focus:border-slate-400 cursor-pointer"
                             />
                           </td>
@@ -391,7 +389,7 @@ export default function CreateReceiptPage() {
                           <td className="px-4 py-3 text-center">
                             <button
                               type="button"
-                              onClick={() => handleRemoveItem(item.product.id)}
+                              onClick={() => handleRemoveItem(item.lineId)}
                               className="text-red-500 hover:text-red-700 transition"
                             >
                               <FiTrash2 size={16} />
@@ -409,7 +407,7 @@ export default function CreateReceiptPage() {
           {/* Right Panel: Receipt Info & Submitting */}
           <div className="space-y-6">
             {/* Info and payment */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="border border-slate-300 bg-white p-5 shadow-sm space-y-4">
               <h3 className="text-sm font-black uppercase text-slate-700 pb-2 border-b border-slate-100">Thông tin phiếu</h3>
 
               {/* Supplier Dropdown */}
@@ -475,7 +473,7 @@ export default function CreateReceiptPage() {
             </div>
 
             {/* Sumary values */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+            <div className="border border-slate-300 bg-white p-5 shadow-sm space-y-3">
               <div className="flex justify-between items-center text-sm font-bold text-slate-500">
                 <span>Tổng tiền hàng:</span>
                 <span className="text-slate-800 font-black">{formatCurrency(totalAmount)}</span>
@@ -515,7 +513,7 @@ export default function CreateReceiptPage() {
             <div className="flex flex-col gap-2">
               <button
                 type="submit"
-                disabled={submitLoading || selectedItems.length === 0}
+                disabled={submitLoading || selectedItems.length === 0 || hasIncompleteLot}
                 className="w-full h-11 rounded-xl bg-blue-600 text-sm font-black text-white hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {submitLoading ? (

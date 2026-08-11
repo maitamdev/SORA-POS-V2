@@ -13,6 +13,7 @@ import {
 import { buildReceiptHtml } from '../utils/receiptTemplate';
 import { printReceipt } from '../utils/receiptPrinter';
 import { CartItem } from '../utils/posHelpers';
+import { recordDemoPromotionUsage } from '../../../utils/promotionUsage';
 
 /**
  * Hook that handles the checkout flow (online + offline), customer phone lookup,
@@ -221,6 +222,8 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       receivedAmount,
       discountType,
       discountValue,
+      autoPromotionIds,
+      voucherPromotionId,
       isRedeemingPoints,
       usedPoints,
     } = store;
@@ -278,12 +281,18 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
         ? Math.floor((total * Math.min(discountValue, maxPercent)) / 100)
         : Math.min(discountValue, maxDiscountValue);
 
+    const promotionIds = Array.from(new Set([
+      ...autoPromotionIds,
+      ...(voucherPromotionId ? [voucherPromotionId] : []),
+    ]));
+
     // Build order payload
     const orderPayload = {
       customer_id: matchedCustomer?.id || null,
       shift_code: activeShift?.shift_code || undefined,
       discount_amount: discountAmount + pointsDiscount,
       manual_discount_amount: manualDiscount,
+      promotion_ids: promotionIds,
       used_points: isRedeemingPoints ? usedPoints : 0,
       note: null as string | null,
       payment: {
@@ -374,6 +383,10 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       const response = await orderAPI.create(orderPayload);
       const orderId = response.data.data.id;
       const orderNumber = response.data.data.order_number;
+
+      if (user?.email === 'demo@sora-pos.com') {
+        recordDemoPromotionUsage(promotionIds);
+      }
 
       const customerObj = finalCustomerId
         ? store.customers.find((c) => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone, email: '' }

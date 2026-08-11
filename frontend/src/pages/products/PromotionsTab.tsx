@@ -5,7 +5,8 @@ import {
   HiOutlineSearch, HiOutlineClock, HiOutlineX,
   HiOutlineCheck, HiOutlineExclamationCircle, HiOutlineLightBulb,
   HiOutlineShoppingCart, HiOutlineFolder, HiOutlineCube,
-  HiOutlineLightningBolt, HiOutlineSparkles,
+  HiOutlineLightningBolt, HiOutlineSparkles, HiOutlinePause,
+  HiOutlinePlay, HiOutlineCalendar,
 } from 'react-icons/hi';
 import { FiGift, FiPercent, FiDollarSign, FiHash, FiPackage, FiClock, FiLink } from 'react-icons/fi';
 import { promotionAPI } from '../../services/promotion.api';
@@ -13,6 +14,10 @@ import { catalogAPI } from '../../services/catalog.api';
 import { Promotion, Category, Product } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
 import { parsePromotionIntent, PROMO_EXAMPLES, type DiscountType } from '../../utils/promoIntentParser';
+import {
+  DEMO_PROMOTION_USAGE_EVENT,
+  readDemoPromotionUsage,
+} from '../../utils/promotionUsage';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
@@ -38,33 +43,163 @@ const DiscountTypeIcon = ({ type, className = 'w-4 h-4' }: { type: DiscountType;
   }
 };
 
-const getPromoStatus = (promo: Promotion) => {
+type PromoStatusKey = 'running' | 'scheduled' | 'disabled' | 'expired' | 'exhausted';
+
+const getPromoStatus = (promo: Promotion): {
+  key: PromoStatusKey;
+  label: string;
+  description: string;
+  className: string;
+  dot: string;
+} => {
   const now = new Date();
   const start = new Date(promo.start_date);
   const end = promo.end_date ? new Date(promo.end_date) : null;
 
-  if (!promo.is_active) return { label: 'Đã tắt', className: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' };
-  if (now < start) return { label: 'Chưa bắt đầu', className: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' };
-  if (end && now > end) return { label: 'Hết hạn', className: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' };
-  if (promo.usage_limit && promo.usage_count >= promo.usage_limit) return { label: 'Hết lượt', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' };
-  return { label: 'Đang chạy', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500 animate-pulse' };
+  if (!promo.is_active) {
+    return {
+      key: 'disabled',
+      label: 'Đã tắt',
+      description: 'Không áp dụng tại POS',
+      className: 'bg-slate-100 text-slate-600 border-slate-200',
+      dot: 'bg-slate-400',
+    };
+  }
+  if (now < start) {
+    return {
+      key: 'scheduled',
+      label: 'Sắp diễn ra',
+      description: 'Chưa đến ngày bắt đầu',
+      className: 'bg-blue-50 text-blue-700 border-blue-200',
+      dot: 'bg-blue-500',
+    };
+  }
+  if (end && now > end) {
+    return {
+      key: 'expired',
+      label: 'Đã hết hạn',
+      description: 'Đã qua ngày kết thúc',
+      className: 'bg-red-50 text-red-700 border-red-200',
+      dot: 'bg-red-500',
+    };
+  }
+  if (promo.usage_limit && promo.usage_count >= promo.usage_limit) {
+    return {
+      key: 'exhausted',
+      label: 'Đã hết lượt',
+      description: 'Đã dùng hết giới hạn',
+      className: 'bg-amber-50 text-amber-800 border-amber-200',
+      dot: 'bg-amber-500',
+    };
+  }
+  return {
+    key: 'running',
+    label: 'Đang áp dụng',
+    description: 'Có thể dùng tại POS',
+    className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    dot: 'bg-emerald-500',
+  };
 };
 
-const formatDate = (dateStr?: string | null) => {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const formatDate = (dateStr?: string | Date | null) => {
+  if (!dateStr) return 'Không giới hạn';
+  const date = dateStr instanceof Date ? dateStr : new Date(dateStr);
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-const getDiscountDisplay = (promo: Promotion) => {
-  const cfg = DISCOUNT_TYPE_CONFIG[promo.discount_type] || DISCOUNT_TYPE_CONFIG.percent;
-  if (promo.discount_type === 'percent') return `${promo.discount_value}%`;
-  if (promo.discount_type === 'fixed_amount') return money(promo.discount_value);
-  if (promo.discount_type === 'buy_x_get_y') return `Mua ${promo.buy_quantity || 0} tặng ${promo.get_quantity || 0}`;
-  if (promo.discount_type === 'fixed_price') return `${promo.combo_quantity || 0} SP = ${money(promo.discount_value)}`;
-  if (promo.discount_type === 'nth_item_discount') return `SP thứ ${promo.nth_item || 2} giảm ${promo.discount_value}%`;
-  if (promo.discount_type === 'happy_hour') return `${promo.happy_hour_start || '?'}-${promo.happy_hour_end || '?'} giảm ${promo.discount_value}%`;
-  if (promo.discount_type === 'bundle') return `${(promo.bundle_product_ids || []).length} SP = ${money(promo.discount_value)}`;
-  return cfg.label;
+const getPromotionBenefit = (promo: Promotion) => {
+  if (promo.discount_type === 'percent') {
+    return {
+      benefit: `Giảm ${promo.discount_value}%`,
+      explanation: 'Tính trên giá trị sản phẩm thuộc phạm vi áp dụng',
+    };
+  }
+  if (promo.discount_type === 'fixed_amount') {
+    return {
+      benefit: `Giảm trực tiếp ${money(promo.discount_value)}`,
+      explanation: 'Trừ vào giá trị sản phẩm thuộc phạm vi áp dụng',
+    };
+  }
+  if (promo.discount_type === 'buy_x_get_y') {
+    const buyQuantity = promo.buy_quantity || 0;
+    const getQuantity = promo.get_quantity || 0;
+    return {
+      benefit: `Tặng ${getQuantity} sản phẩm giá thấp nhất`,
+      explanation: `Mỗi ${buyQuantity + getQuantity} sản phẩm, chỉ tính tiền ${buyQuantity}`,
+    };
+  }
+  if (promo.discount_type === 'fixed_price') {
+    return {
+      benefit: `${promo.combo_quantity || 0} sản phẩm chỉ ${money(promo.discount_value)}`,
+      explanation: 'Tính theo nhóm sản phẩm đủ số lượng',
+    };
+  }
+  if (promo.discount_type === 'nth_item_discount') {
+    return {
+      benefit: `Sản phẩm thứ ${promo.nth_item || 2} giảm ${promo.discount_value}%`,
+      explanation: 'Ưu đãi cho sản phẩm giá thấp nhất trong nhóm',
+    };
+  }
+  if (promo.discount_type === 'happy_hour') {
+    return {
+      benefit: `Giảm ${promo.discount_value}% trong khung giờ vàng`,
+      explanation: `Áp dụng mỗi ngày từ ${promo.happy_hour_start || 'chưa đặt'} đến ${promo.happy_hour_end || 'chưa đặt'}`,
+    };
+  }
+  const bundleCount = (promo.bundle_product_ids || []).length;
+  return {
+    benefit: `Combo ${bundleCount} sản phẩm chỉ ${money(promo.discount_value)}`,
+    explanation: 'Cần đủ tất cả sản phẩm trong combo',
+  };
+};
+
+const getValidityDisplay = (promo: Promotion) => {
+  const now = new Date();
+  const start = new Date(promo.start_date);
+  const end = promo.end_date ? new Date(promo.end_date) : null;
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  if (!promo.is_active) {
+    return {
+      primary: 'Đã tắt thủ công',
+      secondary: end ? `${formatDate(start)} - ${formatDate(end)}` : `Bắt đầu ${formatDate(start)}`,
+    };
+  }
+
+  if (now < start) {
+    const days = Math.max(1, Math.ceil((start.getTime() - now.getTime()) / dayMs));
+    return { primary: `Bắt đầu ${formatDate(start)}`, secondary: `Còn ${days} ngày` };
+  }
+
+  if (end && now > end) {
+    return { primary: `Kết thúc ${formatDate(end)}`, secondary: 'Đã qua thời hạn sử dụng' };
+  }
+
+  if (!end) {
+    return { primary: 'Không giới hạn thời gian', secondary: `Bắt đầu từ ${formatDate(start)}` };
+  }
+
+  const remainingMs = end.getTime() - now.getTime();
+  const remainingDays = Math.ceil(remainingMs / dayMs);
+  return {
+    primary: `Đến ${formatDate(end)}`,
+    secondary: remainingDays <= 1 ? 'Còn dưới 1 ngày' : `Còn ${remainingDays} ngày`,
+  };
+};
+
+const getUsageDisplay = (promo: Promotion) => {
+  if (!promo.usage_limit) {
+    return {
+      primary: `${promo.usage_count.toLocaleString('vi-VN')} lượt`,
+      secondary: 'Không giới hạn lượt dùng',
+    };
+  }
+
+  const remaining = Math.max(promo.usage_limit - promo.usage_count, 0);
+  return {
+    primary: `${promo.usage_count.toLocaleString('vi-VN')} / ${promo.usage_limit.toLocaleString('vi-VN')} lượt`,
+    secondary: remaining > 0 ? `Còn ${remaining.toLocaleString('vi-VN')} lượt` : 'Đã dùng hết',
+  };
 };
 
 interface PromotionsTabProps {
@@ -74,11 +209,12 @@ interface PromotionsTabProps {
 const PromotionsTab = ({ categories }: PromotionsTabProps) => {
   const { user } = useAuthStore();
   const canManage = user?.role === 'admin' || user?.role === 'manager';
+  const isDemoMode = user?.email === 'demo@sora-pos.com';
 
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'scheduled' | 'ended'>('all');
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -115,15 +251,17 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
   // Products for product-scope/bundle selection
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [productSearch, setProductSearch] = useState('');
+  const [hasRequestedProducts, setHasRequestedProducts] = useState(false);
 
   const loadPromotions = async () => {
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { limit: 500 };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (search.trim()) params.search = search.trim();
-      const res = await promotionAPI.list(params);
-      setPromotions(res.data.data.items);
+      const res = await promotionAPI.list({ limit: 500 });
+      const demoUsage = isDemoMode ? readDemoPromotionUsage() : {};
+      setPromotions(res.data.data.items.map((promotion) => ({
+        ...promotion,
+        usage_count: promotion.usage_count + (demoUsage[promotion.id] || 0),
+      })));
     } catch {
       toast.error('Không tải được danh sách khuyến mãi');
     } finally {
@@ -131,15 +269,30 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
     }
   };
 
-  useEffect(() => { loadPromotions(); }, [statusFilter, search]);
+  useEffect(() => { loadPromotions(); }, [isDemoMode]);
 
   useEffect(() => {
-    if ((formApplyTo === 'product' || formDiscountType === 'bundle') && allProducts.length === 0) {
+    if (!isDemoMode) return;
+    const handleDemoUsageUpdated = () => { loadPromotions(); };
+    window.addEventListener(DEMO_PROMOTION_USAGE_EVENT, handleDemoUsageUpdated);
+    return () => window.removeEventListener(DEMO_PROMOTION_USAGE_EVENT, handleDemoUsageUpdated);
+  }, [isDemoMode]);
+
+  useEffect(() => {
+    const listNeedsProductNames = promotions.some((promotion) =>
+      promotion.apply_to === 'product' ||
+      promotion.discount_type === 'bundle' ||
+      Boolean(promotion.get_product_ids?.length)
+    );
+    const formNeedsProducts = formApplyTo === 'product' || formDiscountType === 'bundle';
+
+    if ((listNeedsProductNames || formNeedsProducts) && !hasRequestedProducts) {
+      setHasRequestedProducts(true);
       catalogAPI.products.list({ limit: 500, is_active: true })
         .then((res) => setAllProducts(res.data.data.items))
         .catch(() => {});
     }
-  }, [formApplyTo, formDiscountType]);
+  }, [promotions, formApplyTo, formDiscountType, hasRequestedProducts]);
 
   // ═══ Smart Input — parse on each keystroke ═══
   useEffect(() => {
@@ -285,17 +438,105 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
 
   // Stats
   const stats = useMemo(() => {
-    const now = new Date();
-    let active = 0, expired = 0, totalUsage = 0;
-    promotions.forEach((p) => {
-      const end = p.end_date ? new Date(p.end_date) : null;
-      const isExpired = !p.is_active || (end && now > end) || (p.usage_limit && p.usage_count >= p.usage_limit);
-      if (isExpired) expired++;
-      else active++;
-      totalUsage += p.usage_count;
+    let running = 0;
+    let scheduled = 0;
+    let ended = 0;
+    let totalUsage = 0;
+
+    promotions.forEach((promotion) => {
+      const status = getPromoStatus(promotion);
+      if (status.key === 'running') running += 1;
+      else if (status.key === 'scheduled') scheduled += 1;
+      else ended += 1;
+      totalUsage += promotion.usage_count;
     });
-    return { total: promotions.length, active, expired, totalUsage };
+
+    return { total: promotions.length, running, scheduled, ended, totalUsage };
   }, [promotions]);
+
+  const visiblePromotions = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase('vi-VN');
+
+    return promotions.filter((promotion) => {
+      const status = getPromoStatus(promotion);
+      const matchesStatus = statusFilter === 'all'
+        || (statusFilter === 'running' && status.key === 'running')
+        || (statusFilter === 'scheduled' && status.key === 'scheduled')
+        || (statusFilter === 'ended' && ['disabled', 'expired', 'exhausted'].includes(status.key));
+
+      if (!matchesStatus) return false;
+      if (!query) return true;
+
+      return [promotion.name, promotion.code, promotion.description, DISCOUNT_TYPE_CONFIG[promotion.discount_type]?.label]
+        .some((value) => value?.toLocaleLowerCase('vi-VN').includes(query));
+    });
+  }, [promotions, search, statusFilter]);
+
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories]
+  );
+
+  const productNameById = useMemo(
+    () => new Map(allProducts.map((product) => [product.id, product.name])),
+    [allProducts]
+  );
+
+  const getScopeDisplay = (promotion: Promotion) => {
+    const scopeIds = promotion.discount_type === 'bundle'
+      ? promotion.bundle_product_ids || []
+      : promotion.apply_to_ids || [];
+
+    if (promotion.discount_type === 'bundle') {
+      if (scopeIds.length === 0) {
+        return { primary: 'Chưa chọn sản phẩm', secondary: 'Cần cấu hình lại combo', warning: true };
+      }
+      const names = scopeIds.map((id) => productNameById.get(id)).filter(Boolean) as string[];
+      const remaining = Math.max(scopeIds.length - names.slice(0, 2).length, 0);
+      return {
+        primary: `${scopeIds.length} sản phẩm trong combo`,
+        secondary: names.length > 0
+          ? `${names.slice(0, 2).join(', ')}${remaining > 0 ? ` và ${remaining} sản phẩm khác` : ''}`
+          : 'Đang tải tên sản phẩm',
+        warning: false,
+      };
+    }
+
+    if (promotion.apply_to === 'all') {
+      return { primary: 'Toàn bộ đơn hàng', secondary: 'Không giới hạn sản phẩm', warning: false };
+    }
+
+    if (scopeIds.length === 0) {
+      return {
+        primary: promotion.apply_to === 'category' ? 'Chưa chọn danh mục' : 'Chưa chọn sản phẩm',
+        secondary: 'Cần cấu hình lại phạm vi',
+        warning: true,
+      };
+    }
+
+    const source = promotion.apply_to === 'category' ? categoryNameById : productNameById;
+    const names = scopeIds.map((id) => source.get(id)).filter(Boolean) as string[];
+    const entityLabel = promotion.apply_to === 'category' ? 'danh mục' : 'sản phẩm';
+    const shownNames = names.slice(0, 2);
+    const remaining = Math.max(scopeIds.length - shownNames.length, 0);
+
+    return {
+      primary: `${scopeIds.length} ${entityLabel}`,
+      secondary: shownNames.length > 0
+        ? `${shownNames.join(', ')}${remaining > 0 ? ` và ${remaining} ${entityLabel} khác` : ''}`
+        : `Đang tải tên ${entityLabel}`,
+      warning: false,
+    };
+  };
+
+  const getConditionLabels = (promotion: Promotion) => {
+    const labels: string[] = [];
+    if (promotion.min_order_amount > 0) labels.push(`Đơn tối thiểu ${money(promotion.min_order_amount)}`);
+    if (promotion.max_discount && ['percent', 'happy_hour'].includes(promotion.discount_type)) {
+      labels.push(`Giảm tối đa ${money(promotion.max_discount)}`);
+    }
+    return labels;
+  };
 
   const filteredProducts = useMemo(() => {
     if (!productSearch.trim()) return allProducts.slice(0, 50);
@@ -319,184 +560,302 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
 
   return (
     <div className="space-y-5">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-11 h-11 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center flex-shrink-0">
-            <FiGift className="w-6 h-6" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng khuyến mãi</p>
-            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.total}</h2>
-          </div>
+      <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">Bán hàng / Ưu đãi</p>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Quản lý khuyến mãi</h1>
+          <p className="mt-1 max-w-2xl text-sm font-medium text-slate-500">
+            Theo dõi chương trình đang áp dụng, điều kiện nhận ưu đãi và thời hạn sử dụng.
+          </p>
         </div>
-        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-            <HiOutlineLightBulb className="w-6 h-6" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đang hoạt động</p>
-            <h2 className="text-2xl font-black text-emerald-700 mt-1">{stats.active}</h2>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-11 h-11 rounded-xl bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
-            <HiOutlineClock className="w-6 h-6" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hết hạn / Tắt</p>
-            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.expired}</h2>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-200/60 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
-          <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
-            <FiHash className="w-6 h-6" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tổng lượt sử dụng</p>
-            <h2 className="text-2xl font-black text-slate-800 mt-1">{stats.totalUsage}</h2>
-          </div>
-        </div>
-      </div>
+        {canManage && (
+          <button type="button" onClick={openCreate}
+            className="inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 active:translate-y-px">
+            <HiOutlinePlus className="h-4 w-4" />
+            Tạo khuyến mãi
+          </button>
+        )}
+      </header>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="relative flex-1 max-w-xs">
-            <HiOutlineSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm kiếm theo tên hoặc mã..."
-              className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition" />
-          </div>
-          <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
-            {(['all', 'active', 'expired'] as const).map((s) => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-3 py-2 text-[10px] font-black uppercase tracking-wider transition ${statusFilter === s ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
-                {s === 'all' ? 'Tất cả' : s === 'active' ? 'Đang chạy' : 'Hết hạn'}
+      <section className="border border-slate-200 bg-white shadow-sm" aria-label="Tổng quan khuyến mãi">
+        <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 xl:grid-cols-4 xl:divide-y-0">
+          {[
+            { label: 'Tổng chương trình', value: stats.total, note: 'Đang quản lý', icon: FiGift, tone: 'text-slate-950' },
+            { label: 'Đang áp dụng', value: stats.running, note: 'Có thể dùng tại POS', icon: HiOutlineLightBulb, tone: 'text-emerald-700' },
+            { label: 'Sắp diễn ra', value: stats.scheduled, note: 'Chờ đến ngày bắt đầu', icon: HiOutlineCalendar, tone: 'text-blue-700' },
+            { label: 'Lượt đã dùng', value: stats.totalUsage, note: 'Tổng trên mọi chương trình', icon: FiHash, tone: 'text-slate-950' },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.label} className="min-h-[116px] p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+                  <Icon className="h-4 w-4 text-slate-400" />
+                </div>
+                <p className={`mt-3 text-2xl font-black tracking-tight ${item.tone}`}>{item.value.toLocaleString('vi-VN')}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">{item.note}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 p-4 xl:flex-row xl:items-center xl:justify-between">
+          <label className="relative block w-full xl:max-w-[360px]">
+            <HiOutlineSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <span className="sr-only">Tìm khuyến mãi</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm tên chương trình hoặc mã"
+              aria-label="Tìm tên chương trình hoặc mã khuyến mãi"
+              className="h-11 w-full border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+
+          <div className="grid grid-cols-2 border border-slate-200 sm:flex sm:max-w-full sm:overflow-x-auto">
+            {([
+              { value: 'all' as const, label: 'Tất cả', count: stats.total },
+              { value: 'running' as const, label: 'Đang áp dụng', count: stats.running },
+              { value: 'scheduled' as const, label: 'Sắp diễn ra', count: stats.scheduled },
+              { value: 'ended' as const, label: 'Đã kết thúc', count: stats.ended },
+            ]).map((filter) => (
+              <button
+                key={filter.value}
+                type="button"
+                onClick={() => setStatusFilter(filter.value)}
+                aria-pressed={statusFilter === filter.value}
+                className={`inline-flex h-10 items-center justify-center gap-2 px-3 text-xs font-bold transition sm:shrink-0 ${statusFilter === filter.value ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+              >
+                {filter.label}
+                <span className={`text-[11px] ${statusFilter === filter.value ? 'text-slate-300' : 'text-slate-400'}`}>{filter.count}</span>
               </button>
             ))}
           </div>
         </div>
-        {canManage && (
-          <button onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-700 px-4 py-2.5 text-xs font-extrabold text-white transition-all shadow-md shadow-violet-500/20 hover:shadow-lg hover:-translate-y-0.5">
-            <HiOutlinePlus className="w-4 h-4 stroke-2" />
-            Tạo khuyến mãi
-          </button>
-        )}
-      </div>
+        <div className="flex flex-col gap-2 border-t border-slate-100 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-semibold text-slate-500">
+            Hiển thị <span className="font-black text-slate-800">{visiblePromotions.length}</span> chương trình
+            {search.trim() ? ` phù hợp với “${search.trim()}”` : ''}
+          </p>
+          <p className="inline-flex items-center gap-1.5 font-medium text-slate-400">
+            <HiOutlineLightBulb className="h-3.5 w-3.5 text-blue-500" />
+            Không có mã là tự động áp dụng tại POS
+          </p>
+        </div>
+      </section>
 
-      {/* Promotions Table */}
-      <div className="bg-white border border-slate-200/60 rounded-2xl shadow-sm overflow-hidden">
+      <section className="overflow-hidden border border-slate-200 bg-white shadow-sm" aria-label="Danh sách chương trình khuyến mãi">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-xs font-bold text-slate-500">Đang tải...</span>
+          <div className="divide-y divide-slate-100" aria-label="Đang tải danh sách khuyến mãi">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="grid animate-pulse gap-4 p-5 motion-reduce:animate-none 2xl:grid-cols-[minmax(220px,1.2fr)_minmax(260px,1.45fr)_minmax(220px,1.2fr)_minmax(180px,1fr)_minmax(140px,.8fr)_minmax(145px,.8fr)_116px]">
+                <div className="h-12 bg-slate-100" />
+                <div className="space-y-2"><div className="h-4 w-40 bg-slate-100" /><div className="h-3 w-56 bg-slate-100" /></div>
+                <div className="space-y-2"><div className="h-4 w-32 bg-slate-100" /><div className="h-3 w-44 bg-slate-100" /></div>
+                <div className="space-y-2"><div className="h-4 w-28 bg-slate-100" /><div className="h-3 w-24 bg-slate-100" /></div>
+                <div className="space-y-2"><div className="h-4 w-20 bg-slate-100" /><div className="h-3 w-24 bg-slate-100" /></div>
+                <div className="h-7 w-28 bg-slate-100" />
+                <div className="h-8 w-24 bg-slate-100" />
+              </div>
+            ))}
           </div>
-        ) : promotions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-400 mb-3">
-              <FiGift className="w-7 h-7" />
+        ) : visiblePromotions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center bg-blue-50 text-blue-500">
+              <FiGift className="h-7 w-7" />
             </div>
-            <p className="text-sm font-black text-slate-600">Chưa có khuyến mãi nào</p>
-            <p className="text-xs text-slate-400 mt-1">Tạo chương trình khuyến mãi đầu tiên cho cửa hàng</p>
+            <p className="mt-4 text-sm font-black text-slate-800">
+              {promotions.length === 0 ? 'Chưa có chương trình khuyến mãi' : 'Không tìm thấy chương trình phù hợp'}
+            </p>
+            <p className="mt-1 max-w-sm text-xs font-medium text-slate-500">
+              {promotions.length === 0 ? 'Tạo chương trình đầu tiên để POS tự nhận diện ưu đãi cho khách hàng.' : 'Thử đổi từ khóa hoặc trạng thái lọc để xem các chương trình khác.'}
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              {promotions.length > 0 && (search || statusFilter !== 'all') && (
+                <button type="button" onClick={() => { setSearch(''); setStatusFilter('all'); }} className="h-9 border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
+                  Xóa bộ lọc
+                </button>
+              )}
+              {promotions.length === 0 && canManage && (
+                <button type="button" onClick={openCreate} className="h-9 bg-blue-600 px-3 text-xs font-black text-white transition hover:bg-blue-700">
+                  Tạo khuyến mãi
+                </button>
+              )}
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200/60">
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Tên chương trình</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Loại / Giảm giá</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Phạm vi</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Thời hạn</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Đã dùng</th>
-                  <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</th>
-                  {canManage && (
-                    <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">Thao tác</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {promotions.map((promo) => {
-                  const status = getPromoStatus(promo);
-                  const typeInfo = DISCOUNT_TYPE_CONFIG[promo.discount_type] || DISCOUNT_TYPE_CONFIG.percent;
-                  return (
-                    <tr key={promo.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-xl ${typeInfo.bg} ${typeInfo.border} border flex items-center justify-center flex-shrink-0 ${typeInfo.color}`}>
-                            <DiscountTypeIcon type={promo.discount_type} className="w-4.5 h-4.5" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-black text-slate-800 truncate max-w-[200px]" title={promo.name}>{promo.name}</p>
-                            {promo.description && <p className="text-[10px] text-slate-400 truncate max-w-[200px]" title={promo.description}>{promo.description}</p>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {promo.code ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-xs font-black text-slate-700 tracking-wide border border-slate-200">
-                            <HiOutlineTag className="w-3 h-3" />{promo.code}
-                          </span>
-                        ) : <span className="text-[10px] font-bold text-slate-400 italic">Tự động</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md ${typeInfo.bg} ${typeInfo.color}`}>
-                            <DiscountTypeIcon type={promo.discount_type} className="w-3 h-3" />{typeInfo.label}
-                          </span>
-                          <p className={`text-xs font-black ${typeInfo.color}`}>{getDiscountDisplay(promo)}</p>
-                          {promo.max_discount ? <p className="text-[10px] text-slate-400 font-bold">Tối đa: {money(promo.max_discount)}</p> : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                          promo.apply_to === 'all' ? 'bg-blue-50 text-blue-600' : promo.apply_to === 'category' ? 'bg-amber-50 text-amber-600' : 'bg-pink-50 text-pink-600'
-                        }`}>
-                          {promo.apply_to === 'all' ? 'Toàn đơn' : promo.apply_to === 'category' ? 'Danh mục' : 'Sản phẩm'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-[11px] font-bold text-slate-600">{formatDate(promo.start_date)}</p>
-                        <p className="text-[10px] text-slate-400 font-bold">→ {promo.end_date ? formatDate(promo.end_date) : 'Vô thời hạn'}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-black text-slate-700">
-                          {promo.usage_count}{promo.usage_limit ? <span className="text-slate-400 font-bold">/{promo.usage_limit}</span> : ''}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-lg border ${status.className}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />{status.label}
-                        </span>
-                      </td>
-                      {canManage && (
-                        <td className="px-4 py-3 text-right">
-                          <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleToggleActive(promo)}
-                              className={`p-1.5 rounded-lg text-xs transition ${promo.is_active ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
-                              title={promo.is_active ? 'Tắt' : 'Bật'}>
-                              {promo.is_active ? <HiOutlineExclamationCircle className="w-4 h-4" /> : <HiOutlineCheck className="w-4 h-4" />}
-                            </button>
-                            <button onClick={() => openEdit(promo)} className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition" title="Sửa">
-                              <HiOutlinePencil className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => setConfirmDeleteId(promo.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition" title="Xóa">
-                              <HiOutlineTrash className="w-4 h-4" />
-                            </button>
+          <>
+            <div className="hidden overflow-x-auto 2xl:block">
+              <table className="w-full min-w-[1250px] text-left">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr className="text-[11px] font-black uppercase tracking-[0.1em] text-slate-500">
+                    <th className="w-[230px] px-4 py-3">Chương trình</th>
+                    <th className="w-[285px] px-4 py-3">Khách nhận được</th>
+                    <th className="w-[245px] px-4 py-3">Áp dụng cho</th>
+                    <th className="w-[190px] px-4 py-3">Hiệu lực</th>
+                    <th className="w-[155px] px-4 py-3">Lượt dùng</th>
+                    <th className="w-[150px] px-4 py-3">Trạng thái</th>
+                    {canManage && <th className="w-[116px] px-4 py-3 text-right">Thao tác</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visiblePromotions.map((promo) => {
+                    const status = getPromoStatus(promo);
+                    const typeInfo = DISCOUNT_TYPE_CONFIG[promo.discount_type] || DISCOUNT_TYPE_CONFIG.percent;
+                    const benefit = getPromotionBenefit(promo);
+                    const scope = getScopeDisplay(promo);
+                    const validity = getValidityDisplay(promo);
+                    const usage = getUsageDisplay(promo);
+                    const conditions = getConditionLabels(promo);
+                    return (
+                      <tr key={promo.id} className="align-top transition hover:bg-blue-50/30">
+                        <td className="px-4 py-4">
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-blue-200 bg-blue-50 text-blue-700">
+                              <DiscountTypeIcon type={promo.discount_type} className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-black text-slate-900" title={promo.name}>{promo.name}</p>
+                              <p className="mt-1 text-[11px] font-bold text-blue-700">{typeInfo.label}</p>
+                              {promo.description && <p className="mt-1 line-clamp-2 text-xs font-medium text-slate-500" title={promo.description}>{promo.description}</p>}
+                              {promo.code ? (
+                                <span className="mt-2 inline-flex items-center gap-1 border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-black tracking-wide text-slate-700">
+                                  <HiOutlineTag className="h-3 w-3 text-slate-400" /> Nhập mã {promo.code}
+                                </span>
+                              ) : (
+                                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-black text-blue-700">
+                                  <HiOutlineLightBulb className="h-3 w-3" /> Tự động tại POS
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-black leading-5 text-slate-900">{benefit.benefit}</p>
+                          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">{benefit.explanation}</p>
+                          {conditions.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {conditions.map((condition) => <span key={condition} className="border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-600">{condition}</span>)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className={`text-sm font-black ${scope.warning ? 'text-amber-700' : 'text-slate-800'}`}>{scope.primary}</p>
+                          <p className={`mt-1 text-xs font-medium leading-5 ${scope.warning ? 'text-amber-600' : 'text-slate-500'}`}>{scope.secondary}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-start gap-2">
+                            <HiOutlineCalendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                            <div>
+                              <p className="text-xs font-black text-slate-700">{validity.primary}</p>
+                              <p className="mt-1 text-[11px] font-medium text-slate-500">{validity.secondary}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-black text-slate-800">{usage.primary}</p>
+                          <p className="mt-1 text-[11px] font-medium text-slate-500">{usage.secondary}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-black ${status.className}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />{status.label}
+                          </span>
+                          <p className="mt-1 text-[10px] font-medium text-slate-400">{status.description}</p>
+                        </td>
+                        {canManage && (
+                          <td className="px-4 py-4 text-right">
+                            <div className="inline-flex items-center gap-1">
+                              <button type="button" onClick={() => handleToggleActive(promo)} aria-label={promo.is_active ? `Tắt ${promo.name}` : `Bật ${promo.name}`} title={promo.is_active ? 'Tắt chương trình' : 'Bật chương trình'} className={`flex h-8 w-8 items-center justify-center border transition ${promo.is_active ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>
+                                {promo.is_active ? <HiOutlinePause className="h-4 w-4" /> : <HiOutlinePlay className="h-4 w-4" />}
+                              </button>
+                              <button type="button" onClick={() => openEdit(promo)} aria-label={`Sửa ${promo.name}`} title="Sửa chương trình" className="flex h-8 w-8 items-center justify-center border border-slate-200 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">
+                                <HiOutlinePencil className="h-4 w-4" />
+                              </button>
+                              <button type="button" onClick={() => setConfirmDeleteId(promo.id)} aria-label={`Xóa ${promo.name}`} title="Xóa chương trình" className="flex h-8 w-8 items-center justify-center border border-slate-200 text-slate-600 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                                <HiOutlineTrash className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 2xl:hidden">
+              {visiblePromotions.map((promo) => {
+                const status = getPromoStatus(promo);
+                const benefit = getPromotionBenefit(promo);
+                const scope = getScopeDisplay(promo);
+                const validity = getValidityDisplay(promo);
+                const usage = getUsageDisplay(promo);
+                const conditions = getConditionLabels(promo);
+                return (
+                  <article key={promo.id} className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-blue-200 bg-blue-50 text-blue-700">
+                          <DiscountTypeIcon type={promo.discount_type} className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-slate-900">{promo.name}</p>
+                          <p className="mt-1 text-[11px] font-bold text-blue-700">{DISCOUNT_TYPE_CONFIG[promo.discount_type]?.label}</p>
+                        </div>
+                      </div>
+                      <span className={`inline-flex shrink-0 items-center gap-1.5 border px-2 py-1 text-[10px] font-black ${status.className}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} />{status.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 border-l-2 border-blue-500 bg-blue-50 px-3 py-3">
+                      <p className="text-sm font-black text-slate-900">{benefit.benefit}</p>
+                      <p className="mt-1 text-xs font-medium leading-5 text-slate-600">{benefit.explanation}</p>
+                      {conditions.length > 0 && <p className="mt-2 text-[11px] font-bold text-slate-600">{conditions.join('  |  ')}</p>}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Áp dụng cho</p>
+                        <p className={`mt-1 font-black ${scope.warning ? 'text-amber-700' : 'text-slate-800'}`}>{scope.primary}</p>
+                        <p className={`mt-1 font-medium ${scope.warning ? 'text-amber-600' : 'text-slate-500'}`}>{scope.secondary}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Hiệu lực</p>
+                        <p className="mt-1 font-black text-slate-800">{validity.primary}</p>
+                        <p className="mt-1 font-medium text-slate-500">{validity.secondary}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Lượt dùng</p>
+                        <p className="mt-1 font-black text-slate-800">{usage.primary}</p>
+                        <p className="mt-1 font-medium text-slate-500">{usage.secondary}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                      {promo.code ? <span className="inline-flex items-center gap-1 text-[10px] font-black text-slate-600"><HiOutlineTag className="h-3 w-3 text-slate-400" /> Nhập mã {promo.code}</span> : <span className="inline-flex items-center gap-1 text-[10px] font-black text-blue-700"><HiOutlineLightBulb className="h-3 w-3" /> Tự động tại POS</span>}
+                      {canManage && (
+                        <div className="flex items-center gap-1">
+                          <button type="button" onClick={() => handleToggleActive(promo)} className={`inline-flex h-8 items-center gap-1 border px-2 text-[11px] font-bold ${promo.is_active ? 'border-amber-200 text-amber-700' : 'border-emerald-200 text-emerald-700'}`}>
+                            {promo.is_active ? <HiOutlinePause className="h-3.5 w-3.5" /> : <HiOutlinePlay className="h-3.5 w-3.5" />}
+                            {promo.is_active ? 'Tắt' : 'Bật'}
+                          </button>
+                          <button type="button" onClick={() => openEdit(promo)} className="inline-flex h-8 items-center gap-1 border border-slate-200 px-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"><HiOutlinePencil className="h-3.5 w-3.5" /> Sửa</button>
+                          <button type="button" onClick={() => setConfirmDeleteId(promo.id)} aria-label={`Xóa ${promo.name}`} className="flex h-8 w-8 items-center justify-center border border-slate-200 text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700"><HiOutlineTrash className="h-3.5 w-3.5" /></button>
+                        </div>
                       )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
-      </div>
+      </section>
 
       {/* Delete Confirm */}
       {confirmDeleteId && (
@@ -523,7 +882,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600"><FiGift className="w-5 h-5" /></div>
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><FiGift className="w-5 h-5" /></div>
                 <h3 className="text-sm font-black text-slate-800">{editId ? 'Chỉnh sửa khuyến mãi' : 'Tạo khuyến mãi mới'}</h3>
               </div>
               <button onClick={() => { setShowModal(false); resetForm(); }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition"><HiOutlineX className="w-5 h-5" /></button>
@@ -535,7 +894,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
               {/* ═══ SMART INPUT ═══ */}
               {!editId && (
                 <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-[10px] font-black text-violet-600 uppercase tracking-wider">
+                  <label className="flex items-center gap-1.5 text-[10px] font-black text-blue-600 uppercase tracking-wider">
                     <HiOutlineSparkles className="w-3.5 h-3.5" /> Nhập nhanh bằng mô tả
                   </label>
                   <div className="relative">
@@ -544,11 +903,11 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                       onChange={(e) => setSmartInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && smartParsed) { e.preventDefault(); applySmartResult(); } }}
                       placeholder='VD: "SP thứ 2 giảm 50%" hoặc "Mua 2 tặng 1"'
-                      className="w-full border border-violet-200 bg-violet-50/30 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition pr-20"
+                      className="w-full border border-blue-200 bg-blue-50/30 rounded-xl px-3 py-2.5 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition pr-20"
                     />
                     {smartParsed && (
                       <button type="button" onClick={applySmartResult}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-violet-600 text-white text-[10px] font-black rounded-lg hover:bg-violet-700 transition">
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-blue-600 text-white text-[10px] font-black rounded-lg hover:bg-blue-700 transition">
                         Áp dụng
                       </button>
                     )}
@@ -572,7 +931,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                     <div className="flex flex-wrap gap-1.5">
                       {PROMO_EXAMPLES.slice(0, 4).map((ex) => (
                         <button key={ex} type="button" onClick={() => setSmartInput(ex)}
-                          className="px-2 py-1 text-[9px] font-bold text-violet-600 bg-violet-50 border border-violet-100 rounded-lg hover:bg-violet-100 transition">
+                          className="px-2 py-1 text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition">
                           {ex}
                         </button>
                       ))}
@@ -589,7 +948,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tên chương trình *</label>
                 <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)}
                   placeholder="VD: Giảm 20% cuối tuần / SP thứ 2 nửa giá"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/20 transition" required />
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition" required />
               </div>
 
               {/* Code + Description */}
@@ -598,13 +957,13 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mã khuyến mãi</label>
                   <input type="text" value={formCode} onChange={(e) => setFormCode(e.target.value.toUpperCase())}
                     placeholder="VD: SALE20"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition uppercase" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition uppercase" />
                   <p className="text-[9px] text-slate-400">Bỏ trống → tự động áp dụng</p>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Mô tả</label>
                   <input type="text" value={formDescription} onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="Ghi chú..." className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                    placeholder="Ghi chú..." className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" />
                 </div>
               </div>
 
@@ -615,7 +974,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                   {(Object.entries(DISCOUNT_TYPE_CONFIG) as [DiscountType, typeof DISCOUNT_TYPE_CONFIG['percent']][]).map(([key, info]) => (
                     <button key={key} type="button" onClick={() => setFormDiscountType(key)}
                       className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[10px] font-black border transition-all ${
-                        formDiscountType === key ? 'border-violet-500 bg-violet-50 text-violet-700 ring-1 ring-violet-500/20' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        formDiscountType === key ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500/20' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}>
                       <DiscountTypeIcon type={key} className="w-3.5 h-3.5" />{info.label}
                     </button>
@@ -792,7 +1151,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Đơn hàng tối thiểu (đ)</label>
                 <input type="number" value={formMinOrder || ''} onChange={(e) => setFormMinOrder(Number(e.target.value))}
                   placeholder="0 = không yêu cầu" min={0}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" />
               </div>
 
               {/* Apply To (skip for bundle) */}
@@ -807,7 +1166,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                     ]).map((opt) => (
                       <button key={opt.value} type="button" onClick={() => { setFormApplyTo(opt.value); setFormApplyToIds([]); }}
                         className={`flex-1 flex items-center gap-1.5 justify-center py-2 rounded-xl text-[10px] font-black border transition ${
-                          formApplyTo === opt.value ? 'border-violet-500 bg-violet-50 text-violet-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                          formApplyTo === opt.value ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                         }`}>
                         <opt.Icon className="w-3.5 h-3.5" />{opt.label}
                       </button>
@@ -820,7 +1179,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                         categories.map((cat) => (
                           <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition">
                             <input type="checkbox" checked={formApplyToIds.includes(cat.id)} onChange={() => toggleApplyId(cat.id)}
-                              className="rounded border-slate-300 text-violet-600 focus:ring-violet-500/20" />
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20" />
                             <span className="text-xs font-semibold text-slate-700">{cat.name}</span>
                           </label>
                         ))
@@ -832,14 +1191,14 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                     <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
                       <div className="px-3 py-2 border-b border-slate-200">
                         <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
-                          placeholder="Tìm sản phẩm..." className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-violet-500 transition" />
-                        {formApplyToIds.length > 0 && <p className="text-[10px] font-bold text-violet-600 mt-1">Đã chọn {formApplyToIds.length} sản phẩm</p>}
+                          placeholder="Tìm sản phẩm..." className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-blue-500 transition" />
+                        {formApplyToIds.length > 0 && <p className="text-[10px] font-bold text-blue-600 mt-1">Đã chọn {formApplyToIds.length} sản phẩm</p>}
                       </div>
                       <div className="max-h-36 overflow-y-auto p-2 space-y-0.5">
                         {filteredProducts.map((p) => (
                           <label key={p.id} className="flex items-center gap-2 cursor-pointer hover:bg-white px-2 py-1.5 rounded-lg transition">
                             <input type="checkbox" checked={formApplyToIds.includes(p.id)} onChange={() => toggleApplyId(p.id)}
-                              className="rounded border-slate-300 text-violet-600 focus:ring-violet-500/20" />
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20" />
                             <div className="min-w-0">
                               <span className="text-xs font-semibold text-slate-700 truncate block">{p.name}</span>
                               <span className="text-[10px] text-slate-400 font-bold">{p.sku}</span>
@@ -857,12 +1216,12 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ngày bắt đầu</label>
                   <input type="datetime-local" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ngày kết thúc</label>
                   <input type="datetime-local" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" />
                   <p className="text-[9px] text-slate-400">Bỏ trống → vô thời hạn</p>
                 </div>
               </div>
@@ -873,7 +1232,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Giới hạn lượt</label>
                   <input type="number" value={formUsageLimit} onChange={(e) => setFormUsageLimit(e.target.value ? Number(e.target.value) : '')}
                     placeholder="Không giới hạn" min={1}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-violet-500 transition" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 transition" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</label>
@@ -895,7 +1254,7 @@ const PromotionsTab = ({ categories }: PromotionsTabProps) => {
                 Hủy bỏ
               </button>
               <button onClick={handleSubmit} disabled={saving}
-                className="flex-1 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-extrabold hover:bg-violet-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700 transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
                 {saving ? 'Đang lưu...' : editId ? 'Cập nhật' : 'Tạo khuyến mãi'}
               </button>
             </div>

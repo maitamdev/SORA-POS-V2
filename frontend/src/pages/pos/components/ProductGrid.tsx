@@ -19,8 +19,8 @@ const ProductGridCard = memo(({ product, operationSettings, onAddToCart }: Produ
   const isOutOfStock = product.stock_quantity <= 0;
 
   return (
-    <div className="bg-white border border-slate-200/60 rounded-xl p-3 flex flex-col justify-between hover:shadow-md hover:border-blue-400 transition relative overflow-hidden group">
-      <span className={`absolute top-2.5 right-2.5 px-2 py-0.5 text-[9px] font-black rounded-full border ${
+    <div className="bg-white border border-slate-200/60 rounded-lg p-2.5 flex flex-col justify-between hover:shadow-md hover:border-blue-400 transition relative overflow-hidden group">
+      <span className={`absolute top-2.5 right-2.5 z-10 px-2 py-0.5 text-[9px] font-black rounded-full border shadow-sm ${
         isOutOfStock
           ? 'bg-red-100 text-red-700 border-red-200'
           : isLowStock
@@ -30,30 +30,30 @@ const ProductGridCard = memo(({ product, operationSettings, onAddToCart }: Produ
         Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '(Thấp)'} {isOutOfStock && 'Hết'}
       </span>
 
-      <div className="h-28 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-2 overflow-hidden flex-shrink-0">
+      <div className="h-40 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-1.5 overflow-hidden flex-shrink-0">
         <img
           src={getProductImage(product)}
           alt={product.name}
-          className="max-h-full max-w-full object-contain group-hover:scale-105 transition duration-300"
+          className="h-full w-full scale-[1.2] object-contain group-hover:scale-[1.28] transition duration-300"
           loading="lazy"
         />
       </div>
 
       <div className="flex-1 flex flex-col">
-        <h3 className="text-xs font-black text-slate-800 line-clamp-2 mt-1 min-h-[32px]">
+        <h3 className="text-[13px] font-black text-slate-800 line-clamp-2 mt-1 min-h-[34px]">
           {product.name}
         </h3>
-        <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">
+        <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 tracking-wider">
           {product.sku}
         </p>
       </div>
 
       <div className="mt-3">
-        <span className="text-sm font-black text-blue-600 block">{money(product.sell_price)}</span>
+        <span className="text-base font-black text-blue-600 block">{money(product.sell_price)}</span>
         <button
           onClick={() => onAddToCart(product)}
           disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
-          className="w-full mt-2.5 flex items-center justify-center gap-1 py-1.5 border border-blue-600 text-blue-600 text-[11px] font-black rounded-lg hover:bg-blue-600 hover:text-white transition disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-blue-600"
+          className="w-full mt-2.5 flex h-8 items-center justify-center gap-1 border border-blue-600 text-blue-600 text-[11px] font-black rounded-lg hover:bg-blue-600 hover:text-white transition disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-blue-600"
         >
           <HiOutlinePlus className="w-3.5 h-3.5" />
           <span>Thêm</span>
@@ -219,7 +219,7 @@ const ProductGrid = () => {
             <p className="text-xs text-slate-400 mt-1">Vui lòng điều chỉnh lại bộ lọc tìm kiếm sản phẩm.</p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
             {sortedProducts.map((product) => (
               <ProductGridCard
                 key={product.id}

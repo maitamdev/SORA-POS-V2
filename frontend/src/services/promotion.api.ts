@@ -29,8 +29,22 @@ export const promotionAPI = {
 
   getAutoPromotions: (data: { order_total: number; items?: Array<{ product_id: string; category_id?: string | null; quantity: number; unit_price: number }> }) =>
     api.post<ApiResponse<Array<{
-      promotion: { id: string; name: string; discount_type: string; discount_value: number; max_discount: number | null; apply_to: string; buy_quantity?: number; get_quantity?: number; combo_quantity?: number };
+      promotion: {
+        id: string;
+        name: string;
+        discount_type: string;
+        discount_value: number;
+        max_discount: number | null;
+        apply_to: string;
+        apply_to_ids?: string[];
+        bundle_product_ids?: string[];
+        get_product_ids?: string[];
+        buy_quantity?: number;
+        get_quantity?: number;
+        combo_quantity?: number;
+      };
       discount_amount: number;
+      applicable_product_ids?: string[];
       description?: string;
     }>>>('/promotions/auto', data),
 };

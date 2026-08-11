@@ -86,17 +86,6 @@ const TopHeader = () => {
 
         {/* Real-time Clock — isolated re-render */}
         <LiveClock />
-
-        {/* Profile Info */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200/60">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-            {getUserInitials(user)}
-          </div>
-          <div className="leading-none text-left hidden sm:block">
-            <p className="text-[11px] font-black text-slate-800">{user?.full_name || 'Người dùng'}</p>
-            <p className="text-[9px] font-bold text-slate-400 mt-0.5">{getRoleLabel(user?.role)}</p>
-          </div>
-        </div>
       </div>
     </header>
   );
@@ -129,7 +118,7 @@ const MainLayout = () => {
       <Sidebar />
 
       {/* Main Content - offset by sidebar width on desktop, full width on mobile */}
-      <main className="flex-1 lg:ml-64 min-h-screen transition-all duration-300 flex flex-col">
+      <main className="flex-1 min-w-0 lg:ml-64 min-h-screen transition-all duration-300 flex flex-col">
         {!isPosPage && <TopHeader />}
         <div className={isPosPage ? "" : "flex-1 p-3 sm:p-4 md:p-6"}>
           <Suspense fallback={<PageTransitionLoader />}>

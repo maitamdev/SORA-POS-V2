@@ -556,6 +556,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
                         <th className="px-4 py-3">Sản phẩm / SKU</th>
                         <th className="px-4 py-3 text-right">Đơn giá nhập</th>
                         <th className="px-4 py-3 text-center">Số lượng</th>
+                        <th className="px-4 py-3">Số lô</th>
                         <th className="px-4 py-3 text-center">Hạn sử dụng</th>
                         <th className="px-4 py-3 text-right">Thành tiền</th>
                       </tr>
@@ -571,6 +572,11 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold">{formatCurrency(item.unit_price)}</td>
                           <td className="px-4 py-3 text-center font-bold">{item.quantity} {item.products?.unit || 'cái'}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex border border-blue-100 bg-blue-50 px-2 py-1 text-[10px] font-black tracking-wide text-blue-700">
+                              {item.batch_number || 'Chưa có lô'}
+                            </span>
+                          </td>
                           <td className="px-4 py-3 text-center text-slate-500 font-bold">
                             {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString('vi-VN') : '—'}
                           </td>

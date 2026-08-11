@@ -10,6 +10,7 @@ import {
 import { FiLoader, FiGift, FiPercent, FiDollarSign, FiPackage } from 'react-icons/fi';
 import { usePOSStore, usePOSFinalAmount, usePOSTotal } from '../../../stores/pos.store';
 import { money, getProductImage } from '../utils/posHelpers';
+import type { CartItem } from '../utils/posHelpers';
 import { promotionAPI } from '../../../services/promotion.api';
 
 interface AutoPromoResult {
@@ -18,11 +19,16 @@ interface AutoPromoResult {
     name: string;
     discount_type: string;
     discount_value: number;
+    apply_to?: string;
+    apply_to_ids?: string[];
+    bundle_product_ids?: string[];
+    get_product_ids?: string[];
     buy_quantity?: number;
     get_quantity?: number;
     combo_quantity?: number;
   };
   discount_amount: number;
+  applicable_product_ids?: string[];
   description?: string;
 }
 
@@ -34,6 +40,41 @@ const PromoTypeIcon = ({ type }: { type: string }) => {
     case 'fixed_price': return <FiPackage className="w-3.5 h-3.5" />;
     default: return <FiGift className="w-3.5 h-3.5" />;
   }
+};
+
+const getAutoPromotionProductLabel = (promo: AutoPromoResult, cart: CartItem[]) => {
+  const bundleIds = promo.promotion.discount_type === 'bundle'
+    ? promo.promotion.bundle_product_ids || []
+    : [];
+  const scopedIds = bundleIds.length > 0
+    ? bundleIds
+    : promo.applicable_product_ids && promo.applicable_product_ids.length > 0
+      ? promo.applicable_product_ids
+      : promo.promotion.apply_to === 'product'
+        ? promo.promotion.apply_to_ids || []
+        : promo.promotion.apply_to === 'category'
+          ? cart
+            .filter((item) => item.product.category_id && (promo.promotion.apply_to_ids || []).includes(item.product.category_id))
+            .map((item) => item.product.id)
+          : cart.map((item) => item.product.id);
+
+  const names = Array.from(new Set(
+    cart
+      .filter((item) => scopedIds.includes(item.product.id))
+      .map((item) => item.product.name)
+      .filter(Boolean)
+  ));
+
+  if (names.length > 0) {
+    const visibleNames = names.slice(0, 2);
+    const remaining = names.length - visibleNames.length;
+    return `${visibleNames.join(', ')}${remaining > 0 ? ` + ${remaining} SP khác` : ''}`;
+  }
+
+  if (promo.promotion.apply_to === 'all') return 'Toàn bộ sản phẩm trong đơn';
+  if (promo.promotion.apply_to === 'category') return 'Sản phẩm thuộc danh mục đã chọn';
+  if (promo.promotion.apply_to === 'product') return 'Sản phẩm đã chọn';
+  return 'Sản phẩm trong chương trình';
 };
 
 interface CartPanelProps {
@@ -58,6 +99,8 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
   const setNewCustName = usePOSStore((s) => s.setNewCustName);
   const setAutoPromoDiscount = usePOSStore((s) => s.setAutoPromoDiscount);
   const setVoucherDiscount = usePOSStore((s) => s.setVoucherDiscount);
+  const setAutoPromotionIds = usePOSStore((s) => s.setAutoPromotionIds);
+  const setVoucherPromotionId = usePOSStore((s) => s.setVoucherPromotionId);
 
   const finalAmount = usePOSFinalAmount();
   const total = usePOSTotal();
@@ -77,8 +120,11 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
     if (cart.length === 0) {
       setAutoPromos([]);
       setAutoPromoDiscount(0);
+      setAutoPromotionIds([]);
       return;
     }
+
+    setAutoPromotionIds([]);
 
     const timer = setTimeout(async () => {
       const items = cart.map((item) => ({
@@ -96,16 +142,25 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
         setAutoPromos(arr);
         const sum = arr.reduce((acc, p) => acc + p.discount_amount, 0);
         setAutoPromoDiscount(sum);
+        setAutoPromotionIds(
+          Array.from(new Set(
+            arr
+              .filter((promo) => Number(promo.discount_amount) > 0)
+              .map((promo) => promo.promotion.id)
+              .filter(Boolean)
+          ))
+        );
       } catch {
         setAutoPromos([]);
         setAutoPromoDiscount(0);
+        setAutoPromotionIds([]);
       } finally {
         setAutoPromoLoading(false);
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [cartFingerprint, total, setAutoPromoDiscount]);
+  }, [cartFingerprint, total, setAutoPromoDiscount, setAutoPromotionIds]);
 
   const totalAutoDiscount = useMemo(
     () => autoPromos.reduce((sum, p) => sum + p.discount_amount, 0),
@@ -128,6 +183,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
     if (!code.trim()) {
       setVoucherResult(null);
       setVoucherDiscount(0);
+      setVoucherPromotionId(null);
       setVoucherError('');
       return;
     }
@@ -155,14 +211,16 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
         description: (res.data.data as any).description || '',
       });
       setVoucherDiscount(disc);
+      setVoucherPromotionId(res.data.data.promotion.id);
     } catch (err: any) {
       setVoucherResult(null);
       setVoucherDiscount(0);
+      setVoucherPromotionId(null);
       setVoucherError(err.response?.data?.message || 'Mã không hợp lệ');
     } finally {
       setVoucherLoading(false);
     }
-  }, [cart, total, setVoucherDiscount]);
+  }, [cart, total, setVoucherDiscount, setVoucherPromotionId]);
 
   // Debounce voucher validation
   useEffect(() => {
@@ -172,26 +230,28 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
       } else {
         setVoucherResult(null);
         setVoucherDiscount(0);
+        setVoucherPromotionId(null);
         setVoucherError('');
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [voucherCode, total, cartFingerprint, validateVoucher, setVoucherDiscount]);
+  }, [voucherCode, total, cartFingerprint, validateVoucher, setVoucherDiscount, setVoucherPromotionId]);
 
   useEffect(() => {
     if (cart.length === 0) {
       setVoucherResult(null);
       setVoucherDiscount(0);
+      setVoucherPromotionId(null);
       setVoucherError('');
     }
-  }, [cart.length, setVoucherDiscount]);
+  }, [cart.length, setVoucherDiscount, setVoucherPromotionId]);
 
   return (
     <>
       {/* Cart Header */}
       <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-        <h2 className="text-sm font-black text-slate-800 flex items-center gap-1.5 uppercase">
-          <HiOutlineShoppingCart className="w-5 h-5 text-blue-600" />
+        <h2 className="text-base font-black text-slate-800 flex items-center gap-2 uppercase">
+          <HiOutlineShoppingCart className="w-7 h-7 text-blue-600" />
           <span>Giỏ hàng ({cart.reduce((s, i) => s + i.quantity, 0)})</span>
         </h2>
         {cart.length > 0 && (
@@ -219,22 +279,22 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
             </div>
           ) : (
             cart.map((item) => (
-              <div key={item.product.id} className="py-3 flex items-start justify-between gap-3 group">
+              <div key={item.product.id} className="py-3.5 flex items-start justify-between gap-3 group">
                 <div className="flex items-start gap-3 min-w-0">
                   <img
                     src={getProductImage(item.product)}
                     alt={item.product.name}
-                    className="w-11 h-11 rounded-lg border border-slate-200/60 object-contain flex-shrink-0 bg-white p-0.5"
+                    className="w-14 h-14 rounded-lg border border-slate-200/60 object-contain flex-shrink-0 bg-white p-0.5"
                   />
                   <div className="min-w-0 leading-tight">
-                    <p className="text-xs font-black text-slate-800 truncate" title={item.product.name}>
+                    <p className="text-sm font-black text-slate-800 truncate" title={item.product.name}>
                       {item.product.name}
                     </p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{item.product.sku}</p>
-                    <div className="flex items-center gap-1 mt-2">
+                    <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">{item.product.sku}</p>
+                    <div className="flex items-center gap-1.5 mt-2">
                       <button
                         onClick={() => updateQty(item.product.id, item.quantity - 1)}
-                        className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
+                        className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-extrabold"
                       >
                         -
                       </button>
@@ -242,11 +302,11 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                         type="number"
                         value={item.quantity}
                         onChange={(e) => updateQty(item.product.id, Number(e.target.value))}
-                        className="w-10 h-5.5 border border-slate-200 text-center text-xs font-black text-slate-800 outline-none rounded"
+                        className="w-12 h-7 border border-slate-200 text-center text-sm font-black text-slate-800 outline-none rounded"
                       />
                       <button
                         onClick={() => updateQty(item.product.id, item.quantity + 1)}
-                        className="w-5.5 h-5.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-extrabold"
+                        className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-extrabold"
                       >
                         +
                       </button>
@@ -254,10 +314,10 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <span className="text-xs font-black text-slate-800">
+                  <span className="text-sm font-black text-slate-800">
                     {money(Number(item.product.sell_price) * item.quantity)}
                   </span>
-                  <span className="text-[10px] font-bold text-slate-400">
+                  <span className="text-xs font-bold text-slate-400">
                     {money(item.product.sell_price)}
                   </span>
                   <button
@@ -291,6 +351,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
               <div className="space-y-1.5">
                 {autoPromos.map((ap) => {
                   const isApplied = ap.discount_amount > 0;
+                  const productLabel = getAutoPromotionProductLabel(ap, cart);
                   return (
                     <div
                       key={ap.promotion.id}
@@ -308,6 +369,12 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                           <p className="text-[11px] font-extrabold text-slate-800 truncate">{ap.promotion.name}</p>
                           <p className={`text-[9px] font-bold ${isApplied ? 'text-emerald-600' : 'text-amber-600'}`}>
                             {ap.description}
+                          </p>
+                          <p
+                            className="text-[9px] font-semibold text-slate-500 truncate"
+                            title={`Sản phẩm áp dụng: ${productLabel}`}
+                          >
+                            SP áp dụng: {productLabel}
                           </p>
                         </div>
                       </div>
@@ -460,7 +527,10 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                 <input
                   type="text"
                   value={voucherCode}
-                  onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setVoucherCode(e.target.value.toUpperCase());
+                    setVoucherPromotionId(null);
+                  }}
                   placeholder="Nhập mã KM"
                   className="flex-1 w-full px-1.5 py-1.5 text-xs font-semibold outline-none uppercase"
                 />

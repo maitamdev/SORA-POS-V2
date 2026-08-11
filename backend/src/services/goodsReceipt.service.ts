@@ -5,12 +5,18 @@ import { appCache } from '../utils/cache';
 
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
+const isValidReceiptExpiry = (value: string, today: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value < today) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
 export interface ReceiptItemInput {
   product_id: string;
   quantity: number;
   unit_price: number;
-  expiry_date?: string | null;
-  batch_number?: string | null;
+  expiry_date: string;
+  batch_number: string;
 }
 
 export interface CreateReceiptInput {
@@ -38,9 +44,22 @@ export class GoodsReceiptService {
       throw new AppError(400, 'Danh sách sản phẩm nhập không được để trống');
     }
 
-    for (const item of input.items) {
+    const today = new Date().toISOString().split('T')[0];
+    const normalizedItems = input.items.map((item) => ({
+      ...item,
+      batch_number: String(item.batch_number || '').trim(),
+      expiry_date: String(item.expiry_date || '').trim(),
+    }));
+
+    for (const item of normalizedItems) {
       if (item.quantity <= 0) throw new AppError(400, 'Số lượng nhập phải lớn hơn 0');
       if (item.unit_price < 0) throw new AppError(400, 'Giá nhập không được nhỏ hơn 0');
+      if (!item.batch_number || item.batch_number.length > 100) {
+        throw new AppError(400, 'Mỗi dòng hàng phải có số lô hợp lệ');
+      }
+      if (!isValidReceiptExpiry(item.expiry_date, today)) {
+        throw new AppError(400, 'Hạn sử dụng phải là ngày hợp lệ từ hôm nay trở đi');
+      }
     }
 
     const receiptNumber = generateReceiptNumber();
@@ -49,7 +68,7 @@ export class GoodsReceiptService {
       supplier_id: input.supplier_id || null,
       note: input.note || null,
       paid_amount: Number(input.paid_amount || 0),
-      items: input.items,
+      items: normalizedItems,
     };
 
     const { data: receiptId, error } = await supabase.rpc('create_goods_receipt', {
@@ -135,8 +154,8 @@ export class GoodsReceiptService {
       const previousStock = Number(product.stock_quantity || 0);
       const newStock = previousStock + Number(item.quantity || 0);
 
-      const batchNumber = item.batch_number || `BAT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
-      const expiryDate = item.expiry_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const batchNumber = String(item.batch_number || '').trim();
+      const expiryDate = String(item.expiry_date || '').trim();
 
       // Insert detail
       const { error: detailErr } = await supabase
@@ -156,16 +175,38 @@ export class GoodsReceiptService {
         throw new AppError(400, 'Lỗi lưu chi tiết hàng hóa nhập');
       }
 
-      // Insert tracking batch into product_batches
-      const { error: batchErr } = await supabase
+      // Merge vào đúng lô nếu số lô + HSD đã tồn tại; không ghi đè lô cũ.
+      const { data: existingBatch, error: batchLookupError } = await supabase
         .from('product_batches')
-        .insert({
-          product_id: item.product_id,
-          batch_number: batchNumber,
-          expiry_date: expiryDate,
-          original_quantity: Number(item.quantity || 0),
-          quantity: Number(item.quantity || 0),
-        });
+        .select('id, quantity, original_quantity')
+        .eq('product_id', item.product_id)
+        .eq('batch_number', batchNumber)
+        .eq('expiry_date', expiryDate)
+        .maybeSingle();
+
+      if (batchLookupError) {
+        console.error('[GoodsReceiptService.createFallbackJS] batchLookupError:', batchLookupError);
+        throw new AppError(400, 'Lỗi kiểm tra lô hàng nhập');
+      }
+
+      const batchQuery = existingBatch
+        ? supabase
+            .from('product_batches')
+            .update({
+              quantity: Number(existingBatch.quantity) + Number(item.quantity || 0),
+              original_quantity: Number(existingBatch.original_quantity) + Number(item.quantity || 0),
+            })
+            .eq('id', existingBatch.id)
+        : supabase
+            .from('product_batches')
+            .insert({
+              product_id: item.product_id,
+              batch_number: batchNumber,
+              expiry_date: expiryDate,
+              original_quantity: Number(item.quantity || 0),
+              quantity: Number(item.quantity || 0),
+            });
+      const { error: batchErr } = await batchQuery;
 
       if (batchErr) {
         console.error('[GoodsReceiptService.createFallbackJS] batchErr:', batchErr);

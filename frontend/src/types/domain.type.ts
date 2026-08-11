@@ -73,6 +73,7 @@ export interface Order {
   note?: string | null;
   created_at: string;
   customers?: Customer | null;
+  users?: { id: string; full_name: string; email?: string | null } | null;
   order_details?: OrderDetail[];
   payments?: Payment[];
 }

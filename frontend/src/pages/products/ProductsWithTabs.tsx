@@ -44,31 +44,33 @@ const ProductsWithTabs = () => {
   }, [activeTab]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Sub-Tab Navigation */}
-      <div className="flex justify-start">
-        <div className="inline-flex p-1 bg-slate-200/50 border border-slate-300 rounded-2xl shadow-sm">
+      <div className="border-b border-slate-200">
+        <div className="flex gap-7">
           <button
             onClick={() => setActiveTab('products')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+            className={`relative flex items-center gap-2 px-1 pb-3 pt-1 text-sm font-black transition ${
               activeTab === 'products'
-                ? 'bg-white text-slate-900 shadow-sm border border-slate-300/70'
+                ? 'text-blue-700'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <HiOutlineCube size={15} className="stroke-[2.5]" />
+            <HiOutlineCube size={16} />
             Sản phẩm
+            {activeTab === 'products' && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-blue-600" />}
           </button>
           <button
             onClick={() => setActiveTab('promotions')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+            className={`relative flex items-center gap-2 px-1 pb-3 pt-1 text-sm font-black transition ${
               activeTab === 'promotions'
-                ? 'bg-white text-slate-900 shadow-sm border border-slate-300/70'
+                ? 'text-blue-700'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <FiGift size={15} className="stroke-[2.5]" />
+            <FiGift size={16} />
             Khuyến mãi
+            {activeTab === 'promotions' && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-blue-600" />}
           </button>
         </div>
       </div>

@@ -11,6 +11,8 @@ export interface CreateGoodsReceiptPayload {
     product_id: string;
     quantity: number;
     unit_price: number;
+    expiry_date: string;
+    batch_number: string;
   }>;
 }
 

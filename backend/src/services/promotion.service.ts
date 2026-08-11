@@ -53,8 +53,9 @@ function calculateDiscount(
     const actualFree = Math.min(freeCount, sortedByPrice.length);
     const discountAmount = sortedByPrice.slice(0, actualFree).reduce((sum, p) => sum + p, 0);
 
-    const freeItems = promo.get_product_ids?.length > 0
-      ? promo.get_product_ids.map((pid: string) => ({ product_id: pid, quantity: getQty }))
+    const getProductIds = Array.isArray(promo.get_product_ids) ? promo.get_product_ids : [];
+    const freeItems = getProductIds.length > 0
+      ? getProductIds.map((pid: string) => ({ product_id: pid, quantity: getQty }))
       : undefined;
 
     return {
@@ -156,7 +157,9 @@ function calculateDiscount(
   }
 
   if (discType === 'bundle') {
-    const bundleIds: string[] = promo.bundle_product_ids || [];
+    const bundleIds: string[] = Array.isArray(promo.bundle_product_ids)
+      ? promo.bundle_product_ids
+      : [];
     const bundlePrice = Number(promo.discount_value);
     if (bundleIds.length < 2 || bundlePrice <= 0) return { discount_amount: 0, description: '' };
 
@@ -196,15 +199,17 @@ function getApplicableScope(
   orderTotal: number,
   items: CartItem[]
 ): { applicableTotal: number; applicableItems: CartItem[] } {
-  if (promo.apply_to === 'product' && promo.apply_to_ids?.length > 0) {
-    const filtered = items.filter((i) => promo.apply_to_ids.includes(i.product_id));
+  const applyToIds = Array.isArray(promo.apply_to_ids) ? promo.apply_to_ids : [];
+
+  if (promo.apply_to === 'product' && applyToIds.length > 0) {
+    const filtered = items.filter((i) => applyToIds.includes(i.product_id));
     return {
       applicableTotal: filtered.reduce((sum, i) => sum + i.unit_price * i.quantity, 0),
       applicableItems: filtered,
     };
   }
-  if (promo.apply_to === 'category' && promo.apply_to_ids?.length > 0) {
-    const filtered = items.filter((i) => i.category_id && promo.apply_to_ids.includes(i.category_id));
+  if (promo.apply_to === 'category' && applyToIds.length > 0) {
+    const filtered = items.filter((i) => i.category_id && applyToIds.includes(i.category_id));
     return {
       applicableTotal: filtered.reduce((sum, i) => sum + i.unit_price * i.quantity, 0),
       applicableItems: filtered,
@@ -444,6 +449,37 @@ export class PromotionService {
 
   /* ─── GET AUTO PROMOTIONS (no code, auto-apply) ─── */
   static async getAutoPromotions(orderTotal: number, items: CartItem[]) {
+    const numericOrderTotal = Number(orderTotal);
+    const safeOrderTotal = Number.isFinite(numericOrderTotal) && numericOrderTotal >= 0
+      ? numericOrderTotal
+      : 0;
+    const safeItems: CartItem[] = Array.isArray(items)
+      ? items.flatMap((item) => {
+          if (!item || typeof item !== 'object') return [];
+
+          const productId = typeof item.product_id === 'string' ? item.product_id : '';
+          const quantity = Number(item.quantity);
+          const unitPrice = Number(item.unit_price);
+
+          if (
+            !productId ||
+            !Number.isFinite(quantity) ||
+            quantity <= 0 ||
+            !Number.isFinite(unitPrice) ||
+            unitPrice < 0
+          ) {
+            return [];
+          }
+
+          return [{
+            product_id: productId,
+            category_id: typeof item.category_id === 'string' ? item.category_id : null,
+            quantity,
+            unit_price: unitPrice,
+          }];
+        })
+      : [];
+
     const now = new Date().toISOString();
 
     const { data: promos, error } = await supabase
@@ -460,19 +496,21 @@ export class PromotionService {
     const results: Array<{
       promotion: Record<string, unknown>;
       discount_amount: number;
+      applicable_product_ids?: string[];
       description: string;
       free_items?: Array<{ product_id: string; quantity: number }>;
     }> = [];
 
     for (const promo of promos) {
-      if (promo.usage_limit && promo.usage_count >= promo.usage_limit) continue;
+      try {
+        if (promo.usage_limit && promo.usage_count >= promo.usage_limit) continue;
 
-      const { applicableTotal, applicableItems } = getApplicableScope(promo, orderTotal, items);
+      const { applicableTotal, applicableItems } = getApplicableScope(promo, safeOrderTotal, safeItems);
 
       // If the cart doesn't qualify for min_order_amount, check if it's relevant to show it as a suggestion
-      if (orderTotal < Number(promo.min_order_amount)) {
+      if (safeOrderTotal < Number(promo.min_order_amount)) {
         if (applicableItems.length > 0 || promo.apply_to === 'all') {
-          const needed = Number(promo.min_order_amount) - orderTotal;
+          const needed = Number(promo.min_order_amount) - safeOrderTotal;
           results.push({
             promotion: {
               id: promo.id,
@@ -481,11 +519,15 @@ export class PromotionService {
               discount_value: Number(promo.discount_value),
               max_discount: promo.max_discount ? Number(promo.max_discount) : null,
               apply_to: promo.apply_to,
+              apply_to_ids: Array.isArray(promo.apply_to_ids) ? promo.apply_to_ids : [],
+              bundle_product_ids: Array.isArray(promo.bundle_product_ids) ? promo.bundle_product_ids : [],
+              get_product_ids: Array.isArray(promo.get_product_ids) ? promo.get_product_ids : [],
               buy_quantity: promo.buy_quantity,
               get_quantity: promo.get_quantity,
               combo_quantity: promo.combo_quantity,
             },
             discount_amount: 0,
+            applicable_product_ids: applicableItems.map((item) => item.product_id),
             description: `Đơn tối thiểu ${Number(promo.min_order_amount).toLocaleString('vi-VN')}đ (Cần thêm ${needed.toLocaleString('vi-VN')}đ)`,
           });
         }
@@ -497,7 +539,7 @@ export class PromotionService {
       const result = calculateDiscount(promo, applicableTotal, applicableItems);
 
       // Return the promotion if it either has discount_amount > 0 OR it is relevant but not yet fully met (discount_amount = 0)
-      if (result.discount_amount > 0 || (applicableItems.length > 0 && promo.apply_to !== 'all') || (promo.apply_to === 'all' && items.length > 0)) {
+      if (result.discount_amount > 0 || (applicableItems.length > 0 && promo.apply_to !== 'all') || (promo.apply_to === 'all' && safeItems.length > 0)) {
         results.push({
           promotion: {
             id: promo.id,
@@ -506,14 +548,25 @@ export class PromotionService {
             discount_value: Number(promo.discount_value),
             max_discount: promo.max_discount ? Number(promo.max_discount) : null,
             apply_to: promo.apply_to,
+            apply_to_ids: Array.isArray(promo.apply_to_ids) ? promo.apply_to_ids : [],
+            bundle_product_ids: Array.isArray(promo.bundle_product_ids) ? promo.bundle_product_ids : [],
+            get_product_ids: Array.isArray(promo.get_product_ids) ? promo.get_product_ids : [],
             buy_quantity: promo.buy_quantity,
             get_quantity: promo.get_quantity,
             combo_quantity: promo.combo_quantity,
           },
           discount_amount: result.discount_amount,
+          applicable_product_ids: promo.discount_type === 'bundle' && Array.isArray(promo.bundle_product_ids) && promo.bundle_product_ids.length > 0
+            ? promo.bundle_product_ids
+            : applicableItems.map((item) => item.product_id),
           description: result.description,
           free_items: result.free_items,
         });
+        }
+      } catch (error) {
+        // A malformed legacy promotion should not break checkout. Skip that
+        // promotion and keep the remaining valid rules usable.
+        console.error(`[Promotions] Skipping invalid promotion ${promo.id}:`, error);
       }
     }
 

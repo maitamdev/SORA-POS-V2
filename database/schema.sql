@@ -220,8 +220,30 @@ CREATE TABLE IF NOT EXISTS goods_receipt_details (
   quantity INTEGER NOT NULL CHECK (quantity > 0),                  -- Số lượng nhập
   unit_price DECIMAL(15, 2) NOT NULL CHECK (unit_price >= 0),      -- Giá nhập của mặt hàng đó
   subtotal DECIMAL(15, 2) NOT NULL,                                -- Thành tiền = quantity * unit_price
+  expiry_date DATE,
+  batch_number VARCHAR(100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- ============================================
+-- 13A. PRODUCT BATCHES (Lô hàng và hạn sử dụng)
+-- ============================================
+CREATE TABLE IF NOT EXISTS product_batches (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  batch_number VARCHAR(100) NOT NULL,
+  expiry_date DATE NOT NULL,
+  original_quantity INTEGER NOT NULL CHECK (original_quantity >= 0),
+  quantity INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_product_batches_product_id ON product_batches(product_id);
+CREATE INDEX IF NOT EXISTS idx_product_batches_expiry_date ON product_batches(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_product_batches_quantity ON product_batches(quantity);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_product_batches_product_batch_expiry
+  ON product_batches(product_id, batch_number, expiry_date);
 
 -- ============================================
 -- 14. STOCK TRANSACTIONS (Giao dịch kho)

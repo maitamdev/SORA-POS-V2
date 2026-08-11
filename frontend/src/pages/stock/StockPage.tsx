@@ -163,6 +163,8 @@ const getInitials = (name: string) => {
   return name.substring(0, 2).toUpperCase();
 };
 
+const getProductImage = (product: Product) => product.image_url || '/assets/product-placeholder.svg';
+
 const getStockBarColor = (quantity: number, minLevel: number) => {
   if (quantity <= 0) return 'bg-rose-500';
   if (quantity <= minLevel) return 'bg-rose-500';
@@ -201,7 +203,6 @@ const StockPage = () => {
   // Transactions pagination
   const [txPage, setTxPage] = useState(1);
   const [txPagination, setTxPagination] = useState({ page: 1, limit: 10, total: 0 });
-  const [mode, setMode] = useState<'import' | 'adjust'>('import');
   const [loading, setLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -214,6 +215,7 @@ const StockPage = () => {
 
   // Quick Action Modal state
   const [showActionModal, setShowActionModal] = useState(false);
+  const [actionProductId, setActionProductId] = useState('');
 
   // Search and Category Filter
   const [searchTerm, setSearchTerm] = useState('');
@@ -309,13 +311,19 @@ const StockPage = () => {
     const form = new FormData(formEl);
     const productId = String(form.get('product_id') || '');
     const quantity = Number(form.get('quantity') || 0);
+    const batchNumber = String(form.get('batch_number') || '').trim();
+    const expiryDate = String(form.get('expiry_date') || '');
     const note = String(form.get('note') || '');
+
+    if (!batchNumber || !expiryDate) {
+      toast.error('Vui lòng nhập số lô và hạn sử dụng');
+      return;
+    }
     
     setLoading(true);
     try {
-      if (mode === 'import') await stockAPI.importStock({ product_id: productId, quantity, note });
-      else await stockAPI.adjustStock({ product_id: productId, new_stock: quantity, note });
-      toast.success(mode === 'import' ? 'Đã nhập kho thành công' : 'Đã điều chỉnh tồn kho thành công');
+      await stockAPI.importStock({ product_id: productId, quantity, batch_number: batchNumber, expiry_date: expiryDate, note });
+      toast.success('Đã nhập kho theo lô thành công');
       formEl.reset();
       setShowActionModal(false);
       setTxPage(1);
@@ -434,10 +442,11 @@ const StockPage = () => {
     const totalCount = inventory.length;
     const lowStockCount = alerts.filter(a => a.status === 'low_stock' || a.status === 'out_of_stock').length;
     const safeCount = Math.max(totalCount - lowStockCount, 0);
-    const txCount = transactions.length;
+    const expiryWarningCount = expiryAlerts.filter((batch) => getRemainingExpiryDays(batch.expiry_date) <= 30).length;
+    const txCount = txPagination.total || transactions.length;
 
-    return { totalCount, lowStockCount, safeCount, txCount };
-  }, [inventory, alerts, transactions]);
+    return { totalCount, lowStockCount, safeCount, expiryWarningCount, txCount };
+  }, [inventory, alerts, transactions, expiryAlerts, txPagination.total]);
 
   // Expiry statistics calculation
   const expiryStats = useMemo(() => {
@@ -498,25 +507,27 @@ const StockPage = () => {
   const summary = analysis?.summary;
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-10 mx-auto w-full max-w-[1560px] px-4 sm:px-6 lg:px-8">
+    <div className="w-full max-w-[1600px] mx-auto space-y-5 animate-fadeIn pb-10">
       {/* 1. Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-5">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FiBox className="text-blue-600" />
-            Quản lý Kho hàng
+          <h1 className="text-2xl sm:text-[30px] font-black text-slate-950 tracking-tight flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center bg-blue-50 text-blue-600">
+              <FiBox size={19} />
+            </span>
+            Quản lý kho hàng
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
-            Hệ thống kiểm soát tồn thực tế, theo dõi dòng chảy luân chuyển hàng hóa và tối ưu hóa nhập kho thông minh.
+          <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1.5">
+            Theo dõi tồn kho, lô hạn sử dụng và lịch sử luân chuyển hàng hóa.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2.5 w-full sm:w-auto shrink-0">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0">
           {canManageStock && (
             <>
               {activeTab === 'receipts' && (
                 <button
                   onClick={() => navigate('/stock/receipts/new')}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-[0_4px_12px_rgba(37,99,235,0.2)] hover:shadow-[0_6px_16px_rgba(37,99,235,0.3)] hover:-translate-y-0.5"
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 border border-blue-600 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-4 py-2.5 text-xs sm:text-sm font-extrabold text-white transition-all duration-200 shadow-sm active:scale-[0.98]"
                 >
                   <FiPlus size={16} className="stroke-[2.5]" />
                   Lập phiếu nhập mới
@@ -525,11 +536,11 @@ const StockPage = () => {
               {activeTab !== 'receipts' && (
                 <button
                   onClick={showAIPanel ? () => setShowAIPanel(false) : handleOpenAI}
-                  className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-200 border ${
-                    showAIPanel
-                      ? 'bg-slate-950 text-white border-slate-950 shadow-md'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
-                  }`}
+                   className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 border px-4 py-2.5 text-xs sm:text-sm font-extrabold transition-all duration-200 ${
+                     showAIPanel
+                       ? 'bg-slate-950 text-white border-slate-950 shadow-sm'
+                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                   }`}
                 >
                   <FiZap className={showAIPanel ? 'text-amber-400 fill-amber-400 animate-pulse' : 'text-slate-400'} size={15} />
                   Trợ lý AI
@@ -540,7 +551,7 @@ const StockPage = () => {
           {activeTab === 'inventory' && (
             <button
               onClick={handleExportCsv}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 px-3 py-2.5 text-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md text-xs font-extrabold"
+              className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 px-3 py-2.5 text-slate-700 transition-all flex items-center justify-center gap-1.5 shadow-sm text-xs font-extrabold"
               title="Xuất file CSV tồn kho"
             >
               <FiDownload size={14} />
@@ -555,74 +566,85 @@ const StockPage = () => {
                 loadData();
               }
             }}
-            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 p-2.5 text-slate-600 transition-all flex items-center justify-center shadow-sm hover:shadow-md"
+            className="inline-flex items-center justify-center gap-2 border border-blue-600 bg-blue-600 px-3 py-2.5 text-xs font-extrabold text-white transition-all hover:bg-blue-700 active:scale-[0.98]"
             title="Làm mới dữ liệu"
           >
             <FiRefreshCw className={loading ? 'animate-spin' : ''} size={16} />
+            <span className="hidden sm:inline">Làm mới dữ liệu</span>
           </button>
         </div>
       </header>
 
       {/* 2. KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* Metric 1 */}
-        <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50/60 border border-blue-100/50 flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <div className="group flex items-center gap-4 border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600 transition-transform duration-300 group-hover:scale-105">
             <FiBox size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Tổng mặt hàng</p>
-            <h4 className="text-2xl font-black text-slate-800 mt-0.5 tracking-tight">{stats.totalCount}</h4>
+            <p className="truncate whitespace-nowrap text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Tổng mặt hàng</p>
+            <h4 className="mt-0.5 text-xl font-black tracking-tight text-slate-800 sm:text-2xl">{stats.totalCount}</h4>
           </div>
         </div>
 
-        {/* Metric 2 */}
-        <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner ${
-            stats.lowStockCount > 0 
-              ? 'bg-rose-50 border border-rose-100 text-rose-600 animate-pulse' 
-              : 'bg-slate-50 border border-slate-100 text-slate-400'
+        <div className="group flex items-center gap-4 border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center border transition-transform duration-300 group-hover:scale-105 ${
+            stats.lowStockCount > 0
+              ? 'border-rose-100 bg-rose-50 text-rose-600'
+              : 'border-slate-100 bg-slate-50 text-slate-400'
           }`}>
             <FiAlertCircle size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Tồn thấp / Hết hàng</p>
-            <h4 className={`text-2xl font-black mt-0.5 tracking-tight ${stats.lowStockCount > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{stats.lowStockCount}</h4>
+            <p className="truncate whitespace-nowrap text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Tồn thấp / Hết hàng</p>
+            <h4 className={`mt-0.5 text-xl font-black tracking-tight sm:text-2xl ${stats.lowStockCount > 0 ? 'text-rose-600' : 'text-slate-800'}`}>{stats.lowStockCount}</h4>
           </div>
         </div>
 
-        {/* Metric 3 */}
-        <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50/60 border border-emerald-100/50 flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner">
+        <div className="group flex items-center gap-4 border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-emerald-100 bg-emerald-50 text-emerald-600 transition-transform duration-300 group-hover:scale-105">
             <FiShield size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Mức an toàn</p>
-            <h4 className="text-2xl font-black text-emerald-700 mt-0.5 tracking-tight">{stats.safeCount}</h4>
+            <p className="truncate whitespace-nowrap text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Tồn an toàn</p>
+            <h4 className="mt-0.5 text-xl font-black tracking-tight text-emerald-700 sm:text-2xl">{stats.safeCount}</h4>
           </div>
         </div>
 
-        {/* Metric 4 */}
-        <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50/60 border border-indigo-100/50 flex items-center justify-center text-indigo-600 shrink-0 group-hover:scale-110 transition-transform duration-300 shadow-inner">
-            <FiClock size={22} className="stroke-[2.5]" />
+        <div className="group flex items-center gap-4 border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center border transition-transform duration-300 group-hover:scale-105 ${
+            stats.expiryWarningCount > 0
+              ? 'border-orange-100 bg-orange-50 text-orange-600'
+              : 'border-slate-100 bg-slate-50 text-slate-400'
+          }`}>
+            <FiCalendar size={22} className="stroke-[2.5]" />
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Giao dịch kho</p>
-            <h4 className="text-2xl font-black text-indigo-700 mt-0.5 tracking-tight">{stats.txCount}</h4>
+            <p className="truncate whitespace-nowrap text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lô cần xử lý</p>
+            <h4 className={`mt-0.5 text-xl font-black tracking-tight sm:text-2xl ${stats.expiryWarningCount > 0 ? 'text-orange-600' : 'text-slate-800'}`}>{stats.expiryWarningCount}</h4>
+          </div>
+        </div>
+
+        <div className="group flex items-center gap-4 border border-slate-200/80 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600 transition-transform duration-300 group-hover:scale-105">
+            <FiActivity size={22} className="stroke-[2.5]" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate whitespace-nowrap text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Giao dịch kho</p>
+            <h4 className="mt-0.5 text-xl font-black tracking-tight text-blue-700 sm:text-2xl">{stats.txCount}</h4>
           </div>
         </div>
       </div>
 
       {/* 3. Tab Navigation Section */}
-      <div className="overflow-x-auto border border-slate-300 bg-white shadow-sm" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        <div className="flex min-w-max divide-x divide-slate-300">
+      <div className="overflow-x-auto border-b border-slate-200 bg-white" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="flex min-w-max">
           <button
             onClick={() => setActiveTab('inventory')}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
               activeTab === 'inventory'
-                ? 'bg-slate-950 text-white'
-                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiList size={14} className="stroke-[2.5]" />
@@ -630,17 +652,17 @@ const StockPage = () => {
           </button>
           <button
             onClick={() => setActiveTab('alerts')}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
               activeTab === 'alerts'
-                ? 'bg-slate-950 text-white'
-                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiAlertCircle size={14} className="stroke-[2.5]" />
             Cảnh báo
             {alerts.length > 0 && (
               <span className={`border px-1.5 py-0.5 text-[9px] font-black leading-none ${
-                activeTab === 'alerts' ? 'border-white/30 bg-white text-slate-950' : 'border-rose-200 bg-rose-500 text-white'
+                activeTab === 'alerts' ? 'border-blue-200 bg-white text-blue-700' : 'border-rose-200 bg-rose-50 text-rose-700'
               }`}>
                 {alerts.length}
               </span>
@@ -648,10 +670,10 @@ const StockPage = () => {
           </button>
           <button
             onClick={() => setActiveTab('expiry')}
-            className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+            className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
               activeTab === 'expiry'
-                ? 'bg-slate-950 text-white'
-                : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
             }`}
           >
             <FiCalendar size={14} className="stroke-[2.5]" />
@@ -662,7 +684,7 @@ const StockPage = () => {
               return days <= 30;
             }).length > 0 && (
               <span className={`border px-1.5 py-0.5 text-[9px] font-black leading-none ${
-                activeTab === 'expiry' ? 'border-white/30 bg-white text-slate-950' : 'border-rose-200 bg-rose-500 text-white'
+                activeTab === 'expiry' ? 'border-blue-200 bg-white text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700'
               }`}>
                 {expiryAlerts.filter(item => {
                   const diff = new Date(item.expiry_date).getTime() - new Date().getTime();
@@ -676,10 +698,10 @@ const StockPage = () => {
             <>
               <button
                 onClick={() => setActiveTab('transactions')}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
                   activeTab === 'transactions'
-                    ? 'bg-slate-950 text-white'
-                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiClock size={14} className="stroke-[2.5]" />
@@ -687,10 +709,10 @@ const StockPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('receipts')}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
                   activeTab === 'receipts'
-                    ? 'bg-slate-950 text-white'
-                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiTruck size={14} className="stroke-[2.5]" />
@@ -698,10 +720,10 @@ const StockPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('audit')}
-                className={`flex items-center gap-2 px-4 py-3 text-xs font-black uppercase tracking-[0.08em] transition-all duration-200 ${
+                className={`flex items-center gap-2 border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.06em] transition-all duration-200 ${
                   activeTab === 'audit'
-                    ? 'bg-slate-950 text-white'
-                    : 'bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'border-blue-600 bg-blue-50/40 text-blue-700'
+                    : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
                 <FiSliders size={14} className="stroke-[2.5]" />
@@ -718,63 +740,25 @@ const StockPage = () => {
         {activeTab === 'inventory' && (
           <div className="space-y-4">
             {/* Search, Status & Category Toolbar */}
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between bg-white p-4 border border-slate-200/80 rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-              {/* Left: Search Input */}
-              <div className="relative flex-1 max-w-md">
-                <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Tìm sản phẩm theo tên, SKU, barcode..."
-                  className="w-full h-10 rounded-xl border border-slate-200 pl-10 pr-4 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-slate-50/50 focus:bg-white transition-all shadow-inner"
-                />
-              </div>
+            <div className="border border-slate-200 bg-white p-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]">
+              <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
+                <label className="relative block">
+                  <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Tìm sản phẩm theo tên, SKU, barcode..."
+                    className="h-10 w-full border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+                  />
+                </label>
 
-              {/* Middle: Quick Stock Filter Chips (in Capsule design style) */}
-              <div className="flex flex-wrap gap-1 items-center bg-slate-150/80 p-1 rounded-xl border border-slate-200/30">
-                <button
-                  onClick={() => setStockFilter('all')}
-                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 ${
-                    stockFilter === 'all'
-                      ? 'bg-white text-slate-800 shadow-xs border border-slate-200/10'
-                      : 'text-slate-500 hover:text-slate-850'
-                  }`}
-                >
-                  Tất cả ({inventory.length})
-                </button>
-                <button
-                  onClick={() => setStockFilter('low')}
-                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
-                    stockFilter === 'low'
-                      ? 'bg-white text-rose-600 shadow-xs border border-slate-200/10'
-                      : 'text-slate-500 hover:text-rose-600'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  Tồn thấp ({inventory.filter(i => i.stock_quantity <= i.min_stock_level).length})
-                </button>
-                <button
-                  onClick={() => setStockFilter('safe')}
-                  className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
-                    stockFilter === 'safe'
-                      ? 'bg-white text-emerald-600 shadow-xs border border-slate-200/10'
-                      : 'text-slate-500 hover:text-emerald-600'
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  An toàn ({inventory.filter(i => i.stock_quantity > i.min_stock_level).length})
-                </button>
-              </div>
-
-              {/* Right: Category Filter dropdown */}
-              <div className="flex gap-2 shrink-0">
-                <div className="relative">
-                  <FiSliders className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <label className="relative block">
+                  <FiSliders className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 pl-8 pr-8 text-xs sm:text-sm font-semibold outline-none bg-white focus:border-slate-400 cursor-pointer appearance-none shadow-xs"
+                    className="h-10 w-full appearance-none border border-slate-200 bg-white pl-8 pr-8 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
                   >
                     <option value="all">Tất cả danh mục</option>
                     {categoriesList.map((cat) => (
@@ -783,13 +767,158 @@ const StockPage = () => {
                       </option>
                     ))}
                   </select>
-                  <FiChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                  <FiChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                </label>
+
+                {/* Stock status filter */}
+                <div className="flex items-center border border-slate-200 bg-slate-50 p-1">
+                <button
+                  onClick={() => setStockFilter('all')}
+                  className={`px-3 py-1.5 text-xs font-black transition-all duration-200 ${
+                    stockFilter === 'all'
+                      ? 'bg-white text-slate-800 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  Tất cả
+                </button>
+                <button
+                  onClick={() => setStockFilter('low')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black transition-all duration-200 ${
+                    stockFilter === 'low'
+                      ? 'bg-white text-rose-600 shadow-xs'
+                      : 'text-slate-500 hover:text-rose-600'
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                  Tồn thấp
+                </button>
+                <button
+                  onClick={() => setStockFilter('safe')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black transition-all duration-200 ${
+                    stockFilter === 'safe'
+                      ? 'bg-white text-emerald-600 shadow-xs'
+                      : 'text-slate-500 hover:text-emerald-600'
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  An toàn
+                </button>
                 </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                <p className="text-[11px] font-semibold text-slate-500">
+                  Hiển thị <span className="font-black text-slate-800">{filteredInventory.length}</span> sản phẩm
+                </p>
+                {(searchTerm || selectedCategory !== 'all' || stockFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategory('all');
+                      setStockFilter('all');
+                    }}
+                    className="border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Inventory Table Container */}
-            <div className="overflow-hidden border border-slate-300 bg-white shadow-sm">
+            {/* Inventory product catalog */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {loading ? (
+                Array.from({ length: 8 }).map((_, index) => (
+                  <div key={index} className="min-h-[350px] animate-pulse border border-slate-200 bg-white p-4">
+                    <div className="h-44 bg-slate-100" />
+                    <div className="mt-4 h-3 w-2/3 bg-slate-100" />
+                    <div className="mt-2 h-4 w-full bg-slate-100" />
+                    <div className="mt-2 h-3 w-1/2 bg-slate-100" />
+                    <div className="mt-10 h-5 w-1/3 bg-slate-100" />
+                    <div className="mt-4 h-9 w-full bg-slate-100" />
+                  </div>
+                ))
+              ) : filteredInventory.length === 0 ? (
+                <div className="col-span-full flex min-h-[350px] flex-col items-center justify-center border border-dashed border-slate-300 bg-white p-10 text-center">
+                  <FiBox className="mb-3 text-slate-300" size={38} />
+                  <p className="text-sm font-black text-slate-700">Không tìm thấy sản phẩm</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">Thử đổi từ khóa hoặc bộ lọc danh mục.</p>
+                </div>
+              ) : (
+                filteredInventory.map((product) => {
+                  const isOutOfStock = product.stock_quantity <= 0;
+                  const isLowStock = product.stock_quantity <= product.min_stock_level;
+                  const stockTone = isOutOfStock
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : isLowStock
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+                  return (
+                    <article key={product.id} className="group flex min-h-[350px] flex-col overflow-hidden border border-slate-200 bg-white transition duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+                      <div className="relative flex h-44 items-center justify-center overflow-hidden bg-slate-50 p-4">
+                        <img
+                          src={getProductImage(product)}
+                          alt={product.name}
+                          className="max-h-full max-w-full object-contain transition duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      </div>
+
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="truncate text-[10px] font-black uppercase tracking-[0.08em] text-blue-600">
+                            {product.categories?.name || 'Chưa phân loại'}
+                          </p>
+                          <span className={`shrink-0 border px-2 py-1 text-[9px] font-black uppercase ${stockTone}`}>
+                            {isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'An toàn'}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 min-h-[40px] line-clamp-2 text-sm font-black leading-snug text-slate-900" title={product.name}>
+                          {product.name}
+                        </h3>
+                        <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-wide text-slate-400">SKU: {product.sku}</p>
+
+                        <div className="mt-auto border-t border-slate-100 pt-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Giá bán</p>
+                              <p className="mt-0.5 text-base font-black text-blue-700">{formatNumber(product.sell_price)} đ</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tồn kho</p>
+                              <p className={`mt-0.5 text-sm font-black ${isOutOfStock ? 'text-rose-600' : isLowStock ? 'text-amber-600' : 'text-slate-800'}`}>
+                                {formatNumber(product.stock_quantity)} <span className="text-[10px] text-slate-400">{product.unit || 'cái'}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3 h-1.5 overflow-hidden bg-slate-100">
+                            <div className={`h-full transition-all duration-500 ${getStockBarColor(product.stock_quantity, product.min_stock_level)}`} style={{ width: `${getStockBarPercentage(product.stock_quantity, product.min_stock_level)}%` }} />
+                          </div>
+                          {canManageStock && (
+                            <button
+                              onClick={() => {
+                                setActionProductId(product.id);
+                                setShowActionModal(true);
+                              }}
+                              className="mt-3 flex h-9 w-full items-center justify-center gap-1.5 border border-blue-600 bg-blue-600 text-[11px] font-black text-white transition hover:bg-blue-700 active:translate-y-px"
+                            >
+                              <FiPlus size={14} />
+                              Nhập kho
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Inventory Table Container (legacy fallback, kept for reference) */}
+            <div className="hidden overflow-hidden border border-slate-300 bg-white shadow-sm">
               <div className="scrollbar-none overflow-x-auto">
                 <table className="w-full table-fixed text-left text-sm">
                   <colgroup>
@@ -915,7 +1044,7 @@ const StockPage = () => {
         {/* Tab 2: Stock Alerts */}
         {activeTab === 'alerts' && (
           <div className="space-y-4">
-            <div className="bg-white p-6 border border-slate-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.01)] space-y-5">
+            <div className="border border-slate-200 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] space-y-5">
               <div>
                 <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
                   <FiAlertCircle className="text-rose-500" />
@@ -933,7 +1062,7 @@ const StockPage = () => {
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {alerts.map((alert) => (
-                    <div key={alert.id} className="group rounded-2xl border border-rose-150/60 bg-gradient-to-br from-rose-50/50 to-white p-5 flex flex-col justify-between gap-4 shadow-sm hover:shadow-md hover:border-rose-300 transition-all duration-300">
+                    <div key={alert.id} className="group flex flex-col justify-between gap-4 border border-rose-200 bg-rose-50/30 p-5 shadow-sm transition-all duration-300 hover:border-rose-300 hover:shadow-md">
                       <div>
                         <div className="flex justify-between items-start gap-2">
                           <p className="font-extrabold text-slate-800 text-sm leading-snug line-clamp-2">{alert.products?.name || alert.product_id}</p>
@@ -955,18 +1084,17 @@ const StockPage = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
-                              // Quick import — chuyển sang tab inventory với modal mở sẵn
-                              setMode('import');
+                              setActionProductId(alert.product_id);
                               setShowActionModal(true);
                             }}
-                            className="flex-1 py-2 bg-blue-50 border border-blue-200 hover:border-blue-300 text-xs font-bold text-blue-700 rounded-xl hover:bg-blue-100/80 transition shadow-xs active:bg-blue-100 flex items-center justify-center gap-1.5"
+                            className="flex-1 border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/80 active:bg-blue-100 flex items-center justify-center gap-1.5"
                           >
                             <FiPlus size={12} />
                             Nhập kho
                           </button>
                           <button
                             onClick={() => resolveAlert(alert.id)}
-                            className="flex-1 py-2 bg-white border border-rose-200 hover:border-rose-300 text-xs font-bold text-rose-700 rounded-xl hover:bg-rose-50/80 transition shadow-xs active:bg-rose-100"
+                            className="flex-1 border border-rose-200 bg-white py-2 text-xs font-bold text-rose-700 transition hover:border-rose-300 hover:bg-rose-50/80 active:bg-rose-100"
                           >
                             Đã xử lý
                           </button>
@@ -982,10 +1110,10 @@ const StockPage = () => {
 
         {/* Tab 3: Transactions List */}
         {activeTab === 'transactions' && canManageStock && (
-          <div className="bg-white p-6 border border-slate-200/80 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.01)] space-y-4">
+          <div className="border border-slate-200 bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.01)] space-y-4">
             <div>
               <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
-                <FiActivity className="text-indigo-500" />
+                <FiActivity className="text-blue-500" />
                 Nhật ký luân chuyển kho
               </h2>
               <p className="text-xs text-slate-400 font-semibold mt-1">Lịch sử xuất nhập hàng hóa, điều chỉnh chênh lệch tồn kho chi tiết.</p>
@@ -998,7 +1126,7 @@ const StockPage = () => {
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto rounded-xl border border-slate-150">
+                <div className="overflow-x-auto border border-slate-200">
                   <table className="w-full text-left text-sm min-w-[800px]">
                     <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
                       <tr>
@@ -1078,7 +1206,7 @@ const StockPage = () => {
                             onClick={() => setTxPage(pNum)}
                             className={`w-8 h-8 rounded-lg text-xs font-black transition ${
                               txPage === pNum
-                                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/10'
+                               ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
                                 : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
                             }`}
                           >
@@ -1758,7 +1886,7 @@ const StockPage = () => {
         </div>
       )}
 
-      {/* 6. QUICK ACTION ACTION MODAL (Popup điều chỉnh tồn kho đẹp mắt) */}
+      {/* 6. QUICK ACTION MODAL */}
       {showActionModal && canManageStock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-xs animate-fadeIn">
           <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-scaleIn">
@@ -1766,7 +1894,7 @@ const StockPage = () => {
             <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
               <h3 className="text-base font-black text-slate-800 flex items-center gap-1.5">
                 <FiSettings className="text-blue-500" />
-                Cập nhật kho nhanh
+                Nhập kho nhanh theo lô
               </h3>
               <button
                 onClick={() => setShowActionModal(false)}
@@ -1778,26 +1906,7 @@ const StockPage = () => {
 
             {/* Modal Form */}
             <form onSubmit={submit} className="space-y-4">
-              <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200/50">
-                <button
-                  type="button"
-                  onClick={() => setMode('import')}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-black transition-all duration-200 ${
-                    mode === 'import' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Cộng thêm tồn
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('adjust')}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-black transition-all duration-200 ${
-                    mode === 'adjust' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Điều chỉnh tổng tồn
-                </button>
-              </div>
+
 
               <label className="block">
                 <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Chọn sản phẩm *</span>
@@ -1805,9 +1914,11 @@ const StockPage = () => {
                   <select
                     name="product_id"
                     required
+                    value={actionProductId}
+                    onChange={(event) => setActionProductId(event.target.value)}
                     className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-white appearance-none cursor-pointer"
                   >
-                    <option value="">Chọn sản phẩm cần chỉnh</option>
+                    <option value="">Chọn sản phẩm cần nhập</option>
                     {inventory.map((product) => (
                       <option key={product.id} value={product.id}>
                         [{product.sku}] {product.name} (Tồn hiện tại: {product.stock_quantity})
@@ -1819,18 +1930,39 @@ const StockPage = () => {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">
-                  {mode === 'import' ? 'Số lượng cần cộng thêm *' : 'Số lượng tồn mới chính xác *'}
-                </span>
+                <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Số lượng nhập thêm *</span>
                 <input
                   name="quantity"
                   type="number"
-                  min={mode === 'import' ? 1 : 0}
+                  min={1}
                   required
-                  placeholder={mode === 'import' ? 'Ví dụ: 50' : 'Ví dụ: 120'}
+                  placeholder="Ví dụ: 120"
                   className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
                 />
               </label>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Số lô *</span>
+                  <input
+                    name="batch_number"
+                    required
+                    maxLength={100}
+                    placeholder="VD: LOT-2026-08"
+                    className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Hạn sử dụng *</span>
+                  <input
+                    name="expiry_date"
+                    type="date"
+                    required
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
+                  />
+                </label>
+              </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Lý do / Ghi chú</span>

@@ -1,13 +1,17 @@
 -- Atomic stock import/adjust RPC for manual inventory operations.
 -- Run after database/enterprise_pos_core.sql.
 
+DROP FUNCTION IF EXISTS public.apply_stock_change(uuid, text, integer, integer, uuid, text);
+
 CREATE OR REPLACE FUNCTION public.apply_stock_change(
   p_product_id uuid,
   p_mode text,
   p_quantity integer,
   p_new_stock integer,
   p_user_id uuid,
-  p_note text DEFAULT NULL
+  p_note text DEFAULT NULL,
+  p_batch_number text DEFAULT NULL,
+  p_expiry_date date DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -28,6 +32,14 @@ BEGIN
 
   IF p_mode = 'import' AND COALESCE(p_quantity, 0) <= 0 THEN
     RAISE EXCEPTION 'Import quantity must be greater than 0';
+  END IF;
+
+  IF p_mode = 'import' AND NULLIF(trim(p_batch_number), '') IS NULL THEN
+    RAISE EXCEPTION 'Batch number is required for imports';
+  END IF;
+
+  IF p_mode = 'import' AND (p_expiry_date IS NULL OR p_expiry_date < CURRENT_DATE) THEN
+    RAISE EXCEPTION 'Expiry date must be today or later';
   END IF;
 
   IF p_mode = 'adjustment' AND COALESCE(p_new_stock, -1) < 0 THEN
@@ -58,17 +70,32 @@ BEGIN
   SET stock_quantity = v_next_stock
   WHERE id = p_product_id;
 
-  SELECT *
-  INTO v_latest_batch
-  FROM public.product_batches
-  WHERE product_id = p_product_id
-  ORDER BY expiry_date DESC
-  LIMIT 1
-  FOR UPDATE;
+  IF p_mode = 'import' THEN
+    SELECT *
+    INTO v_latest_batch
+    FROM public.product_batches
+    WHERE product_id = p_product_id
+      AND batch_number = trim(p_batch_number)
+      AND expiry_date = p_expiry_date
+    LIMIT 1
+    FOR UPDATE;
+  ELSE
+    SELECT *
+    INTO v_latest_batch
+    FROM public.product_batches
+    WHERE product_id = p_product_id
+    ORDER BY expiry_date DESC
+    LIMIT 1
+    FOR UPDATE;
+  END IF;
 
   IF FOUND THEN
     UPDATE public.product_batches
-    SET quantity = GREATEST(0, quantity + v_delta)
+    SET quantity = GREATEST(0, quantity + v_delta),
+        original_quantity = CASE
+          WHEN p_mode = 'import' THEN original_quantity + v_delta
+          ELSE original_quantity
+        END
     WHERE id = v_latest_batch.id;
   ELSE
     INSERT INTO public.product_batches(
@@ -80,10 +107,10 @@ BEGIN
     )
     VALUES (
       p_product_id,
-      CASE WHEN p_mode = 'import' THEN 'BAT-IMPORTED' ELSE 'BAT-ADJUSTED' END,
-      CURRENT_DATE + INTERVAL '1 year',
-      GREATEST(v_next_stock, 0),
-      GREATEST(v_next_stock, 0)
+      CASE WHEN p_mode = 'import' THEN trim(p_batch_number) ELSE 'BAT-ADJUSTED' END,
+      CASE WHEN p_mode = 'import' THEN p_expiry_date ELSE CURRENT_DATE + INTERVAL '1 year' END,
+      CASE WHEN p_mode = 'import' THEN v_delta ELSE GREATEST(v_next_stock, 0) END,
+      CASE WHEN p_mode = 'import' THEN v_delta ELSE GREATEST(v_next_stock, 0) END
     );
   END IF;
 

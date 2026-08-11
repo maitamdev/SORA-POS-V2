@@ -37,7 +37,7 @@ export const stockAPI = {
     api.get<ApiResponse<ListResponse<ProductBatch>>>(`/stock/expiry-alerts${buildQuery(params)}`),
   transactions: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<StockTransaction>>>(`/stock/transactions${buildQuery(params)}`),
-  importStock: (data: { product_id: string; quantity: number; note?: string }) =>
+  importStock: (data: { product_id: string; quantity: number; batch_number: string; expiry_date: string; note?: string }) =>
     api.post<ApiResponse<StockTransaction>>('/stock/import', data),
   adjustStock: (data: { product_id: string; new_stock: number; note?: string }) =>
     api.post<ApiResponse<StockTransaction>>('/stock/adjust', data),

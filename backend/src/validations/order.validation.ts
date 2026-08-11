@@ -6,6 +6,7 @@ export const orderCreateSchema = z.object({
   shift_code: z.string().trim().min(4).max(16).optional(),
   discount_amount: z.coerce.number().min(0).optional(),
   manual_discount_amount: z.coerce.number().min(0).optional(),
+  promotion_ids: z.array(z.string().uuid()).max(20).optional(),
   used_points: z.coerce.number().int().min(0).optional(),
   note: z.string().trim().optional().nullable(),
   payment: z.object({

@@ -17,12 +17,12 @@ import { useNotificationStore, NotificationType } from '../../stores/notificatio
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 const TYPE_CONFIG: Record<NotificationType, { icon: React.ComponentType<{ className?: string }>; color: string; bg: string }> = {
-  order_new: { icon: HiOutlineShoppingBag, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  order_cancelled: { icon: HiOutlineBan, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-  stock_low: { icon: HiOutlineExclamationCircle, color: 'text-orange-400', bg: 'bg-orange-500/10' },
-  stock_out: { icon: HiOutlineXCircle, color: 'text-red-400', bg: 'bg-red-500/10' },
-  shift_checkin: { icon: HiOutlineUser, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-  info: { icon: HiOutlineInformationCircle, color: 'text-slate-400', bg: 'bg-slate-500/10' },
+  order_new: { icon: HiOutlineShoppingBag, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  order_cancelled: { icon: HiOutlineBan, color: 'text-amber-600', bg: 'bg-amber-50' },
+  stock_low: { icon: HiOutlineExclamationCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+  stock_out: { icon: HiOutlineXCircle, color: 'text-red-600', bg: 'bg-red-50' },
+  shift_checkin: { icon: HiOutlineUser, color: 'text-blue-600', bg: 'bg-blue-50' },
+  info: { icon: HiOutlineInformationCircle, color: 'text-slate-600', bg: 'bg-slate-100' },
 };
 
 function timeAgo(timestamp: string): string {
@@ -73,7 +73,7 @@ const NotificationCenter = () => {
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/50 transition-all duration-200"
+        className="relative w-9 h-9 flex items-center justify-center text-slate-500 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition-all duration-200"
         aria-label="Thông báo"
         id="notification-bell"
       >
@@ -90,13 +90,13 @@ const NotificationCenter = () => {
       {/* Dropdown Panel */}
       {isOpen && (
         <div
-          className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-[#0c1120] border border-slate-700/60 shadow-2xl shadow-black/50 z-[90] overflow-hidden"
+          className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl shadow-slate-200/50 z-[90] overflow-hidden"
           style={{ maxHeight: 'calc(100vh - 100px)' }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/40 bg-[#0a0f1e]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-black uppercase tracking-wider text-white">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
                 Thông báo
               </h3>
               {unreadCount > 0 && (
@@ -109,7 +109,7 @@ const NotificationCenter = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllAsRead()}
-                  className="text-[10px] font-bold uppercase text-blue-400 hover:text-blue-300 px-2 py-1 hover:bg-blue-500/10 rounded transition-colors"
+                  className="text-[10px] font-bold uppercase text-blue-600 hover:text-blue-700 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
                   title="Đánh dấu tất cả đã đọc"
                 >
                   <HiOutlineCheck className="w-4 h-4" />
@@ -117,7 +117,7 @@ const NotificationCenter = () => {
               )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-slate-500 hover:text-slate-300 p-1 hover:bg-slate-700/40 rounded transition-colors"
+                className="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded transition-colors"
               >
                 <HiOutlineX className="w-4 h-4" />
               </button>
@@ -128,11 +128,11 @@ const NotificationCenter = () => {
           <div className="overflow-y-auto" style={{ maxHeight: '400px' }}>
             {notifications.length === 0 ? (
               <div className="px-4 py-12 text-center">
-                <HiOutlineBell className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <HiOutlineBell className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                   Chưa có thông báo
                 </p>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   Thông báo mới sẽ xuất hiện ở đây
                 </p>
               </div>
@@ -144,8 +144,8 @@ const NotificationCenter = () => {
                   <div
                     key={notification.id}
                     className={`
-                      group flex items-start gap-3 px-4 py-3 border-b border-slate-800/40 cursor-pointer
-                      transition-all duration-150 hover:bg-slate-800/30
+                      group flex items-start gap-3 px-4 py-3 border-b border-slate-100 cursor-pointer
+                      transition-all duration-150 hover:bg-slate-50
                       ${notification.isRead ? 'opacity-60' : ''}
                     `}
                     onClick={() => {
@@ -162,17 +162,17 @@ const NotificationCenter = () => {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-[11px] font-black text-slate-200 uppercase tracking-wide truncate">
+                        <p className="text-[11px] font-black text-slate-800 uppercase tracking-wide truncate">
                           {notification.title}
                         </p>
                         {!notification.isRead && (
                           <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed line-clamp-2">
+                      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
                         {notification.message}
                       </p>
-                      <p className="text-[10px] text-slate-600 mt-1 font-semibold">
+                      <p className="text-[10px] text-slate-400 mt-1 font-semibold">
                         {timeAgo(notification.timestamp)}
                       </p>
                     </div>
@@ -183,7 +183,7 @@ const NotificationCenter = () => {
                         e.stopPropagation();
                         removeNotification(notification.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 p-1 rounded transition-all"
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 p-1 rounded transition-all"
                       title="Xóa"
                     >
                       <HiOutlineX className="w-3.5 h-3.5" />
@@ -196,13 +196,13 @@ const NotificationCenter = () => {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-slate-700/40 bg-[#0a0f1e]">
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50">
               <button
                 onClick={() => {
                   clearAll();
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-red-400 py-1.5 hover:bg-red-500/5 rounded transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-red-600 py-1.5 hover:bg-red-50 rounded transition-colors"
               >
                 <HiOutlineTrash className="w-3.5 h-3.5" />
                 Xóa tất cả thông báo

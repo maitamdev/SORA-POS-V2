@@ -46,6 +46,15 @@ const formatShortDate = (dateStr: string) => {
   return `${day}/${month}`;
 };
 
+const formatOrderMeta = (dateStr: string) => {
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+  })}`;
+};
+
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' font-family='Arial' font-size='12' fill='%2394a3b8'%3ESP%3C/text%3E%3C/svg%3E";
 
@@ -136,12 +145,6 @@ const DashboardPage = () => {
     [revenuePoints],
   );
 
-  const categorySales = data?.category_sales || [];
-  const maxCategoryValue = useMemo(
-    () => Math.max(...categorySales.map((item) => item.value), 100000),
-    [categorySales],
-  );
-
   const paymentConfig = useMemo(() => {
     const stats = data?.payment_stats || [];
     const total = stats.reduce((sum, item) => sum + item.count, 0);
@@ -227,445 +230,277 @@ const DashboardPage = () => {
   ];
 
   return (
-    <div className="min-h-full space-y-4 bg-slate-50 text-slate-950">
-      <section className="border border-slate-300 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-300 px-4 py-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-blue-700">
-                SORA-POS
-              </span>
-              <span className="text-[11px] font-semibold text-slate-400">Trung tâm vận hành cửa hàng</span>
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950">Dashboard Tổng Quan</h1>
-            <p className="mt-1 text-xs font-semibold text-slate-500">
-              Theo dõi doanh thu, đơn hàng, tồn kho và cảnh báo trong một màn hình.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex h-10 items-center gap-2 border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700">
-              <HiOutlineCalendar className="h-4 w-4 text-slate-400" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-                onClick={(event) => event.currentTarget.showPicker?.()}
-                className="h-full min-w-[140px] cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-slate-700 outline-none"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => loadData(selectedDate, selectedRange)}
-              className="flex h-10 items-center justify-center gap-2 border border-slate-900 bg-slate-950 px-4 text-xs font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
-            >
-              <HiOutlineRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Tải lại
-            </button>
-          </div>
+    <div className="min-h-full space-y-2 bg-slate-50 text-slate-950">
+      <section className="flex flex-col gap-2 border-b border-slate-200 pb-2 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <h1 className="text-[23px] font-black leading-tight tracking-tight text-slate-950">Tổng quan</h1>
+          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+            Theo dõi nhanh doanh thu, đơn hàng, tồn kho và hiệu quả bán hàng.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 divide-y divide-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 xl:grid-cols-5">
-          {kpis.map((item) => {
-            const TrendIcon = trendCopy(item.growth).icon;
-            const trend = trendCopy(item.growth);
-            const Icon = item.icon;
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex h-8 items-center border border-slate-300 bg-white p-1">
+            {[7, 30].map((range) => (
+              <button
+                key={range}
+                type="button"
+                onClick={() => setSelectedRange(range)}
+                className={`h-6 px-3 text-[10px] font-black transition ${
+                  selectedRange === range ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {range} ngày
+              </button>
+            ))}
+          </div>
 
-            return (
-              <div key={item.label} className={`border-l-4 ${item.accent} bg-white px-4 py-3`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{item.label}</p>
-                    <p className="mt-2 truncate text-xl font-black tracking-tight text-slate-950">{item.value}</p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-black ${trend.tone}`}>
-                        <TrendIcon className="h-3.5 w-3.5" />
-                        {trend.text}
-                      </span>
-                      <span className="text-[10px] font-semibold text-slate-400">{item.sub || 'so với hôm qua'}</span>
-                    </div>
-                  </div>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-slate-300 bg-slate-50 text-slate-700">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <div className="relative flex h-8 items-center gap-2 border border-slate-300 bg-white px-3 text-[11px] font-bold text-slate-700">
+            <HiOutlineCalendar className="h-4 w-4 text-blue-600" />
+            <span>{formatDisplayDate(selectedDate)}</span>
+            <input
+              aria-label="Chọn ngày dashboard"
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              onClick={(event) => event.currentTarget.showPicker?.()}
+              className="absolute inset-0 cursor-pointer opacity-0"
+            />
+          </div>
+
+          <button
+            type="button"
+            aria-label="Tải lại dashboard"
+            title="Tải lại dashboard"
+            onClick={() => loadData(selectedDate, selectedRange)}
+            className="flex h-8 w-8 items-center justify-center border border-slate-300 bg-white text-slate-700 transition hover:border-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={loading}
+          >
+            <HiOutlineRefresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-8">
-          <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {kpis.map((item) => {
+          const TrendIcon = trendCopy(item.growth).icon;
+          const trend = trendCopy(item.growth);
+          const Icon = item.icon;
+
+          return (
+            <article key={item.label} className={`min-h-[110px] border border-slate-200 bg-white p-4`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[12px] font-black uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-700">
+                  <Icon className="h-4 w-4" />
+                </span>
+              </div>
+              <p className="mt-2 truncate text-[24px] font-black tracking-tight text-slate-950">{item.value}</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-black ${trend.tone} ${trend.tone === 'text-emerald-600' ? 'bg-emerald-50' : trend.tone === 'text-rose-600' ? 'bg-rose-50' : 'bg-slate-100'}`}>
+                  <TrendIcon className="h-3.5 w-3.5" />
+                  {trend.text}
+                </span>
+                <span className="truncate text-[11px] font-semibold text-slate-400">{item.sub || 'so với hôm qua'}</span>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+        <div className="min-w-0 border border-slate-200 bg-white p-3 xl:col-span-8">
+          <div className="flex flex-col gap-1.5 border-b border-slate-100 pb-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Doanh thu theo thời gian</h2>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
-                Tổng {selectedRange} ngày: <span className="text-slate-950">{money(totalRevenue)}</span> · {totalOrders} đơn
+              <h2 className="text-[15px] font-black tracking-tight text-slate-900">Doanh thu theo thời gian</h2>
+              <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                {selectedRange} ngày: <span className="font-black text-slate-900">{money(totalRevenue)}</span> / {totalOrders} đơn
               </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {[7, 30].map((range) => (
-                <button
-                  key={range}
-                  type="button"
-                  onClick={() => setSelectedRange(range)}
-                  className={`border px-3 py-2 text-[11px] font-black transition ${
-                    selectedRange === range
-                      ? 'border-blue-600 bg-blue-600 text-white'
-                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400'
-                  }`}
-                >
-                  {range} ngày
-                </button>
-              ))}
-              <div className="border border-slate-300 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-500">
-                Ngày tốt nhất: <span className="text-slate-950">{formatShortDate(bestDay.date)}</span>
-              </div>
+            <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400">
+              <span>Ngày tốt nhất: <b className="text-slate-700">{formatShortDate(bestDay.date)}</b></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-4 bg-blue-600" /> Doanh thu</span>
             </div>
           </div>
 
-          <div className="relative h-[360px] overflow-hidden border border-slate-300 bg-white">
-            <div className="absolute inset-x-0 top-0 z-10 flex flex-col gap-3 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur xl:flex-row xl:items-center xl:justify-between">
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <div className="border border-slate-300 bg-white px-4 py-2.5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Hôm nay</p>
-                    <p className="mt-1 text-sm font-black text-slate-950">{money(summary.today_revenue)}</p>
-                  </div>
-                  <div className="border border-slate-300 bg-white px-4 py-2.5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{selectedRange} ngày qua</p>
-                    <p className="mt-1 text-sm font-black text-slate-950">{money(totalRevenue)}</p>
-                  </div>
-                  <div className="border border-emerald-200 bg-emerald-50 px-4 py-2.5">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">Tăng trưởng</p>
-                    <p className="mt-1 text-sm font-black text-emerald-700">{summary.today_revenue_growth >= 0 ? '+' : ''}{summary.today_revenue_growth}%</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-2 w-5 bg-blue-600" />
-                    Doanh thu
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-0 w-5 border-t border-dashed border-slate-400" />
-                    Xu hướng
-                  </span>
-                </div>
-            </div>
-
-            <div className="absolute inset-x-0 bottom-0 top-[94px] px-4 pb-4 pt-4">
-                {revenueChartData.length > 0 && revenueChartData.some((item) => item.revenue > 0) ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={revenueChartData} margin={{ top: 8, right: 24, bottom: 4, left: 2 }}>
-                    <defs>
-                      <linearGradient id="revenueAreaFill" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.24} />
-                        <stop offset="52%" stopColor="#60a5fa" stopOpacity={0.1} />
-                        <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#e5edf7" strokeDasharray="4 8" vertical={false} />
-                    <XAxis
-                      axisLine={false}
-                      dataKey="label"
-                      interval={0}
-                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 800 }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      domain={[0, 'dataMax']}
-                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
-                      tickFormatter={(value) => compactMoney(Number(value))}
-                      tickLine={false}
-                      width={54}
-                    />
-                    <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#0f172a', strokeDasharray: '4 5', strokeWidth: 1 }} />
-                    <Area
-                      dataKey="trendRevenue"
-                      dot={false}
-                      fill="transparent"
-                      isAnimationActive={false}
-                      stroke="#9db4d0"
-                      strokeDasharray="4 5"
-                      strokeWidth={2}
-                      type="linear"
-                    />
-                    <Area
-                      activeDot={{ fill: '#ffffff', r: 5, stroke: '#2563eb', strokeWidth: 3 }}
-                      dataKey="revenue"
-                      dot={false}
-                      fill="url(#revenueAreaFill)"
-                      fillOpacity={1}
-                      isAnimationActive={false}
-                      stroke="#2563eb"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={3}
-                      type="monotone"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs font-semibold text-slate-400">
-                  Chưa có dữ liệu doanh thu trong khoảng thời gian này
-                </div>
-              )}
-            </div>
+          <div className="mt-2 h-[245px] min-w-0 sm:h-[265px] xl:h-[275px]">
+            {revenueChartData.length > 0 && revenueChartData.some((item) => item.revenue > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={revenueChartData} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueAreaFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.18} />
+                      <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#e5edf7" strokeDasharray="3 6" vertical={false} />
+                  <XAxis axisLine={false} dataKey="label" interval={0} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} tickLine={false} />
+                  <YAxis axisLine={false} domain={[0, 'dataMax']} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} tickFormatter={(value) => compactMoney(Number(value))} tickLine={false} width={50} />
+                  <Tooltip content={<RevenueTooltip />} cursor={{ stroke: '#0f172a', strokeDasharray: '4 5', strokeWidth: 1 }} />
+                  <Area dataKey="trendRevenue" dot={false} fill="transparent" isAnimationActive={false} stroke="#b8c7da" strokeDasharray="4 5" strokeWidth={1.5} type="linear" />
+                  <Area
+                    activeDot={{ fill: '#ffffff', r: 5, stroke: '#2563eb', strokeWidth: 3 }}
+                    dataKey="revenue"
+                    dot={{ fill: '#ffffff', r: 3, stroke: '#2563eb', strokeWidth: 2 }}
+                    fill="url(#revenueAreaFill)"
+                    isAnimationActive={false}
+                    stroke="#6aaee0"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    type="monotone"
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center border border-dashed border-slate-200 text-xs font-semibold text-slate-400">
+                Chưa có dữ liệu doanh thu trong khoảng thời gian này
+              </div>
+            )}
           </div>
         </div>
 
-        <aside className="grid gap-4 xl:col-span-4">
-          <div className="border border-slate-300 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Cảnh báo vận hành</h2>
-              <HiOutlineBell className="h-5 w-5 text-slate-400" />
+        <div className="min-w-0 border border-slate-200 bg-white p-4 xl:col-span-4">
+          <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <h2 className="text-[17px] font-black tracking-tight text-slate-900">Top bán chạy</h2>
+              <p className="mt-0.5 text-[12px] font-medium text-slate-400">Trong {selectedRange} ngày gần nhất</p>
             </div>
-
-            <div className="space-y-3">
-              <Link
-                to="/stock?tab=alerts"
-                className="block border border-rose-200 bg-rose-50 p-3 transition hover:border-rose-300"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black text-rose-800">Tồn kho thấp</p>
-                    <p className="mt-1 text-2xl font-black text-rose-700">{summary.low_stock_count}</p>
-                    <p className="text-[11px] font-semibold text-rose-600">{summary.new_low_stock_count} mặt hàng mới chạm ngưỡng</p>
-                  </div>
-                  <HiOutlineExclamationCircle className="h-7 w-7 text-rose-500" />
-                </div>
-              </Link>
-
-              <Link to="/stock?tab=expiry" className="block border border-amber-200 bg-amber-50 p-3 transition hover:border-amber-300">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black text-amber-800">Sắp hết hạn</p>
-                    <p className="mt-1 text-2xl font-black text-amber-700">HSD</p>
-                    <p className="text-[11px] font-semibold text-amber-700">Kiểm tra lô hàng cần ưu tiên bán</p>
-                  </div>
-                  <HiOutlineCalendar className="h-7 w-7 text-amber-500" />
-                </div>
-              </Link>
-
-              <div className="border border-emerald-200 bg-emerald-50 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black text-emerald-800">Dòng tiền hôm nay</p>
-                    <p className="mt-1 text-lg font-black text-emerald-700">{money(summary.today_revenue)}</p>
-                    <p className="text-[11px] font-semibold text-emerald-700">Theo doanh thu đã ghi nhận</p>
-                  </div>
-                  <HiOutlineCash className="h-7 w-7 text-emerald-500" />
-                </div>
-              </div>
-            </div>
+            <Link to="/reports" className="text-[13px] font-black text-blue-700 hover:text-blue-900">Tất cả</Link>
           </div>
 
-          <div className="border border-slate-300 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Thanh toán</h2>
-              <span className="text-[11px] font-bold text-slate-400">{paymentConfig.total} đơn</span>
-            </div>
-
-            <div className="flex items-center gap-5">
-              <div className="relative h-28 w-28 shrink-0">
-                <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-                  <circle cx="60" cy="60" r={paymentConfig.radius} fill="transparent" stroke="#e2e8f0" strokeWidth="14" />
-                  {paymentConfig.segments.map((segment) => (
-                    <circle
-                      key={segment.name}
-                      cx="60"
-                      cy="60"
-                      r={paymentConfig.radius}
-                      fill="transparent"
-                      stroke={segment.color}
-                      strokeDasharray={`${segment.strokeLength} ${paymentConfig.circumference}`}
-                      strokeDashoffset={-segment.strokeOffset}
-                      strokeLinecap="butt"
-                      strokeWidth="14"
-                    />
-                  ))}
-                  <circle cx="60" cy="60" r="34" fill="#ffffff" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">Tổng</span>
-                  <span className="text-lg font-black text-slate-950">{paymentConfig.total}</span>
+          <div className="space-y-0">
+            {data.top_products.length > 0 ? (
+              data.top_products.slice(0, 5).map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0">
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center border text-[12px] font-black ${idx === 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : idx === 1 ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-blue-100 bg-blue-50 text-blue-700'}`}>
+                    {idx + 1}
+                  </span>
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    onError={(event) => {
+                      event.currentTarget.src = PLACEHOLDER_IMAGE;
+                    }}
+                    className="h-10 w-10 shrink-0 border border-slate-200 bg-slate-50 object-contain"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-black text-slate-800" title={item.name}>{item.name}</p>
+                    <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-400">Đã bán: {item.quantity}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[13px] font-black text-slate-900">{compactMoney(item.revenue)}</p>
+                    <p className="text-[11px] font-semibold text-slate-400">doanh thu</p>
+                  </div>
                 </div>
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-2">
-                {paymentConfig.segments.length > 0 ? (
-                  paymentConfig.segments.map((segment) => (
-                    <div key={segment.name} className="flex items-center justify-between gap-3 text-xs">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="h-2.5 w-2.5 shrink-0" style={{ backgroundColor: segment.color }} />
-                        <span className="truncate font-bold text-slate-600">{segment.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-black text-slate-950">{segment.percentage}%</p>
-                        <p className="text-[9px] font-semibold text-slate-400">{segment.count} đơn</p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs font-semibold text-slate-400">Chưa có giao dịch thanh toán</p>
-                )}
-              </div>
-            </div>
+              ))
+            ) : (
+              <p className="py-10 text-center text-sm font-semibold text-slate-400">Chưa có sản phẩm bán chạy</p>
+            )}
           </div>
-        </aside>
+        </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Danh mục bán chạy</h2>
-            <span className="text-[11px] font-bold text-slate-400">{selectedRange} ngày</span>
-          </div>
-          <div className="space-y-3">
-            {categorySales.length > 0 ? (
-              categorySales.slice(0, 5).map((item) => {
-                const percent = Math.max(8, (item.value / maxCategoryValue) * 100);
-                return (
-                  <div key={item.name}>
-                    <div className="mb-1 flex items-center justify-between gap-3">
-                      <span className="truncate text-xs font-bold text-slate-700">{item.name}</span>
-                      <span className="text-xs font-black text-slate-950">{compactMoney(item.value)}</span>
-                    </div>
-                    <div className="h-2 border border-slate-300 bg-slate-100">
-                      <div className="h-full bg-blue-600" style={{ width: `${percent}%` }} />
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="py-10 text-center text-xs font-semibold text-slate-400">Chưa có dữ liệu danh mục</p>
-            )}
+      <section className="grid grid-cols-1 gap-2 xl:grid-cols-12">
+        <div className="min-w-0 border border-slate-200 bg-white p-4 xl:col-span-4">
+          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
+            <h2 className="text-[17px] font-black tracking-tight text-slate-900">Phương thức thanh toán</h2>
+            <span className="text-[13px] font-bold text-slate-400">{paymentConfig.total} đơn</span>
           </div>
 
-          <div className="mt-5 border-t border-slate-300 pt-4">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Sắp hết hàng</h2>
-              <Link to="/stock?tab=alerts" className="text-[11px] font-black text-blue-700 hover:text-blue-900">
-                Xem tất cả
-              </Link>
+          <div className="flex items-center gap-4">
+            <div className="relative h-24 w-24 shrink-0">
+              <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                <circle cx="60" cy="60" r={paymentConfig.radius} fill="transparent" stroke="#e2e8f0" strokeWidth="14" />
+                {paymentConfig.segments.map((segment) => (
+                  <circle key={segment.name} cx="60" cy="60" r={paymentConfig.radius} fill="transparent" stroke={segment.color} strokeDasharray={`${segment.strokeLength} ${paymentConfig.circumference}`} strokeDashoffset={-segment.strokeOffset} strokeLinecap="butt" strokeWidth="14" />
+                ))}
+                <circle cx="60" cy="60" r="34" fill="#ffffff" />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Tổng</span>
+                <span className="text-lg font-black text-slate-950">{paymentConfig.total}</span>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {data.low_stock_products.length > 0 ? (
-                data.low_stock_products.slice(0, 2).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        onError={(event) => {
-                          event.currentTarget.src = PLACEHOLDER_IMAGE;
-                        }}
-                        className="h-9 w-9 shrink-0 border border-slate-300 bg-slate-50 object-contain"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-black text-slate-800" title={item.name}>
-                          {item.name}
-                        </p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          Tồn kho: <span className="text-rose-600">{item.stock}</span>
-                        </p>
-                      </div>
-                    </div>
-                    <span className="shrink-0 border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-black uppercase text-rose-700">
-                      {item.alert_status}
-                    </span>
+            <div className="min-w-0 flex-1 space-y-2">
+              {paymentConfig.segments.length > 0 ? paymentConfig.segments.map((segment) => (
+                <div key={segment.name} className="flex items-center justify-between gap-2 text-[13px]">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="h-3 w-3 shrink-0" style={{ backgroundColor: segment.color }} />
+                    <span className="truncate font-bold text-slate-600">{segment.name}</span>
                   </div>
-                ))
-              ) : (
-                <p className="py-6 text-center text-xs font-semibold text-slate-400">Tồn kho đang an toàn</p>
-              )}
+                  <div className="text-right">
+                    <p className="font-black text-slate-950">{segment.percentage}%</p>
+                    <p className="text-[11px] font-semibold text-slate-400">{segment.count} đơn</p>
+                  </div>
+                </div>
+              )) : <p className="text-sm font-semibold text-slate-400">Chưa có giao dịch thanh toán</p>}
             </div>
           </div>
+
         </div>
 
-        <div className="border border-slate-300 bg-white p-4 shadow-sm xl:col-span-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Giao dịch gần đây</h2>
-            <Link to="/orders" className="border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700 hover:border-blue-400">
-              Xem tất cả
+        <div className="min-w-0 border border-slate-200 bg-white p-4 xl:col-span-4">
+          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <h2 className="text-[17px] font-black tracking-tight text-slate-900">Cảnh báo vận hành</h2>
+              <p className="mt-0.5 text-[12px] font-medium text-slate-400">Các việc cần được ưu tiên</p>
+            </div>
+            <HiOutlineBell className="h-5 w-5 text-slate-400" />
+          </div>
+
+          <div className="space-y-2">
+            <Link to="/stock?tab=alerts" className="flex items-center justify-between gap-3 border border-rose-200 bg-rose-50 px-3.5 py-2.5 transition hover:border-rose-300">
+              <div className="flex min-w-0 items-center gap-3">
+                <HiOutlineExclamationCircle className="h-5 w-5 shrink-0 text-rose-500" />
+                <div className="min-w-0"><p className="text-[13px] font-black text-rose-800">Tồn kho thấp</p><p className="truncate text-[11px] font-semibold text-rose-600">{summary.new_low_stock_count} mặt hàng mới chạm ngưỡng</p></div>
+              </div>
+              <span className="text-2xl font-black text-rose-700">{summary.low_stock_count}</span>
             </Link>
+
+            <Link to="/stock?tab=expiry" className="flex items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3.5 py-2.5 transition hover:border-amber-300">
+              <div className="flex min-w-0 items-center gap-3">
+                <HiOutlineCalendar className="h-5 w-5 shrink-0 text-amber-500" />
+                <div className="min-w-0"><p className="text-[13px] font-black text-amber-800">Lô sắp hết hạn</p><p className="truncate text-[11px] font-semibold text-amber-700">Kiểm tra hàng cần ưu tiên bán</p></div>
+              </div>
+              <span className="text-[14px] font-black text-amber-700">Xem</span>
+            </Link>
+
+            <div className="flex items-center justify-between gap-3 border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
+              <div className="flex min-w-0 items-center gap-3">
+                <HiOutlineCash className="h-5 w-5 shrink-0 text-emerald-500" />
+                <div className="min-w-0"><p className="text-[13px] font-black text-emerald-800">Dòng tiền hôm nay</p><p className="truncate text-[11px] font-semibold text-emerald-700">Theo doanh thu đã ghi nhận</p></div>
+              </div>
+              <span className="text-[14px] font-black text-emerald-700">{money(summary.today_revenue)}</span>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            {data.recent_orders.length > 0 ? (
-              <table className="w-full min-w-[560px] text-left">
-                <thead>
-                  <tr className="border-b border-slate-300 text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    <th className="pb-2">Mã hóa đơn</th>
-                    <th className="pb-2">Khách hàng</th>
-                    <th className="pb-2">Thanh toán</th>
-                    <th className="pb-2 text-right">Tổng tiền</th>
-                    <th className="pb-2 text-right">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {data.recent_orders.slice(0, 5).map((order) => (
-                    <tr key={order.id} className="text-xs transition hover:bg-slate-50">
-                      <td className="py-2.5 font-black text-slate-900">{order.order_number}</td>
-                      <td className="py-2.5 font-semibold text-slate-500">{order.customer_name}</td>
-                      <td className="py-2.5 font-semibold text-slate-600">{order.payment_method}</td>
-                      <td className="py-2.5 text-right font-black text-slate-900">{money(order.total_amount)}</td>
-                      <td className="py-2.5 text-right">
-                        <span className={`inline-flex border px-2 py-1 text-[10px] font-black ${statusTone(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="py-10 text-center text-xs font-semibold text-slate-400">Không có giao dịch gần đây</p>
-            )}
-          </div>
         </div>
 
-        <div className="grid gap-4 xl:col-span-3">
-          <div className="border border-slate-300 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-black uppercase tracking-[0.14em] text-slate-800">Top bán chạy</h2>
-              <Link to="/reports" className="text-[11px] font-black text-blue-700 hover:text-blue-900">
-                Xem tất cả
-              </Link>
+        <div className="min-w-0 border border-slate-200 bg-white p-4 xl:col-span-4">
+          <div className="mb-2 flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <h2 className="text-[17px] font-black tracking-tight text-slate-900">Đơn hàng gần đây</h2>
+              <p className="mt-0.5 text-[12px] font-medium text-slate-400">Các giao dịch mới nhất</p>
             </div>
+            <Link to="/orders" className="text-[13px] font-black text-blue-700 hover:text-blue-900">Tất cả</Link>
+          </div>
 
-            <div className="space-y-3">
-              {data.top_products.length > 0 ? (
-                data.top_products.slice(0, 4).map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-3 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                    <span className="w-4 text-center text-xs font-black text-slate-400">{idx + 1}</span>
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      onError={(event) => {
-                        event.currentTarget.src = PLACEHOLDER_IMAGE;
-                      }}
-                      className="h-10 w-10 shrink-0 border border-slate-300 bg-slate-50 object-contain"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-black text-slate-800" title={item.name}>
-                        {item.name}
-                      </p>
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-bold">
-                        <span className="text-slate-400">Đã bán: {item.quantity}</span>
-                        <span className="text-blue-700">{compactMoney(item.revenue)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="py-8 text-center text-xs font-semibold text-slate-400">Chưa có sản phẩm bán chạy</p>
-              )}
-            </div>
+          <div className="space-y-0">
+            {data.recent_orders.length > 0 ? data.recent_orders.slice(0, 4).map((order) => (
+              <div key={order.id} className="flex items-center gap-3 border-b border-slate-100 py-2.5 last:border-0">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center bg-blue-50 text-blue-600"><HiOutlineCalendar className="h-4 w-4" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12px] font-black text-slate-800" title={order.order_number}>{order.order_number}</p>
+                  <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-400">{formatOrderMeta(order.created_at)} / {order.customer_name}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[13px] font-black text-slate-900">{compactMoney(order.total_amount)}</p>
+                  <span className={`text-[11px] font-black ${statusTone(order.status).split(' ').pop()}`}>{order.status}</span>
+                </div>
+              </div>
+            )) : <p className="py-10 text-center text-sm font-semibold text-slate-400">Không có giao dịch gần đây</p>}
           </div>
         </div>
       </section>

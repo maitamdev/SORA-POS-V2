@@ -17,7 +17,8 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 | 7 | `enterprise_pos_core.sql` | Tạo RPC transaction cho checkout, hủy đơn, nhập kho và audit log |
 | 8 | `stock_atomic_rpc.sql` | Tạo RPC thao tác kho atomic |
 | 9 | `expiry_setup.sql` | Tạo bảng/chức năng quản lý lô hàng và hạn sử dụng nếu cần |
-| 10 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
+| 10 | `lot_expiry_upgrade.sql` | Gộp lô trùng, bắt buộc HSD/số lô và cập nhật RPC cho database đang chạy |
+| 11 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
 
 ## Luu Y
 
@@ -36,4 +37,3 @@ Mật khẩu demo chỉ dùng cho môi trường thuyết trình/kiểm thử. K
 
 
 # Khởi Tạo Database Sora POS (PostgreSQL/Supabase)
-

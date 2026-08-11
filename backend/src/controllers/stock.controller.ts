@@ -21,7 +21,14 @@ export class StockController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     successResponse(
       res,
-      await StockService.importStock(req.body.product_id, req.body.quantity, req.user.userId, req.body.note),
+      await StockService.importStock(
+        req.body.product_id,
+        req.body.quantity,
+        req.user.userId,
+        req.body.note,
+        req.body.batch_number,
+        req.body.expiry_date
+      ),
       'Nhập kho thành công',
       201
     );

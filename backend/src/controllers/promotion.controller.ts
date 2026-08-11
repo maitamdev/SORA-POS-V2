@@ -32,9 +32,17 @@ export class PromotionController {
 
   static autoPromotions = asyncHandler(async (req: Request, res: Response) => {
     const { order_total, items } = req.body;
+    // Auto promotion lookup is called while the cart changes. A stale client
+    // payload must not turn a non-critical lookup into a 500 response.
+    const parsedOrderTotal = Number(order_total);
+    const safeOrderTotal = Number.isFinite(parsedOrderTotal) && parsedOrderTotal >= 0
+      ? parsedOrderTotal
+      : 0;
+    const safeItems = Array.isArray(items) ? items : [];
+
     successResponse(
       res,
-      await PromotionService.getAutoPromotions(order_total || 0, items || []),
+      await PromotionService.getAutoPromotions(safeOrderTotal, safeItems),
       'Lấy khuyến mãi tự động thành công'
     );
   });

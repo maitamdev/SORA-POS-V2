@@ -236,10 +236,12 @@ export const openApiSpec: OpenApiSpec = {
       },
       StockImport: {
         type: 'object',
-        required: ['product_id', 'quantity'],
+        required: ['product_id', 'quantity', 'batch_number', 'expiry_date'],
         properties: {
           product_id: { type: 'string', format: 'uuid' },
           quantity: { type: 'integer', minimum: 1 },
+          batch_number: { type: 'string', minLength: 1, maxLength: 100 },
+          expiry_date: { type: 'string', format: 'date' },
           note: { type: 'string' },
         },
       },

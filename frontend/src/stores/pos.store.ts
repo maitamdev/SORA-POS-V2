@@ -28,6 +28,8 @@ interface POSState {
   voucherCode: string;
   autoPromoDiscount: number;
   voucherDiscount: number;
+  autoPromotionIds: string[];
+  voucherPromotionId: string | null;
 
   // Customer
   customerId: string;
@@ -84,6 +86,8 @@ interface POSState {
   setVoucherCode: (code: string) => void;
   setAutoPromoDiscount: (value: number) => void;
   setVoucherDiscount: (value: number) => void;
+  setAutoPromotionIds: (ids: string[]) => void;
+  setVoucherPromotionId: (id: string | null) => void;
 
   // Actions — Customer
   setCustomerId: (id: string) => void;
@@ -146,6 +150,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   voucherCode: '',
   autoPromoDiscount: 0,
   voucherDiscount: 0,
+  autoPromotionIds: [],
+  voucherPromotionId: null,
 
   // Customer
   customerId: '',
@@ -252,6 +258,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
       voucherCode: '',
       autoPromoDiscount: 0,
       voucherDiscount: 0,
+      autoPromotionIds: [],
+      voucherPromotionId: null,
       receivedAmount: 0,
       showCashPayment: false,
       showClearCartConfirm: false,
@@ -262,6 +270,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   setVoucherCode: (code) => set({ voucherCode: code }),
   setAutoPromoDiscount: (value) => set({ autoPromoDiscount: value }),
   setVoucherDiscount: (value) => set({ voucherDiscount: value }),
+  setAutoPromotionIds: (ids) => set({ autoPromotionIds: ids }),
+  setVoucherPromotionId: (id) => set({ voucherPromotionId: id }),
 
   // ── Actions — Customer ──
   setCustomerId: (id) => set({ customerId: id }),
@@ -310,6 +320,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
       voucherCode: '',
       autoPromoDiscount: 0,
       voucherDiscount: 0,
+      autoPromotionIds: [],
+      voucherPromotionId: null,
       customerPhone: '',
       matchedCustomer: null,
       newCustName: '',
@@ -392,4 +404,3 @@ export const usePOSSortedProducts = () =>
       return items;
     })
   );
-
