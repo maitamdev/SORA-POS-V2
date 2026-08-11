@@ -40,6 +40,7 @@ test('health and OpenAPI discovery endpoints are reachable', async () => {
   const spec = await readJson<{ paths: Record<string, unknown> }>(openApi);
   assert.ok(spec.paths['/orders']);
   assert.ok(spec.paths['/stock/receipts']);
+  assert.ok(spec.paths['/stock/purchase-orders']);
   assert.ok(spec.paths['/promotions/validate']);
 });
 
@@ -68,6 +69,7 @@ test('protected API domains reject requests without a bearer token', async () =>
     '/api/stock/inventory',
     '/api/stock/summary',
     '/api/stock/receipts',
+    '/api/stock/purchase-orders',
     '/api/reports/dashboard',
     '/api/ai/recommendations',
     '/api/staff',

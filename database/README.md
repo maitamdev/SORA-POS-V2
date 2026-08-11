@@ -19,8 +19,9 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 | 9 | `expiry_setup.sql` | Tạo bảng/chức năng quản lý lô hàng và hạn sử dụng nếu cần |
 | 10 | `lot_expiry_upgrade.sql` | Gộp lô trùng, bắt buộc HSD/số lô và cập nhật RPC cho database đang chạy |
 | 11 | `inventory_replenishment_v2.sql` | Chính sách lead time, tồn an toàn, MOQ và đơn mua đang về cho engine nhập hàng v2 |
-| 12 | `stock_summary_rpc.sql` | Aggregate KPI tồn kho trong PostgreSQL để dashboard không phải tải toàn bộ catalog về Node.js |
-| 13 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
+| 12 | `purchase_order_lifecycle.sql` | Vòng đời đơn nhập, duyệt, đang về và nhận hàng từng phần atomic |
+| 13 | `stock_summary_rpc.sql` | Aggregate KPI tồn kho trong PostgreSQL để dashboard không phải tải toàn bộ catalog về Node.js |
+| 14 | `seed.sql` | Du lieu mau, chi dung cho demo/database moi |
 
 ## Luu Y
 

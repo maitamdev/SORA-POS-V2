@@ -76,6 +76,12 @@ const menuItems = [
     roles: ['admin', 'manager', 'cashier'],
   },
   {
+    label: 'Đặt hàng NCC',
+    icon: HiOutlineClipboardList,
+    path: '/stock/purchase-orders',
+    roles: ['admin', 'manager'],
+  },
+  {
     label: 'Khách hàng',
     icon: HiOutlineUserGroup,
     path: '/customers',
@@ -171,10 +177,15 @@ const Sidebar = () => {
         <ul className="space-y-0.5">
           {filteredMenu.map((item) => {
             const Icon = item.icon;
+            const hasMoreSpecificActiveItem = filteredMenu.some(
+              (candidate) => candidate.path !== item.path
+                && candidate.path.startsWith(item.path)
+                && location.pathname.startsWith(candidate.path),
+            );
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
-                : location.pathname.startsWith(item.path);
+                : location.pathname.startsWith(item.path) && !hasMoreSpecificActiveItem;
 
             return (
               <li key={item.path}>

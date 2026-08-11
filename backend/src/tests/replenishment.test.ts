@@ -43,3 +43,24 @@ test('replenishment migration contains policy, incoming-order and RLS safeguards
   assert.match(migration, /ALTER TABLE public\.product_supply_policies ENABLE ROW LEVEL SECURITY/);
   assert.match(migration, /ADD COLUMN IF NOT EXISTS forecast_confidence/);
 });
+
+test('purchase order lifecycle migration locks partial receiving and protects RPCs', () => {
+  const migrationPath = path.resolve(__dirname, '../../../database/purchase_order_lifecycle.sql');
+  const migration = fs.readFileSync(migrationPath, 'utf8');
+
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.create_purchase_order/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.set_purchase_order_status/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.receive_purchase_order/);
+  assert.match(migration, /FOR UPDATE OF poi/);
+  assert.match(migration, /received_quantity \+ r\.quantity/);
+  assert.match(migration, /purchase_order_item_id UUID REFERENCES/);
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.receive_purchase_order/);
+});
+
+test('replenishment counts only committed purchase orders as incoming supply', () => {
+  const servicePath = path.resolve(__dirname, '../services/inventoryReplenishment.service.ts');
+  const service = fs.readFileSync(servicePath, 'utf8');
+
+  assert.match(service, /new Set\(\['approved', 'partially_received', 'ordered', 'in_transit'\]\)/);
+  assert.doesNotMatch(service, /new Set\(\['draft', 'pending', 'approved'/);
+});

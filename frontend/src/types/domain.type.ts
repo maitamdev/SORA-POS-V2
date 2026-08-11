@@ -313,6 +313,7 @@ export interface GoodsReceiptDetail {
   subtotal: number;
   expiry_date?: string | null;
   batch_number?: string | null;
+  purchase_order_item_id?: string | null;
   created_at: string;
   products?: {
     id: string;
@@ -321,6 +322,48 @@ export interface GoodsReceiptDetail {
     barcode?: string | null;
     unit: string;
   } | null;
+}
+
+export type PurchaseOrderStatus =
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'ordered'
+  | 'in_transit'
+  | 'partially_received'
+  | 'received'
+  | 'cancelled';
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchase_order_id: string;
+  product_id: string;
+  quantity: number;
+  received_quantity: number;
+  unit_cost: number;
+  created_at: string;
+  products?: Pick<Product, 'id' | 'name' | 'sku' | 'barcode' | 'unit' | 'cost_price' | 'sell_price' | 'image_url'> | null;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  order_number: string;
+  supplier_id?: string | null;
+  status: PurchaseOrderStatus;
+  expected_at?: string | null;
+  total_amount: number;
+  note?: string | null;
+  created_by?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  ordered_at?: string | null;
+  in_transit_at?: string | null;
+  received_at?: string | null;
+  cancelled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  suppliers?: Pick<Supplier, 'id' | 'name' | 'phone' | 'email'> | null;
+  items?: PurchaseOrderItem[];
 }
 
 export interface GoodsReceipt {

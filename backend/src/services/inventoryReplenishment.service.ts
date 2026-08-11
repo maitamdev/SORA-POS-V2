@@ -269,7 +269,10 @@ export class InventoryReplenishmentService {
       return { map, available: false };
     }
 
-    const openStatuses = new Set(['draft', 'pending', 'approved', 'partially_received', 'ordered', 'in_transit']);
+    // A draft or approval queue item is not committed supply. Counting it as
+    // incoming would suppress a valid reorder recommendation before a buyer
+    // has actually approved/placed the purchase order.
+    const openStatuses = new Set(['approved', 'partially_received', 'ordered', 'in_transit']);
     for (const row of data || []) {
       const purchaseOrder = Array.isArray(row.purchase_orders) ? row.purchase_orders[0] : row.purchase_orders;
       if (purchaseOrder?.status && !openStatuses.has(String(purchaseOrder.status))) continue;

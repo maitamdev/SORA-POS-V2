@@ -15,6 +15,7 @@ import settingsRoutes from './settings.routes';
 import shiftRoutes from './shift.routes';
 import auditRoutes from './audit.routes';
 import goodsReceiptRoutes from './goodsReceipt.routes';
+import purchaseOrderRoutes from './purchaseOrder.routes';
 import payosRoutes from './payos.routes';
 import webhookRoutes from './webhook.routes';
 import telegramRoutes from './telegram.routes';
@@ -38,6 +39,7 @@ router.get('/', (_req: Request, res: Response) => {
       '/api/orders',
       '/api/stock',
       '/api/stock/receipts',
+      '/api/stock/purchase-orders',
       '/api/reports',
       '/api/ai',
       '/api/staff',
@@ -70,6 +72,7 @@ router.use('/customers', httpCacheMiddleware(30, 60), customerRoutes);
 router.use('/orders', orderRoutes);
 router.use('/stock', stockRoutes);
 router.use('/stock/receipts', goodsReceiptRoutes);
+router.use('/stock/purchase-orders', purchaseOrderRoutes);
 router.use('/reports', reportRoutes);
 router.use('/ai', aiRoutes);
 router.use('/staff', staffRoutes);

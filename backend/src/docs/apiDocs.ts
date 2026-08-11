@@ -414,6 +414,35 @@ export const openApiSpec: OpenApiSpec = {
     '/stock/receipts/{id}/payment': {
       patch: { tags: ['Stock'], summary: 'Add goods receipt payment', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['pay_amount'], properties: { pay_amount: { type: 'number', exclusiveMinimum: 0 } } }), responses: { '200': ok() } },
     },
+    '/stock/purchase-orders': {
+      get: { tags: ['Stock'], summary: 'List supplier purchase orders', description: 'Roles: admin, manager', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      post: {
+        tags: ['Stock'],
+        summary: 'Create a supplier purchase order draft',
+        description: 'Roles: admin, manager. Creates a draft; it does not change on-hand stock.',
+        security: auth,
+        requestBody: jsonBody({
+          type: 'object',
+          required: ['supplier_id', 'items'],
+          properties: {
+            supplier_id: { type: 'string', format: 'uuid' },
+            expected_at: { type: 'string', format: 'date-time', nullable: true },
+            note: { type: 'string', nullable: true },
+            items: { type: 'array', minItems: 1, maxItems: 500 },
+          },
+        }),
+        responses: { '201': ok('Created') },
+      },
+    },
+    '/stock/purchase-orders/{id}': {
+      get: { tags: ['Stock'], summary: 'Get supplier purchase order detail', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
+    },
+    '/stock/purchase-orders/{id}/status': {
+      patch: { tags: ['Stock'], summary: 'Advance or cancel a purchase order', description: 'Roles: admin, manager. Status transitions are validated in PostgreSQL.', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['status'], properties: { status: { type: 'string', enum: ['pending', 'approved', 'ordered', 'in_transit', 'cancelled'] } } }), responses: { '200': ok() } },
+    },
+    '/stock/purchase-orders/{id}/receive': {
+      post: { tags: ['Stock'], summary: 'Receive all or part of a purchase order', description: 'Roles: admin, manager. Creates a goods receipt, updates batches/HSD and stock atomically.', security: auth, parameters: [idParam()], requestBody: jsonBody({ type: 'object', required: ['items'], properties: { paid_amount: { type: 'number', minimum: 0 }, note: { type: 'string', nullable: true }, items: { type: 'array', minItems: 1, maxItems: 500 } } }), responses: { '200': ok() } },
+    },
     '/reports/dashboard': {
       get: { tags: ['Reports'], summary: 'Dashboard report', security: auth, parameters: [{ name: 'date', in: 'query', schema: { type: 'string', format: 'date' } }], responses: { '200': ok() } },
     },
