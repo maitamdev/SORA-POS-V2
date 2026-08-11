@@ -3,10 +3,13 @@ import cors from 'cors';
 import compression from 'compression';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/error.middleware';
+import { requestContextMiddleware } from './middlewares/requestContext.middleware';
 import routes from './routes';
 import { sendApiDocsPage, sendOpenApiSpec } from './docs/apiDocs';
 
 const app = express();
+
+app.use(requestContextMiddleware);
 
 const isAllowedDevOrigin = (origin: string) => {
   try {

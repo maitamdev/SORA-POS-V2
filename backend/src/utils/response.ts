@@ -29,5 +29,6 @@ export const errorResponse = (
     success: false,
     message,
     errors,
+    request_id: res.getHeader('X-Request-ID') || null,
   });
 };

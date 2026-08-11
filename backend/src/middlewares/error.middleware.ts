@@ -7,7 +7,7 @@ import { AppError } from '../utils/AppError';
  */
 export const errorHandler = (
   err: Error & { status?: number; statusCode?: number },
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
@@ -18,6 +18,7 @@ export const errorHandler = (
       success: false,
       message: err.message,
       errors: null,
+      request_id: req.requestId || null,
     });
     return;
   }
@@ -32,5 +33,6 @@ export const errorHandler = (
       ? 'Có lỗi xảy ra, vui lòng thử lại'
       : err.message,
     errors: null,
+    request_id: req.requestId || null,
   });
 };

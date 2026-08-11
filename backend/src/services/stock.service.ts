@@ -5,6 +5,14 @@ import { AppError } from '../utils/AppError';
 import { appCache } from '../utils/cache';
 
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
+let stockSummaryRpcAvailable: boolean | null = null;
+
+const isMissingStockSummaryRpc = (message: string) => {
+  const normalized = message.toLowerCase();
+  return normalized.includes('get_stock_summary')
+    || normalized.includes('could not find the function')
+    || normalized.includes('schema cache');
+};
 
 export class StockService {
   private static async applyStockChangeRpc(params: {
@@ -481,8 +489,38 @@ export class StockService {
    * Stock Summary — tổng quan kho hàng cho dashboard.
    */
   static async summary() {
+    // Prefer a single database aggregate for large catalogs. Keep the existing
+    // JS calculation as a compatibility fallback until the migration is applied.
+    if (stockSummaryRpcAvailable !== false) {
+      const { data, error } = await supabase.rpc('get_stock_summary');
+      if (!error && data && typeof data === 'object' && !Array.isArray(data)) {
+        stockSummaryRpcAvailable = true;
+        const summary = data as Record<string, unknown>;
+        return {
+          total_products: Number(summary.total_products || 0),
+          out_of_stock_count: Number(summary.out_of_stock_count || 0),
+          low_stock_count: Number(summary.low_stock_count || 0),
+          safe_count: Number(summary.safe_count || 0),
+          total_stock_value: Number(summary.total_stock_value || 0),
+          total_retail_value: Number(summary.total_retail_value || 0),
+          alerts_pending: Number(summary.alerts_pending || 0),
+          top_low_stock: Array.isArray(summary.top_low_stock) ? summary.top_low_stock : [],
+          category_breakdown: Array.isArray(summary.category_breakdown) ? summary.category_breakdown : [],
+        };
+      }
+
+      if (error && isMissingStockSummaryRpc(error.message || '')) {
+        stockSummaryRpcAvailable = false;
+      } else if (error) {
+        console.warn('[StockService.summary] Aggregate RPC failed; using fallback:', error.message);
+        // Avoid retrying a broken/unauthorized function on every request in a
+        // warm serverless instance. A new deployment will re-check it.
+        stockSummaryRpcAvailable = false;
+      }
+    }
+
     // Chạy các query song song để tăng tốc
-    const [productsRes, alertsRes, lowStockRes] = await Promise.all([
+    const [productsRes, alertsRes] = await Promise.all([
       // Tổng sản phẩm đang active
       supabase
         .from('products')
@@ -493,14 +531,6 @@ export class StockService {
         .from('stock_alerts')
         .select('id', { count: 'exact', head: true })
         .in('status', ['low_stock', 'out_of_stock']),
-      // Top 10 sản phẩm tồn thấp nhất (kể cả hết hàng)
-      supabase
-        .from('products')
-        .select('id, name, sku, stock_quantity, min_stock_level, categories(id, name)')
-        .eq('is_active', true)
-        .lte('stock_quantity', 0)
-        .order('stock_quantity', { ascending: true })
-        .limit(10),
     ]);
 
     const allProducts = productsRes.data || [];

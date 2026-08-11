@@ -2,6 +2,39 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { env } from './env';
 
 let supabaseInstance: SupabaseClient | null = null;
+const SUPABASE_REQUEST_TIMEOUT_MS = 12_000;
+
+const fetchWithTimeout: typeof fetch = async (input, init = {}) => {
+  const controller = new AbortController();
+  let timedOut = false;
+  const parentSignal = init.signal;
+  const abortFromParent = () => controller.abort();
+
+  if (parentSignal?.aborted) {
+    controller.abort();
+  } else {
+    parentSignal?.addEventListener('abort', abortFromParent, { once: true });
+  }
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, SUPABASE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) {
+      const timeoutError = new Error(`Supabase request timed out after ${SUPABASE_REQUEST_TIMEOUT_MS}ms`);
+      timeoutError.name = 'SupabaseTimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    parentSignal?.removeEventListener('abort', abortFromParent);
+  }
+};
 
 /**
  * Lazy init Supabase client
@@ -15,6 +48,7 @@ function getSupabase(): SupabaseClient {
       );
     }
     supabaseInstance = createClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
+      global: { fetch: fetchWithTimeout },
       auth: {
         autoRefreshToken: false,
         persistSession: false,

@@ -29,8 +29,9 @@ const request = async (path: string, init?: RequestInit) => fetch(`${baseUrl}${p
 const readJson = async <T>(response: Response): Promise<T> => response.json() as Promise<T>;
 
 test('health and OpenAPI discovery endpoints are reachable', async () => {
-  const health = await request('/api/health');
+  const health = await request('/api/health', { headers: { 'x-request-id': 'smoke-health-1' } });
   assert.equal(health.status, 200);
+  assert.equal(health.headers.get('x-request-id'), 'smoke-health-1');
   const healthBody = await readJson<{ success?: boolean }>(health);
   assert.equal(healthBody.success, true);
 
@@ -40,6 +41,21 @@ test('health and OpenAPI discovery endpoints are reachable', async () => {
   assert.ok(spec.paths['/orders']);
   assert.ok(spec.paths['/stock/receipts']);
   assert.ok(spec.paths['/promotions/validate']);
+});
+
+test('invalid API requests expose the trace id for support correlation', async () => {
+  const response = await request('/api/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-request-id': 'smoke-validation-1',
+    },
+    body: JSON.stringify({}),
+  });
+
+  const body = await readJson<{ request_id?: string }>(response);
+  assert.equal(response.headers.get('x-request-id'), 'smoke-validation-1');
+  assert.equal(body.request_id, 'smoke-validation-1');
 });
 
 test('protected API domains reject requests without a bearer token', async () => {
