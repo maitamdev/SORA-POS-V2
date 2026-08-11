@@ -98,6 +98,27 @@ dialog,
   border-radius: 0 !important;
 }
 
+:where(button, a, input, select, textarea, [role='button']):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* Tailwind v3 does not ship `shadow-xs`/`shadow-2xs`; keep these legacy
+   utility names intentional and consistent instead of silently dropping the
+   elevation on older screens. */
+.shadow-2xs {
+  box-shadow: 0 1px 1px rgb(15 23 42 / 0.04) !important;
+}
+
+.shadow-xs {
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06) !important;
+}
+
 @media (max-width: 639px) {
   .order-detail-shell {
     border-radius: 0 !important;

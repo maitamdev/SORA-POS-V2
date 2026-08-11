@@ -257,7 +257,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                         )}
                       </div>
                       <div className="mt-3 flex items-center gap-1.5 text-[10px] font-semibold text-slate-400">
-                        <QrScanIcon className="w-4 h-4 text-slate-350" />
+                        <QrScanIcon className="w-4 h-4 text-slate-400" />
                         <span>Quét mã để thanh toán</span>
                       </div>
                     </>
@@ -421,7 +421,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col sm:flex-row gap-3 p-6 border-t border-slate-150 bg-slate-50/80">
+        <div className="flex flex-col sm:flex-row gap-3 p-6 border-t border-slate-200 bg-slate-50/80">
           <button
             onClick={() => setShowTransferPayment(false)}
             className="flex-1 py-4 bg-white border border-slate-200/80 hover:bg-slate-50 text-slate-700 text-sm font-black rounded-2xl flex items-center justify-center gap-2 shadow-sm transition"

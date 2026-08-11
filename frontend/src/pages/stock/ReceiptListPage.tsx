@@ -24,9 +24,9 @@ const formatDate = (dateString: string) => {
 };
 
 const statusColors = {
-  paid: 'bg-emerald-50 text-emerald-700 border-emerald-250',
-  partial: 'bg-amber-50 text-amber-700 border-amber-250',
-  unpaid: 'bg-rose-50 text-rose-700 border-rose-250',
+  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  partial: 'bg-amber-50 text-amber-700 border-amber-200',
+  unpaid: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 
 const statusLabels = {
@@ -161,7 +161,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
       'bg-blue-50 text-blue-600 border-blue-100',
       'bg-indigo-50 text-indigo-600 border-indigo-100',
       'bg-purple-50 text-purple-600 border-purple-100',
-      'bg-orange-50 text-orange-600 border-orange-105',
+      'bg-orange-50 text-orange-600 border-orange-100',
       'bg-teal-50 text-teal-600 border-teal-100',
     ];
     let hash = 0;
@@ -184,7 +184,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
   return (
     <div className={isEmbedded ? "space-y-6 animate-fadeIn" : "space-y-6 animate-fadeIn pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"}>
       {!isEmbedded && (
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-150 pb-5">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <FiTruck className="text-blue-600" />
@@ -352,14 +352,14 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
               </option>
             ))}
           </select>
-          <FiX className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-350 cursor-pointer hidden" size={14} />
+          <FiX className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer hidden" size={14} />
           <FiEye className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none hidden" size={14} />
         </div>
 
         {(supplierId || paymentStatus !== 'all' || dateFrom || dateTo) && (
           <button
             onClick={resetFilters}
-            className="h-9 px-3.5 rounded-xl border border-slate-250 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-500 transition shadow-2xs self-end sm:self-auto"
+            className="h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-500 transition shadow-sm self-end sm:self-auto"
           >
             Xóa toàn bộ lọc
           </button>
@@ -370,7 +370,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-55/65 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+            <thead className="bg-slate-50/65 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
               <tr>
                 <th className="px-5 py-4">Mã phiếu</th>
                 <th className="px-5 py-4">Nhà cung cấp</th>
@@ -393,7 +393,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
               ) : receipts.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-20 text-center text-slate-400 font-bold">
-                    <FiTruck className="inline mb-2 text-slate-350 block mx-auto" size={32} />
+                    <FiTruck className="inline mb-2 text-slate-400 block mx-auto" size={32} />
                     Không tìm thấy phiếu nhập kho nào.
                   </td>
                 </tr>
@@ -467,7 +467,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
               </div>
               <button
                 onClick={() => setSelectedReceipt(null)}
-                className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-750 transition"
+                className="rounded-xl border border-slate-200 p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition"
               >
                 <FiX size={16} />
               </button>
@@ -512,7 +512,7 @@ export default function ReceiptListPage({ isEmbedded = false, refreshTrigger = 0
 
               {/* Payment Section for Debt */}
               {selectedReceipt.payment_status !== 'paid' && (
-                <div className="rounded-xl border border-blue-150 bg-blue-50/40 p-4 space-y-3 shadow-xs">
+                <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3 shadow-xs">
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="font-extrabold text-blue-900 text-sm">Thanh toán thêm nợ Nhà cung cấp</p>

@@ -257,7 +257,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
         {cart.length > 0 && (
           <button
             onClick={onClearCart}
-            className="flex items-center gap-1 text-[11px] font-bold text-red-500 hover:text-red-750 transition"
+            className="flex items-center gap-1 text-[11px] font-bold text-red-500 hover:text-red-700 transition"
           >
             <HiOutlineTrash className="w-4 h-4" />
             <span>Xóa giỏ hàng</span>
@@ -322,7 +322,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                   </span>
                   <button
                     onClick={() => updateQty(item.product.id, 0)}
-                    className="text-xs font-bold text-slate-350 hover:text-red-500 opacity-0 group-hover:opacity-100 transition duration-150 self-end mt-1"
+                    className="text-xs font-bold text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition duration-150 self-end mt-1"
                   >
                     Xóa
                   </button>
@@ -441,7 +441,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                     </div>
                     <button
                       onClick={() => onPhoneChange('')}
-                      className="text-[10px] font-bold text-red-500 hover:text-red-750 uppercase"
+                      className="text-[10px] font-bold text-red-500 hover:text-red-700 uppercase"
                     >
                       Hủy
                     </button>

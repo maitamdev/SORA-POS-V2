@@ -68,7 +68,7 @@ const getExpiryStatusView = (remainingDays: number) => {
   if (remainingDays === 0) {
     return {
       label: 'Hết hạn hôm nay',
-      badgeClass: 'bg-orange-100 text-orange-850 border-orange-300 animate-pulse',
+      badgeClass: 'bg-orange-100 text-orange-800 border-orange-300 animate-pulse',
       progressColor: 'bg-orange-500',
       progressPercent: 5,
     };
@@ -1840,7 +1840,7 @@ const StockPage = () => {
                     ) : filteredExpiryAlerts.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-16 text-center text-slate-400 font-bold">
-                          <FiBox className="inline mb-2 text-slate-350 block mx-auto" size={28} />
+                          <FiBox className="inline mb-2 text-slate-400 block mx-auto" size={28} />
                           Không tìm thấy lô sản phẩm nào phù hợp.
                         </td>
                       </tr>
@@ -1880,7 +1880,7 @@ const StockPage = () => {
 
                             {/* Batch Number */}
                             <td className="px-5 py-3.5">
-                              <span className="font-bold text-xs text-slate-650 bg-slate-100 rounded px-2 py-0.5 border border-slate-200/80">
+                              <span className="font-bold text-xs text-slate-600 bg-slate-100 rounded px-2 py-0.5 border border-slate-200/80">
                                 {batch.batch_number}
                               </span>
                             </td>
@@ -1945,7 +1945,7 @@ const StockPage = () => {
                   </div>
                 ) : filteredExpiryAlerts.length === 0 ? (
                   <div className="bg-white p-8 border border-slate-200 rounded-xl text-center text-slate-400 font-bold shadow-xs">
-                    <FiBox className="inline mb-2 text-slate-350 block mx-auto" size={28} />
+                    <FiBox className="inline mb-2 text-slate-400 block mx-auto" size={28} />
                     Không tìm thấy lô sản phẩm nào phù hợp.
                   </div>
                 ) : (
@@ -2091,7 +2091,7 @@ const StockPage = () => {
             <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_4px_25px_rgba(0,0,0,0.02)]">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
+                  <thead className="bg-slate-50/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200 tracking-wider">
                     <tr>
                       <th className="px-5 py-4 w-1/3">Sản phẩm</th>
                       <th className="px-5 py-4 text-right">Tồn hệ thống</th>
@@ -2240,7 +2240,7 @@ const StockPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowActionModal(false)}
-                  className="flex-1 h-10 rounded-xl border border-slate-350 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition"
+                  className="flex-1 h-10 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition"
                 >
                   Hủy bỏ
                 </button>

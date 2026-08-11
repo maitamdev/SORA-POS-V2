@@ -698,14 +698,14 @@ const CategoriesPage = () => {
                                 <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
                                 <span className="text-[9px] text-slate-400 font-bold block uppercase mt-0.5">Đơn vị: {p.unit || 'Cái'}</span>
                               </td>
-                              <td className="py-2 px-3 text-right font-black text-slate-850">{formattedPrice}</td>
+                              <td className="py-2 px-3 text-right font-black text-slate-900">{formattedPrice}</td>
                               <td className="py-2 px-3 text-center font-black text-slate-800">{p.stock_quantity}</td>
                               <td className="py-2 px-3 text-center">
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border whitespace-nowrap ${
                                   isOutOfStock
                                     ? 'bg-red-50 text-red-600 border-red-200'
                                     : isLowStock
-                                    ? 'bg-amber-50 text-amber-600 border-amber-250'
+                                    ? 'bg-amber-50 text-amber-600 border-amber-200'
                                     : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                 }`}>
                                   {isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'Còn hàng'}
@@ -715,7 +715,7 @@ const CategoriesPage = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveProductFromCategory(p.id)}
-                                  className="p-1 hover:bg-red-50 text-slate-450 hover:text-red-600 rounded transition"
+                                  className="p-1 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded transition"
                                   title="Xóa khỏi danh mục"
                                 >
                                   <HiOutlineTrash className="h-4 w-4" />
@@ -776,14 +776,14 @@ const CategoriesPage = () => {
                                 <td className="py-2 px-3">
                                   <div className="font-extrabold text-slate-800 leading-snug">{p.name}</div>
                                 </td>
-                                <td className="py-2 px-3 text-slate-450">
+                                <td className="py-2 px-3 text-slate-500">
                                   {isInCurrentCategory ? (
                                     <span className="text-blue-600 font-bold">Danh mục này</span>
                                   ) : (
                                     p.categories?.name || 'Không có'
                                   )}
                                 </td>
-                                <td className="py-2 px-3 text-right font-black text-slate-850">
+                                <td className="py-2 px-3 text-right font-black text-slate-900">
                                   {Number(p.sell_price || 0).toLocaleString('vi-VN')}đ
                                 </td>
                                 <td className="py-2 px-3 text-center">

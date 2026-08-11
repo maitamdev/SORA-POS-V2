@@ -714,7 +714,7 @@ const StaffPage = () => {
                                     ? 'bg-amber-50 text-amber-700 border-amber-100'
                                     : o.payment_method === 'Thẻ ngân hàng'
                                       ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                                      : 'bg-blue-50 text-blue-750 border-blue-100'
+                                      : 'bg-blue-50 text-blue-700 border-blue-100'
                                 }`}>
                                   {o.payment_method}
                                 </span>
@@ -765,7 +765,7 @@ const StaffPage = () => {
                         ) : (
                           reportData.products_sold.map((p, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/50 transition">
-                              <td className="px-4 py-3 font-extrabold text-slate-850 text-xs">
+                              <td className="px-4 py-3 font-extrabold text-slate-900 text-xs">
                                 {p.name}
                               </td>
                               <td className="px-4 py-3 text-center font-black text-slate-900 font-mono text-xs">
@@ -842,7 +842,7 @@ const StaffPage = () => {
                       </div>
 
                       {/* Receipt Metadata */}
-                      <div className="space-y-2 text-xs font-semibold text-slate-650 pb-2">
+                      <div className="space-y-2 text-xs font-semibold text-slate-600 pb-2">
                         <div className="flex justify-between">
                           <span className="text-slate-400">Khách hàng:</span>
                           <span className="text-slate-800 font-extrabold">{selectedOrder.customers?.name || 'Khách lẻ'}</span>
@@ -888,7 +888,7 @@ const StaffPage = () => {
                       </div>
 
                       {/* Bill Summary */}
-                      <div className="border-t border-dashed border-slate-200 pt-4 space-y-2 text-xs font-semibold text-slate-650">
+                      <div className="border-t border-dashed border-slate-200 pt-4 space-y-2 text-xs font-semibold text-slate-600">
                         <div className="flex justify-between">
                           <span className="text-slate-400">Tổng tiền hàng:</span>
                           <span className="font-bold text-slate-800 font-mono">{money(selectedOrder.total_amount || 0)}</span>

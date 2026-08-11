@@ -906,7 +906,7 @@ const ProductsPage = () => {
             </div>
             <div className="leading-tight">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sắp hết hàng</p>
-              <h2 className="text-2xl font-black text-slate-850 mt-1 text-amber-600">{stats.lowStock}</h2>
+              <h2 className="text-2xl font-black text-slate-900 mt-1 text-amber-600">{stats.lowStock}</h2>
               <span className="text-[10px] font-bold text-slate-400 mt-1 block">
                 Cần nhập thêm hàng
               </span>
@@ -1052,7 +1052,7 @@ const ProductsPage = () => {
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className={`px-4 py-1.5 border text-xs font-bold rounded-xl flex items-center gap-1.5 transition ${
                   showAdvancedFilters
-                    ? 'bg-slate-150 border-slate-300 text-slate-700'
+                    ? 'bg-slate-100 border-slate-300 text-slate-700'
                     : 'border-slate-200 hover:bg-slate-50 text-slate-600'
                 }`}
               >
@@ -1278,7 +1278,7 @@ const ProductsPage = () => {
 
                         {/* Stock Quantity */}
                         {visibleColumns.stock && (
-                          <td className={`${densityPadding} px-3 text-center font-black text-slate-850`}>
+                          <td className={`${densityPadding} px-3 text-center font-black text-slate-900`}>
                             {p.stock_quantity}
                           </td>
                         )}
@@ -1297,7 +1297,7 @@ const ProductsPage = () => {
                               isOutOfStock
                                 ? 'bg-red-50 text-red-600 border-red-200'
                                 : isLowStock
-                                ? 'bg-amber-50 text-amber-600 border-amber-250'
+                                ? 'bg-amber-50 text-amber-600 border-amber-200'
                                 : 'bg-emerald-50 text-emerald-600 border-emerald-200'
                             }`}>
                               {isOutOfStock ? 'Hết hàng' : isLowStock ? 'Tồn thấp' : 'Còn hàng'}
@@ -1454,7 +1454,7 @@ const ProductsPage = () => {
 
                     <div className="mt-3 space-y-2">
                       <div className="min-w-0 border-b border-slate-100 pb-2">
-                        <h3 className="text-xs font-black text-slate-850 leading-snug line-clamp-2 min-h-[32px]" title={p.name}>
+                        <h3 className="text-xs font-black text-slate-900 leading-snug line-clamp-2 min-h-[32px]" title={p.name}>
                           {p.name}
                         </h3>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate mt-1">
@@ -1474,15 +1474,15 @@ const ProductsPage = () => {
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 flex items-center justify-between gap-2">
                         <div>
                           <p className="text-[9px] font-black text-slate-400 uppercase">Tồn kho</p>
-                          <p className="text-sm font-black text-slate-850">{p.stock_quantity}</p>
+                          <p className="text-sm font-black text-slate-900">{p.stock_quantity}</p>
                         </div>
                         <div className="text-center">
                           <p className="text-[9px] font-black text-slate-400 uppercase">Cảnh báo</p>
-                          <p className="text-sm font-black text-slate-850">{p.min_stock_level}</p>
+                          <p className="text-sm font-black text-slate-900">{p.min_stock_level}</p>
                         </div>
                         <div className="text-right min-w-0">
                           <p className="text-[9px] font-black text-slate-400 uppercase">ĐVT</p>
-                          <p className="text-sm font-black text-slate-850 truncate">{p.unit || '-'}</p>
+                          <p className="text-sm font-black text-slate-900 truncate">{p.unit || '-'}</p>
                         </div>
                       </div>
 
@@ -1580,10 +1580,10 @@ const ProductsPage = () => {
             {categoryCounts.map((cat, idx) => (
               <div key={idx} className="flex justify-between items-center text-xs py-1 hover:bg-slate-50/50 rounded px-1">
                 <span className="font-bold text-slate-600">{cat.name}</span>
-                <span className="font-black text-slate-850 px-2 py-0.5 bg-slate-50 rounded border border-slate-100">{cat.count}</span>
+                <span className="font-black text-slate-900 px-2 py-0.5 bg-slate-50 rounded border border-slate-100">{cat.count}</span>
               </div>
             ))}
-            <div className="border-t border-slate-150 pt-2 flex justify-between items-center text-xs font-black text-slate-800">
+            <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-xs font-black text-slate-800">
               <span>Tổng cộng</span>
               <span>{stats.total}</span>
             </div>
@@ -1967,7 +1967,7 @@ const ProductsPage = () => {
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
                     placeholder="Ví dụ: SP000001"
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
 
@@ -1991,7 +1991,7 @@ const ProductsPage = () => {
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
                     placeholder="Quét hoặc nhập mã vạch sản phẩm"
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
               </div>
@@ -2006,7 +2006,7 @@ const ProductsPage = () => {
                   onChange={(e) => setName(e.target.value)}
                   onBlur={handleAIAutoCategorize}
                   placeholder="Ví dụ: Coca Cola 330ml"
-                  className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -2018,7 +2018,7 @@ const ProductsPage = () => {
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
                     placeholder="Lon, Chai, Gói..."
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
 
@@ -2034,7 +2034,7 @@ const ProductsPage = () => {
                       const cat = categories.find((c) => c.id === id);
                       setCategoryName(cat ? cat.name : '');
                     }}
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition text-slate-800"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition text-slate-800"
                   >
                     <option value="">-- Chọn danh mục --</option>
                     {categories.map((cat) => (
@@ -2055,7 +2055,7 @@ const ProductsPage = () => {
                     value={costPrice || ''}
                     onChange={(e) => setCostPrice(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
 
@@ -2071,7 +2071,7 @@ const ProductsPage = () => {
                     value={sellPrice || ''}
                     onChange={(e) => setSellPrice(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
 
@@ -2083,7 +2083,7 @@ const ProductsPage = () => {
                     value={stockQuantity}
                     onChange={(e) => setStockQuantity(Number(e.target.value))}
                     placeholder="0"
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
 
@@ -2095,7 +2095,7 @@ const ProductsPage = () => {
                     value={minStockLevel}
                     onChange={(e) => setMinStockLevel(Number(e.target.value))}
                     placeholder={String(operationSettings.defaultMinStockLevel)}
-                    className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                    className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                   />
                 </div>
               </div>
@@ -2122,7 +2122,7 @@ const ProductsPage = () => {
                     setImageUrl(val);
                   }}
                   placeholder="https://example.com/image.jpg"
-                  className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition"
                 />
               </div>
 
@@ -2134,7 +2134,7 @@ const ProductsPage = () => {
                     type="button"
                     onClick={handleAIGenerateDescription}
                     disabled={generatingAI || !name.trim()}
-                    className="text-[10px] font-black text-blue-600 hover:text-blue-850 flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 disabled:opacity-50 transition"
+                    className="text-[10px] font-black text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 disabled:opacity-50 transition"
                   >
                     {generatingAI ? (
                       <>
@@ -2155,7 +2155,7 @@ const ProductsPage = () => {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Nhập mô tả sản phẩm (ví dụ: nước uống có ga)..."
-                  className="w-full border border-slate-205 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition h-20 resize-none"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2 font-semibold outline-none focus:border-blue-500 bg-slate-50 transition h-20 resize-none"
                 />
               </div>
 

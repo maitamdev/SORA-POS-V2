@@ -187,7 +187,7 @@ const OrdersPage = () => {
                 className={`h-8 w-8 rounded-lg border flex items-center justify-center transition text-xs font-bold active:scale-95 duration-150 ${
                   currentPage === pNum
                     ? 'bg-emerald-600 border-emerald-600 text-white font-extrabold shadow-sm shadow-emerald-500/20'
-                    : 'border-slate-200 bg-white text-slate-650 hover:bg-slate-50'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {pNum}
@@ -230,7 +230,7 @@ const OrdersPage = () => {
             Tra cứu lịch sử đơn hàng, xem chi tiết hóa đơn bán lẻ và quản lý hủy đơn hoàn kho từ POS.
           </p>
           {user?.role === 'cashier' && (
-            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-750 text-[11px] font-bold rounded-xl border border-blue-100/60">
+            <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-xl border border-blue-100/60">
               <FiAlertCircle className="text-blue-500" />
               Bạn đang xem các hóa đơn trong ngày hôm nay do chính bạn thực hiện.
             </div>
@@ -495,7 +495,7 @@ const OrdersPage = () => {
               ) : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-20 text-center text-slate-400 font-bold">
-                    <FiFileText className="inline mb-2 text-slate-350 block mx-auto" size={32} />
+                    <FiFileText className="inline mb-2 text-slate-400 block mx-auto" size={32} />
                     Không tìm thấy hóa đơn nào phù hợp.
                   </td>
                 </tr>
@@ -574,7 +574,7 @@ const OrdersPage = () => {
       {/* 4.5 Pagination Bar (Bottom) */}
       {filteredOrders.length > 0 && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white border border-slate-200 px-5 py-4 text-xs text-slate-500 mt-2">
-          <div className="font-semibold text-slate-650">
+          <div className="font-semibold text-slate-600">
             Hiển thị <span className="font-black text-slate-800">{itemsStart} - {itemsEnd}</span> trên <span className="font-black text-slate-800">{filteredOrders.length}</span> hóa đơn
           </div>
           <div>

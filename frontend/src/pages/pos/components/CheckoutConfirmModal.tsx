@@ -123,7 +123,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                           setUsedPoints(0);
                         }
                       }}
-                      className="rounded border-slate-350 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
                     />
                     <span className="text-xs font-black text-blue-900">
                       Sử dụng điểm tích lũy ({matchedCustomer.points} điểm khả dụng)
@@ -142,7 +142,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                           setUsedPoints(Math.min(points, maxPoints));
                         }}
                         placeholder="0"
-                        className="w-24 bg-white border border-slate-250 px-2.5 py-1 rounded-lg text-xs font-black text-slate-800 text-center outline-none focus:border-blue-500 transition"
+                        className="w-24 bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-black text-slate-800 text-center outline-none focus:border-blue-500 transition"
                       />
                       <span className="text-xs text-blue-700 font-bold">điểm (giảm {money(usedPoints * 1000)})</span>
                     </div>
@@ -167,7 +167,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                         <img
                           src={getProductImage(item.product)}
                           alt={item.product.name}
-                          className="w-7 h-7 rounded border border-slate-150 object-contain p-0.5 bg-white flex-shrink-0"
+                          className="w-7 h-7 rounded border border-slate-200 object-contain p-0.5 bg-white flex-shrink-0"
                         />
                         <div className="min-w-0 leading-tight">
                           <p className="font-extrabold text-slate-800 truncate" title={item.product.name}>
@@ -188,7 +188,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
               </div>
 
               {/* Pricing Breakdown */}
-              <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-4 space-y-2 text-xs font-bold text-slate-650">
+              <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-4 space-y-2 text-xs font-bold text-slate-600">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">Tạm tính:</span>
                   <span className="text-slate-800 font-extrabold">{money(total)}</span>

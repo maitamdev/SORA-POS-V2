@@ -213,7 +213,7 @@ const ProductGrid = () => {
       {/* Product Grid / List */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-1">
         {products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-dashed border-slate-350 p-10 text-center text-slate-400">
+          <div className="flex flex-col items-center justify-center h-64 bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-400">
             <HiOutlineShoppingCart className="w-12 h-12 text-slate-300 mb-2" />
             <p className="font-extrabold text-slate-500">Chưa có sản phẩm nào được hiển thị</p>
             <p className="text-xs text-slate-400 mt-1">Vui lòng điều chỉnh lại bộ lọc tìm kiếm sản phẩm.</p>

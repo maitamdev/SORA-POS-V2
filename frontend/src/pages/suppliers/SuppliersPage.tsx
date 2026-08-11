@@ -83,12 +83,12 @@ const getSupplierLogo = (name: string, email?: string | null): string => {
 
 const getAvatarColor = (name: string): string => {
   const colors = [
-    'bg-emerald-50 text-emerald-700 border-emerald-250',
-    'bg-blue-50 text-blue-700 border-blue-250',
-    'bg-indigo-50 text-indigo-700 border-indigo-250',
-    'bg-purple-50 text-purple-700 border-purple-250',
-    'bg-rose-50 text-rose-700 border-rose-250',
-    'bg-amber-50 text-amber-700 border-amber-250'
+    'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'bg-blue-50 text-blue-700 border-blue-200',
+    'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'bg-purple-50 text-purple-700 border-purple-200',
+    'bg-rose-50 text-rose-700 border-rose-200',
+    'bg-amber-50 text-amber-700 border-amber-200'
   ];
   let sum = 0;
   for (let i = 0; i < name.length; i++) {
@@ -456,7 +456,7 @@ const SuppliersPage = () => {
         </div>
 
         {/* Suspended Suppliers */}
-        <div className="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md hover:border-amber-250 transition-all duration-300">
+        <div className="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md hover:border-amber-200 transition-all duration-300">
           <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
             <FiAlertCircle size={22} className="stroke-[2.5]" />
           </div>
@@ -467,7 +467,7 @@ const SuppliersPage = () => {
         </div>
 
         {/* Inactive Suppliers */}
-        <div className="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md hover:border-rose-250 transition-all duration-300">
+        <div className="group flex items-center gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-xs hover:shadow-md hover:border-rose-200 transition-all duration-300">
           <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-300">
             <FiX size={22} className="stroke-[2.5]" />
           </div>
@@ -484,7 +484,7 @@ const SuppliersPage = () => {
         {showFilter && (
         <aside className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-black uppercase text-slate-750 flex items-center gap-2">
+          <h3 className="text-sm font-black uppercase text-slate-700 flex items-center gap-2">
               <FiSliders className="text-slate-500" />
               Bộ lọc tìm kiếm
             </h3>
@@ -574,7 +574,7 @@ const SuppliersPage = () => {
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="flex-1 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-black text-slate-650 transition flex items-center justify-center gap-1.5"
+                className="flex-1 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-black text-slate-600 transition flex items-center justify-center gap-1.5"
               >
                 Đặt lại
               </button>
@@ -615,7 +615,7 @@ const SuppliersPage = () => {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="bg-slate-55/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200/80 tracking-wider">
+                      <thead className="bg-slate-50/60 text-[10px] font-black uppercase text-slate-400 border-b border-slate-200/80 tracking-wider">
                 <tr>
                   <th className="px-5 py-4 w-[35%]">Nhà cung cấp</th>
                   <th className="px-5 py-4 w-[20%]">Người liên hệ</th>
@@ -629,7 +629,7 @@ const SuppliersPage = () => {
                 {loading ? (
                   <tr>
                     <td colSpan={canManageSuppliers ? 6 : 5} className="py-20 text-center text-slate-400 font-bold">
-                      <FiRefreshCw className="inline animate-spin mr-2 text-emerald-650" size={18} />
+                        <FiRefreshCw className="inline animate-spin mr-2 text-emerald-600" size={18} />
                       Đang tải danh sách đối tác...
                     </td>
                   </tr>
@@ -645,7 +645,7 @@ const SuppliersPage = () => {
                     const displayTaxCode = getDisplayTaxCode(supplier.tax_code);
 
                     return (
-                      <tr key={supplier.id} className="hover:bg-slate-55/30 transition duration-150">
+                      <tr key={supplier.id} className="hover:bg-slate-50/30 transition duration-150">
                         {/* 1. Supplier Name, Logo & Tax Code */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3.5">
@@ -665,9 +665,9 @@ const SuppliersPage = () => {
                         </td>
 
                         {/* 2. Contact Person */}
-                        <td className="px-5 py-4 text-slate-650">
+                        <td className="px-5 py-4 text-slate-600">
                           {supplier.contact_person || (
-                            <span className="text-slate-350 font-medium italic">Chưa cập nhật</span>
+                            <span className="text-slate-400 font-medium italic">Chưa cập nhật</span>
                           )}
                         </td>
 
@@ -675,7 +675,7 @@ const SuppliersPage = () => {
                         <td className="px-5 py-4">
                           {supplier.phone ? (
                             <div className="flex items-center gap-1.5 text-slate-700 font-bold">
-                              <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-150">
+                              <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200">
                                 <FiPhone size={10} className="stroke-[2.5]" />
                               </span>
                               {supplier.phone}
@@ -689,7 +689,7 @@ const SuppliersPage = () => {
                         <td className="px-5 py-4">
                           {supplier.email ? (
                             <div className="flex items-center gap-1.5 text-slate-500 font-medium max-w-[180px] truncate" title={supplier.email}>
-                              <span className="w-5 h-5 rounded-md bg-slate-50 text-slate-400 flex items-center justify-center shrink-0 border border-slate-150">
+                              <span className="w-5 h-5 rounded-md bg-slate-50 text-slate-400 flex items-center justify-center shrink-0 border border-slate-200">
                                 <FiMail size={10} className="stroke-[2.5]" />
                               </span>
                               {supplier.email}
@@ -707,7 +707,7 @@ const SuppliersPage = () => {
                             </span>
                           )}
                           {status === 'suspended' && (
-                            <span className="inline-flex whitespace-nowrap rounded-lg border border-amber-250 bg-amber-50 px-2.5 py-1 text-[11px] font-extrabold text-amber-700">
+                            <span className="inline-flex whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-extrabold text-amber-700">
                               Tạm ngưng
                             </span>
                           )}
@@ -725,7 +725,7 @@ const SuppliersPage = () => {
                               {/* Fast Edit Button */}
                               <button
                                 onClick={() => openEditModal(supplier)}
-                                className="p-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg border border-slate-100 hover:border-emerald-150 transition"
+                                className="p-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg border border-slate-100 hover:border-emerald-200 transition"
                                 title="Sửa nhanh"
                               >
                                 <FiEdit size={13} className="stroke-[2.5]" />
@@ -738,7 +738,7 @@ const SuppliersPage = () => {
                                   className={`p-1.5 rounded-lg border transition ${
                                     openDropdownId === supplier.id 
                                       ? 'bg-slate-900 border-slate-950 text-white' 
-                                      : 'bg-slate-50 border-slate-100 hover:bg-slate-150 text-slate-450'
+                                      : 'bg-slate-50 border-slate-100 hover:bg-slate-100 text-slate-500'
                                   }`}
                                 >
                                   <FiMoreVertical size={13} className="stroke-[2.5]" />
@@ -748,7 +748,7 @@ const SuppliersPage = () => {
                                 {openDropdownId === supplier.id && (
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setOpenDropdownId(null)} />
-                                    <div className="absolute right-0 mt-1.5 w-40 bg-white border border-slate-150 rounded-xl shadow-lg py-1.5 z-20 animate-fadeIn">
+                                    <div className="absolute right-0 mt-1.5 w-40 bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 z-20 animate-fadeIn">
                                       <button
                                         onClick={() => openEditModal(supplier)}
                                         className="w-full text-left px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
@@ -776,7 +776,7 @@ const SuppliersPage = () => {
                                           <hr className="my-1 border-slate-100" />
                                           <button
                                             onClick={() => handleHardDelete(supplier.id, supplier.name)}
-                                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-rose-650 hover:bg-rose-50 transition flex items-center gap-2"
+                                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition flex items-center gap-2"
                                             title="Xóa vĩnh viễn nhà cung cấp khỏi hệ thống"
                                           >
                                             <FiX size={12} className="text-rose-500 stroke-[2.5]" />
@@ -828,7 +828,7 @@ const SuppliersPage = () => {
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(currentPage - 1)}
-                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-650 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white"
+                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white"
                   >
                     &lt;
                   </button>
@@ -840,8 +840,8 @@ const SuppliersPage = () => {
                         onClick={() => setCurrentPage(pageNum)}
                         className={`h-8 w-8 rounded-lg border flex items-center justify-center transition ${
                           currentPage === pageNum
-                            ? 'bg-emerald-600 border-emerald-650 text-white font-extrabold'
-                            : 'border-slate-200 bg-white text-slate-650 hover:bg-slate-50'
+                            ? 'bg-emerald-600 border-emerald-600 text-white font-extrabold'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         {pageNum}
@@ -851,7 +851,7 @@ const SuppliersPage = () => {
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(currentPage + 1)}
-                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-650 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white"
+                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:bg-slate-50 transition disabled:opacity-40 disabled:hover:bg-white"
                   >
                     &gt;
                   </button>
@@ -986,7 +986,7 @@ const SuppliersPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-650 transition"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-600 transition"
                 >
                   Hủy bỏ
                 </button>
