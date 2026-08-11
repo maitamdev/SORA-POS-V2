@@ -591,7 +591,7 @@ const ReportsPage = () => {
   return (
     <div className="flex flex-col gap-6 animate-fadeIn pb-10">
       {/* HEADER SECTION */}
-      <header className="-order-20 flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tight">
             {activeReportTab === 'revenue' ? 'Báo cáo doanh thu' : 'Báo cáo tồn kho'}
@@ -630,16 +630,16 @@ const ReportsPage = () => {
         </div>
       </header>
 
-      <nav className="report-card flex w-full flex-wrap items-center gap-1 border border-slate-200 bg-white p-1 shadow-sm" role="tablist" aria-label="Loại báo cáo">
+      <nav className="flex w-full flex-wrap items-center gap-6 border-b border-slate-200" role="tablist" aria-label="Loại báo cáo">
         <button
           type="button"
           role="tab"
           aria-selected={activeReportTab === 'revenue'}
           onClick={() => setActiveReportTab('revenue')}
-          className={`report-control inline-flex min-h-10 flex-1 items-center justify-center gap-2 px-4 text-xs font-black transition sm:flex-none ${
+          className={`report-control inline-flex min-h-11 flex-1 items-center justify-center gap-2 border-b-2 px-1 text-xs font-black transition sm:flex-none ${
             activeReportTab === 'revenue'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
           }`}
         >
           <HiTrendUp className="h-4 w-4" />
@@ -650,10 +650,10 @@ const ReportsPage = () => {
           role="tab"
           aria-selected={activeReportTab === 'inventory'}
           onClick={() => setActiveReportTab('inventory')}
-          className={`report-control inline-flex min-h-10 flex-1 items-center justify-center gap-2 px-4 text-xs font-black transition sm:flex-none ${
+          className={`report-control inline-flex min-h-11 flex-1 items-center justify-center gap-2 border-b-2 px-1 text-xs font-black transition sm:flex-none ${
             activeReportTab === 'inventory'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              ? 'border-blue-600 text-blue-700'
+              : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'
           }`}
         >
           <FiPackage className="h-4 w-4" />
@@ -731,7 +731,7 @@ const ReportsPage = () => {
       </div>
 
       {/* AI REVENUE REPORT ASSISTANT — AUTO-LOADED */}
-      <section className={`${activeReportTab === 'revenue' ? '' : 'hidden'} report-panel border-t-4 border-blue-600 bg-white p-6 shadow-sm`}>
+      <section className={`${activeReportTab === 'revenue' ? '' : 'hidden'} report-panel border border-slate-200 bg-white p-6`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
@@ -1193,8 +1193,8 @@ const ReportsPage = () => {
       </section>
 
       {/* ═══════════════ AI BÁO CÁO KHO (ENTERPRISE) ═══════════════ */}
-      <section className={`${activeReportTab === 'inventory' ? '' : 'hidden'} report-panel -order-10 overflow-hidden border border-slate-200 bg-white shadow-sm`}>
-        <div className="flex flex-col gap-3 border-t-4 border-blue-600 border-b border-slate-200 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
+      <section className={`${activeReportTab === 'inventory' ? '' : 'hidden'} report-panel overflow-hidden border border-slate-200 bg-white`}>
+        <div className="flex flex-col gap-3 border-b border-slate-200 bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="report-card flex h-11 w-11 items-center justify-center bg-blue-50 text-blue-600">
               <FiPackage className="h-5 w-5" />

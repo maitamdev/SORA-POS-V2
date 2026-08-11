@@ -87,14 +87,15 @@ dialog,
   border-radius: 10px !important;
 }
 
-/* Report surfaces use the same restrained hierarchy while keeping dense data readable. */
+/* Report surfaces use a flat enterprise geometry while keeping dense data readable. */
 .report-panel {
-  border-radius: 16px !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 .report-card,
 .report-control {
-  border-radius: 10px !important;
+  border-radius: 0 !important;
 }
 
 @media (max-width: 639px) {
