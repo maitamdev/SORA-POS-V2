@@ -5,7 +5,6 @@ import { appCache } from '../utils/cache';
 import { JwtPayload } from '../types/user.type';
 import { CatalogService } from './catalog.service';
 import { PromotionService } from './promotion.service';
-import { calculateOrderMargin, formatMarginLossMessage } from '../utils/orderMargin';
 
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
 
@@ -100,33 +99,6 @@ export class OrderService {
   }
 
   static async create(input: CreateOrderInput, userId: string) {
-    const productIds = Array.from(new Set(input.items.map((item) => item.product_id)));
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, name, sell_price, cost_price')
-      .in('id', productIds);
-
-    if (productsError) throw new AppError(500, productsError.message);
-
-    const productsById = new Map((products || []).map((product) => [product.id, product]));
-    const marginLines = input.items.map((item) => {
-      const product = productsById.get(item.product_id);
-      if (!product) throw new AppError(400, `Không tìm thấy sản phẩm ${item.product_id}`);
-
-      return {
-        product_id: item.product_id,
-        product_name: product.name,
-        quantity: Number(item.quantity),
-        unit_price: Number(product.sell_price || 0),
-        cost_price: Number(product.cost_price || 0),
-        discount: Number(item.discount || 0),
-      };
-    });
-    const margin = calculateOrderMargin(marginLines, Number(input.discount_amount || 0));
-    if (margin.isLoss) {
-      throw new AppError(400, formatMarginLossMessage(margin));
-    }
-
     const { data: orderId, error } = await supabase.rpc('create_pos_order', {
       p_payload: input,
       p_user_id: userId,

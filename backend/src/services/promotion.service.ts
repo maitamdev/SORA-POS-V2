@@ -3,45 +3,7 @@ import { supabase } from '../config/supabase';
 import { parsePagination } from '../utils/query';
 
 type Query = Record<string, unknown>;
-type CartItem = {
-  product_id: string;
-  category_id?: string | null;
-  quantity: number;
-  unit_price: number;
-  cost_price?: number;
-};
-
-const enrichCartItemsWithCosts = async (items: CartItem[]) => {
-  const productIds = Array.from(new Set(items.map((item) => item.product_id)));
-  if (productIds.length === 0) return items;
-
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, sell_price, cost_price')
-    .in('id', productIds);
-
-  if (error) throw new AppError(503, 'Không thể xác thực giá vốn sản phẩm cho khuyến mãi');
-
-  const productsById = new Map((data || []).map((product) => [product.id, product]));
-  return items.flatMap((item) => {
-    const product = productsById.get(item.product_id);
-    if (!product) return [];
-
-    return [{
-      ...item,
-      unit_price: Number(product.sell_price ?? item.unit_price ?? 0),
-      cost_price: Math.max(Number(product.cost_price || 0), 0),
-    }];
-  });
-};
-
-const isMarginSafe = (items: CartItem[], revenue: number, discount: number) => {
-  const cogs = items.reduce(
-    (sum, item) => sum + Math.max(Number(item.cost_price || 0), 0) * Number(item.quantity || 0),
-    0,
-  );
-  return Math.max(Number(revenue || 0) - Number(discount || 0), 0) >= cogs - 0.01;
-};
+type CartItem = { product_id: string; category_id?: string | null; quantity: number; unit_price: number };
 
 /**
  * Helper: calculate discount based on promo type and applicable items
@@ -440,22 +402,13 @@ export class PromotionService {
       throw new AppError(400, `Đơn hàng tối thiểu ${minFormatted}đ để áp dụng mã này`);
     }
 
-    const pricedItems = await enrichCartItemsWithCosts(items);
-    const effectiveOrderTotal = pricedItems.reduce(
-      (sum, item) => sum + Number(item.unit_price || 0) * Number(item.quantity || 0),
-      0,
-    );
-    const { applicableTotal, applicableItems } = getApplicableScope(promo, effectiveOrderTotal, pricedItems);
+    const { applicableTotal, applicableItems } = getApplicableScope(promo, orderTotal, items);
 
     if (applicableTotal <= 0 && promo.apply_to !== 'all') {
       throw new AppError(400, 'Không có sản phẩm nào trong đơn hàng thuộc phạm vi khuyến mãi');
     }
 
     const result = calculateDiscount(promo, applicableTotal, applicableItems);
-
-    if (!isMarginSafe(applicableItems, applicableTotal, result.discount_amount)) {
-      throw new AppError(400, 'Khuyến mãi này làm giá bán sau giảm thấp hơn giá vốn và không thể áp dụng');
-    }
 
     return {
       valid: true,
@@ -496,6 +449,10 @@ export class PromotionService {
 
   /* ─── GET AUTO PROMOTIONS (no code, auto-apply) ─── */
   static async getAutoPromotions(orderTotal: number, items: CartItem[]) {
+    const numericOrderTotal = Number(orderTotal);
+    const safeOrderTotal = Number.isFinite(numericOrderTotal) && numericOrderTotal >= 0
+      ? numericOrderTotal
+      : 0;
     const safeItems: CartItem[] = Array.isArray(items)
       ? items.flatMap((item) => {
           if (!item || typeof item !== 'object') return [];
@@ -523,19 +480,6 @@ export class PromotionService {
         })
       : [];
 
-    let pricedItems: CartItem[];
-    try {
-      pricedItems = await enrichCartItemsWithCosts(safeItems);
-    } catch (error) {
-      console.error('[Promotions] Không thể đọc giá vốn để kiểm tra biên lợi nhuận:', error);
-      return [];
-    }
-
-    const effectiveOrderTotal = pricedItems.reduce(
-      (sum, item) => sum + Number(item.unit_price || 0) * Number(item.quantity || 0),
-      0,
-    );
-    let acceptedDiscount = 0;
     const now = new Date().toISOString();
 
     const { data: promos, error } = await supabase
@@ -561,12 +505,12 @@ export class PromotionService {
       try {
         if (promo.usage_limit && promo.usage_count >= promo.usage_limit) continue;
 
-      const { applicableTotal, applicableItems } = getApplicableScope(promo, effectiveOrderTotal, pricedItems);
+      const { applicableTotal, applicableItems } = getApplicableScope(promo, safeOrderTotal, safeItems);
 
       // If the cart doesn't qualify for min_order_amount, check if it's relevant to show it as a suggestion
-      if (effectiveOrderTotal < Number(promo.min_order_amount)) {
+      if (safeOrderTotal < Number(promo.min_order_amount)) {
         if (applicableItems.length > 0 || promo.apply_to === 'all') {
-          const needed = Number(promo.min_order_amount) - effectiveOrderTotal;
+          const needed = Number(promo.min_order_amount) - safeOrderTotal;
           results.push({
             promotion: {
               id: promo.id,
@@ -594,18 +538,8 @@ export class PromotionService {
 
       const result = calculateDiscount(promo, applicableTotal, applicableItems);
 
-      // Never suggest a promotion that makes the scoped products or the full
-      // cart sell below cost. The final checkout guard remains authoritative.
-      if (
-        result.discount_amount > 0 &&
-        (!isMarginSafe(applicableItems, applicableTotal, result.discount_amount) ||
-          !isMarginSafe(pricedItems, effectiveOrderTotal, acceptedDiscount + result.discount_amount))
-      ) {
-        continue;
-      }
-
       // Return the promotion if it either has discount_amount > 0 OR it is relevant but not yet fully met (discount_amount = 0)
-      if (result.discount_amount > 0 || (applicableItems.length > 0 && promo.apply_to !== 'all') || (promo.apply_to === 'all' && pricedItems.length > 0)) {
+      if (result.discount_amount > 0 || (applicableItems.length > 0 && promo.apply_to !== 'all') || (promo.apply_to === 'all' && safeItems.length > 0)) {
         results.push({
           promotion: {
             id: promo.id,
@@ -628,7 +562,6 @@ export class PromotionService {
           description: result.description,
           free_items: result.free_items,
         });
-        acceptedDiscount += result.discount_amount;
         }
       } catch (error) {
         // A malformed legacy promotion should not break checkout. Skip that
