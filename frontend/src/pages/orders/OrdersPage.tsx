@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import {
   FiCalendar, FiRefreshCw, FiUser, FiX,
   FiEye, FiTrash2, FiFileText, FiCheck,
-  FiAlertCircle, FiClock, FiSearch, FiCreditCard
+  FiAlertCircle, FiClock, FiSearch, FiCreditCard,
+  FiCheckCircle, FiMail, FiPackage, FiPhone
 } from 'react-icons/fi';
 import { orderAPI } from '../../services/order.api';
 import { Order } from '../../types/domain.type';
@@ -580,180 +581,221 @@ const OrdersPage = () => {
         </div>
       )}
 
-      {/* 5. Drawer Chi tiết Hóa đơn (Thermal Receipt style) */}
+      {/* 5. Drawer Chi tiết Hóa đơn */}
       {selected && (
-        <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 overflow-hidden">
-            {/* Backdrop */}
-            <div 
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity duration-300"
-              onClick={() => setSelected(null)} 
-            />
+        <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="order-detail-title" role="dialog" aria-modal="true">
+          <div
+            className="absolute inset-0 bg-slate-950/50 backdrop-blur-[2px] transition-opacity duration-300"
+            onClick={() => setSelected(null)}
+          />
 
-            <div className="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
-              <div className="pointer-events-auto w-screen max-w-md transform bg-white shadow-2xl transition duration-500 ease-in-out border-l border-slate-100 flex flex-col h-full animate-slideLeft">
-                
-                {/* Drawer Header */}
-                <div className="bg-slate-950 px-5 py-5 text-white flex items-center justify-between shadow-md shrink-0">
-                  <div>
-                    <h2 className="text-base font-black flex items-center gap-2 text-white">
-                      <FiFileText className="text-blue-500" size={18} />
-                      Chi tiết Hóa đơn
-                    </h2>
-                    <p className="mt-0.5 text-[11px] text-slate-400 font-semibold font-mono">
-                      Số: {selected.order_number}
-                    </p>
+          <div className="pointer-events-none fixed inset-y-0 right-0 flex w-full justify-end">
+            <aside className="order-detail-shell pointer-events-auto flex h-full w-full max-w-[560px] flex-col border-l border-slate-200 bg-slate-50 shadow-[-18px_0_50px_rgba(15,23,42,0.16)] animate-slideLeft">
+              {/* Header */}
+              <div className="shrink-0 bg-[#07152f] px-5 pb-5 pt-4 text-white sm:px-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border border-blue-300/25 bg-blue-400/10 text-blue-200">
+                      <FiFileText size={19} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-300">Hóa đơn bán lẻ</p>
+                      <h2 id="order-detail-title" className="mt-1 text-xl font-black tracking-tight text-white">Chi tiết hóa đơn</h2>
+                      <p className="mt-1 truncate font-mono text-[11px] font-semibold text-slate-400">{selected.order_number}</p>
+                    </div>
                   </div>
-                  <button 
+                  <button
+                    type="button"
                     onClick={() => setSelected(null)}
-                    className="rounded-xl border border-slate-800 p-2 text-slate-400 hover:bg-slate-900 hover:text-white transition-all"
+                    aria-label="Đóng chi tiết hóa đơn"
+                    className="order-detail-control inline-flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
                   >
-                    <FiX size={16} />
+                    <FiX size={17} />
                   </button>
                 </div>
 
-                {/* Drawer Body - Scrollable Thermal Receipt style */}
-                <div className="flex-1 overflow-y-auto p-5 bg-slate-50">
-                  {detailLoading ? (
-                    <div className="py-20 text-center text-slate-400 font-semibold">
-                      <FiRefreshCw className="inline animate-spin mr-2 text-blue-500" size={16} />
-                      Đang lấy chi tiết...
-                    </div>
-                  ) : (
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-5 relative overflow-hidden">
-                      {/* Top decoration (Receipt design) */}
-                      <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
-                      
-                      {/* Logo and Store Name */}
-                      <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-200">
-                        <h3 className="text-base font-black text-slate-900 tracking-tight">SORA POS</h3>
-                        <p className="text-[10px] text-slate-400 font-bold">HÓA ĐƠN BÁN LẺ</p>
-                        <div className="flex justify-center items-center gap-1.5 text-xs text-slate-500 font-semibold mt-1">
-                          <FiClock size={12} />
-                          {formatDate(selected.created_at)}
-                        </div>
-                      </div>
-
-                      {/* Receipt Metadata */}
-                      <div className="space-y-2 text-xs font-semibold text-slate-600 pb-2">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Khách hàng:</span>
-                          <span className="text-slate-800 font-extrabold">{selected.customers?.name || 'Khách lẻ'}</span>
-                        </div>
-                        {selected.customers?.phone && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">Số điện thoại:</span>
-                            <span className="text-slate-800 font-extrabold">{selected.customers.phone}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Trạng thái đơn:</span>
-                          <span className={`font-black uppercase ${selected.status === 'completed' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {selected.status === 'completed' ? 'Thành công' : 'Đã hủy'}
-                          </span>
-                        </div>
-                        {selected.note && (
-                          <div className="pt-2 border-t border-slate-100/50">
-                            <p className="text-slate-400 mb-0.5">Ghi chú:</p>
-                            <p className="text-slate-700 leading-relaxed font-semibold italic bg-slate-50 p-2 rounded-lg border border-slate-100">
-                              "{selected.note}"
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Products List */}
-                      <div className="space-y-3">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1.5">Danh sách hàng hóa</p>
-                        <div className="divide-y divide-slate-100">
-                          {selected.order_details?.map((item) => (
-                            <div key={item.id} className="py-2.5 flex justify-between gap-3 text-xs">
-                              <div className="min-w-0">
-                                <p className="font-extrabold text-slate-800 leading-tight truncate">{item.product_name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-1 font-mono">
-                                  {item.quantity} x {money(item.unit_price)}
-                                </p>
-                              </div>
-                              <p className="font-black text-slate-900 font-mono text-right shrink-0">{money(item.subtotal)}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Bill Summary */}
-                      <div className="border-t border-dashed border-slate-200 pt-4 space-y-2 text-xs font-semibold text-slate-600">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Tổng tiền hàng:</span>
-                          <span className="font-bold text-slate-800 font-mono">{money(selected.total_amount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Chiết khấu / Giảm giá:</span>
-                          <span className="font-bold text-rose-600 font-mono">-{money(selected.discount_amount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-sm">
-                          <span className="font-black text-slate-800">Thanh toán thực tế:</span>
-                          <span className="font-black text-slate-900 text-base font-mono">{money(selected.final_amount)}</span>
-                        </div>
-                      </div>
-
-                      {/* Footer decorative text */}
-                      <div className="text-center text-[10px] text-slate-400 font-semibold border-t border-slate-100 pt-4 pb-1">
-                        <p>Cảm ơn quý khách và hẹn gặp lại!</p>
-                        <p className="mt-0.5 font-mono text-[9px] text-slate-300">Sora POS System v2.0</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Drawer Footer Actions */}
-                <div className="p-4 border-t border-slate-150/40 bg-white shrink-0 space-y-3">
-                  {/* Gửi Email Hóa Đơn */}
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gửi hóa đơn qua email</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        placeholder="Nhập email khách hàng..."
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
-                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 font-semibold"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (!emailInput.trim()) {
-                            toast.error('Vui lòng nhập email');
-                            return;
-                          }
-                          setIsSending(true);
-                          try {
-                            await orderAPI.sendInvoiceEmail(selected.id, emailInput);
-                            toast.success('Đã gửi email hóa đơn thành công!');
-                          } catch (err: any) {
-                            toast.error(err.response?.data?.message || 'Gửi email thất bại');
-                          } finally {
-                            setIsSending(false);
-                          }
-                        }}
-                        disabled={isSending}
-                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition disabled:opacity-50 flex items-center justify-center min-w-[70px]"
-                      >
-                        {isSending ? '...' : 'Gửi'}
-                      </button>
-                    </div>
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
+                    <FiClock size={13} className="text-blue-300" />
+                    <span>{formatDate(selected.created_at)}</span>
                   </div>
-
-                  {selected && selected.status !== 'cancelled' && user?.role !== 'cashier' && (
-                    <button
-                      onClick={() => cancel(selected)}
-                      className="w-full inline-flex items-center justify-center gap-1.5 h-11 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-sm font-black text-white transition-all shadow-[0_4px_12px_rgba(225,29,72,0.2)]"
-                    >
-                      <FiTrash2 size={16} />
-                      Yêu cầu hủy hóa đơn này
-                    </button>
-                  )}
+                  <span className={`order-detail-chip inline-flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${selected.status === 'completed' ? 'border-emerald-300/25 bg-emerald-400/10 text-emerald-200' : 'border-rose-300/25 bg-rose-400/10 text-rose-200'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${selected.status === 'completed' ? 'bg-emerald-300' : 'bg-rose-300'}`} />
+                    {selected.status === 'completed' ? 'Thành công' : 'Đã hủy'}
+                  </span>
                 </div>
               </div>
-            </div>
+
+              {/* Body */}
+              <div className="min-h-0 flex-1 overflow-y-auto bg-[#f4f7fb] px-4 py-5 sm:px-6">
+                {detailLoading ? (
+                  <div className="animate-pulse space-y-4">
+                    <div className="order-detail-card h-48 border border-slate-200 bg-white" />
+                    <div className="order-detail-card h-64 border border-slate-200 bg-white" />
+                    <div className="order-detail-card h-40 border border-slate-200 bg-slate-900" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <section className="order-detail-card border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Giao dịch</p>
+                          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-950">Biên nhận bán lẻ</h3>
+                          <p className="mt-1 text-xs font-semibold text-slate-500">Thông tin đơn hàng và khách mua</p>
+                        </div>
+                        <div className={`order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border ${selected.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-rose-200 bg-rose-50 text-rose-600'}`}>
+                          {selected.status === 'completed' ? <FiCheckCircle size={22} /> : <FiAlertCircle size={22} />}
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Khách hàng</p>
+                          <p className="mt-1 truncate text-sm font-black text-slate-900">{selected.customers?.name || 'Khách lẻ'}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Thanh toán</p>
+                          <p className="mt-1 truncate text-sm font-black text-slate-900">{paymentLabels[getPaymentMethod(selected)]}</p>
+                        </div>
+                        {selected.customers?.phone && (
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400"><FiPhone size={11} /> Điện thoại</p>
+                            <p className="mt-1 text-sm font-black text-slate-900">{selected.customers.phone}</p>
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Mã hóa đơn</p>
+                          <p className="mt-1 truncate font-mono text-[11px] font-bold text-slate-700">{selected.order_number}</p>
+                        </div>
+                      </div>
+
+                      {selected.note && (
+                        <div className="mt-4 border-l-2 border-blue-500 bg-blue-50/70 px-3 py-2.5">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-blue-700">Ghi chú</p>
+                          <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-700">"{selected.note}"</p>
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="order-detail-card border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+                      <div className="flex items-end justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Chi tiết đơn</p>
+                          <h3 className="mt-1 text-lg font-black tracking-tight text-slate-950">Danh sách hàng hóa</h3>
+                        </div>
+                        <span className="order-detail-chip shrink-0 border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black text-slate-500">
+                          {selected.order_details?.length || 0} món
+                        </span>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {selected.order_details?.map((item, index) => (
+                          <div key={item.id} className="order-detail-card flex items-center gap-3 border border-slate-200 bg-slate-50/70 p-3 transition hover:border-blue-200 hover:bg-blue-50/40">
+                            <div className="order-detail-control flex h-9 w-9 shrink-0 items-center justify-center border border-blue-100 bg-white font-mono text-[10px] font-black text-blue-600">
+                              {String(index + 1).padStart(2, '0')}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-black leading-tight text-slate-900">{item.product_name}</p>
+                              <p className="mt-1 flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                                <FiPackage size={11} /> {item.quantity} x {money(item.unit_price)}
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-right font-mono text-sm font-black text-slate-950">{money(item.subtotal)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="order-detail-card bg-[#07152f] p-5 text-white shadow-[0_12px_30px_rgba(7,21,47,0.18)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-300">Thanh toán</p>
+                          <h3 className="mt-1 text-lg font-black tracking-tight">Tóm tắt giao dịch</h3>
+                        </div>
+                        <FiCreditCard className="text-blue-300" size={22} />
+                      </div>
+
+                      <div className="mt-5 space-y-3 text-xs font-semibold">
+                        <div className="flex items-center justify-between gap-4 text-slate-400">
+                          <span>Tổng tiền hàng</span>
+                          <span className="font-mono font-bold text-slate-200">{money(selected.total_amount || 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4 text-slate-400">
+                          <span>Chiết khấu / Giảm giá</span>
+                          <span className="font-mono font-bold text-rose-300">-{money(selected.discount_amount || 0)}</span>
+                        </div>
+                        <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
+                          <span className="font-black text-slate-100">Khách thanh toán</span>
+                          <span className="font-mono text-xl font-black text-blue-200">{money(selected.final_amount)}</span>
+                        </div>
+                      </div>
+                    </section>
+
+                    <p className="pb-1 text-center text-[11px] font-semibold text-slate-400">Cảm ơn quý khách đã mua hàng tại Sora POS.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-4 sm:px-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="order-detail-control flex h-9 w-9 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600">
+                    <FiMail size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-slate-900">Gửi hóa đơn qua email</p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-slate-400">Hóa đơn sẽ được gửi đến khách hàng.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <div className="relative min-w-0 flex-1">
+                    <FiMail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <input
+                      type="email"
+                      placeholder="Nhập email khách hàng..."
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      className="order-detail-control h-11 w-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/10"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!emailInput.trim()) {
+                        toast.error('Vui lòng nhập email');
+                        return;
+                      }
+                      setIsSending(true);
+                      try {
+                        await orderAPI.sendInvoiceEmail(selected.id, emailInput);
+                        toast.success('Đã gửi email hóa đơn thành công!');
+                      } catch (err: any) {
+                        toast.error(err.response?.data?.message || 'Gửi email thất bại');
+                      } finally {
+                        setIsSending(false);
+                      }
+                    }}
+                    disabled={isSending}
+                    className="order-detail-control inline-flex h-11 min-w-[78px] items-center justify-center gap-1.5 bg-blue-600 px-4 text-xs font-black text-white transition hover:bg-blue-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSending ? <FiRefreshCw className="animate-spin" size={14} /> : <FiMail size={14} />}
+                    <span>{isSending ? 'Đang gửi' : 'Gửi'}</span>
+                  </button>
+                </div>
+
+                {selected.status !== 'cancelled' && user?.role !== 'cashier' && (
+                  <button
+                    type="button"
+                    onClick={() => cancel(selected)}
+                    className="order-detail-control mt-3 inline-flex h-10 w-full items-center justify-center gap-2 border border-rose-200 bg-rose-50 text-xs font-black text-rose-700 transition hover:bg-rose-100 active:translate-y-px"
+                  >
+                    <FiTrash2 size={14} />
+                    Yêu cầu hủy hóa đơn này
+                  </button>
+                )}
+              </div>
+            </aside>
           </div>
         </div>
       )}
