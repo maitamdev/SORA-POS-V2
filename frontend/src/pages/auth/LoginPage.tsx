@@ -6,7 +6,9 @@ import toast from 'react-hot-toast';
 import { HiOutlineEye, HiOutlineEyeOff, HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi';
 import { loginSchema, LoginFormData } from '../../validations/login.schema';
 import { useAuthStore } from '../../stores/auth.store';
-import logoUrl from '../../assets/new-logo.png';
+
+// Keep login and app navigation on the same canonical original logo asset.
+const logoUrl = '/assets/logo.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();

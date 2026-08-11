@@ -22,7 +22,10 @@ import {
   HiOutlineDownload,
 } from 'react-icons/hi';
 import NotificationCenter from '../common/NotificationCenter';
-import logoUrl from '../../assets/new-logo.png';
+
+// Use the canonical public asset so the original SORA-POS logo is served once
+// and is shared with the favicon/manifest instead of being bundled again.
+const logoUrl = '/assets/logo.png';
 
 /**
  * Cấu trúc menu sidebar

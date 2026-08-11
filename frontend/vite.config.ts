@@ -14,14 +14,23 @@ export default defineConfig({
       registerType: 'autoUpdate',
       manifest: false, // Sử dụng manifest.webmanifest thủ công trong public/
       workbox: {
-        // Precache tất cả asset tĩnh khi build production
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff,woff2}'],
+        // Precache the application shell only. Large images are handled by the
+        // runtime cache below so the first install does not download the whole
+        // media library before the POS becomes interactive.
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
         // Keep the fixed public logo out of precache so it cannot remain stale.
         globIgnores: ['assets/logo.png'],
-        // Cho phép precache file lớn (mặc định 2MB, nâng lên 5MB)
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Runtime caching cho Google Fonts CDN
         runtimeCaching: [
+          {
+            urlPattern: /\.(?:png|jpe?g|webp)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'sora-images-v1',
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
