@@ -592,47 +592,47 @@ const OrdersPage = () => {
           <div className="pointer-events-none fixed inset-y-0 right-0 flex w-full justify-end">
             <aside className="order-detail-shell pointer-events-auto flex h-full w-full max-w-[560px] flex-col border-l border-slate-200 bg-slate-50 shadow-[-18px_0_50px_rgba(15,23,42,0.16)] animate-slideLeft">
               {/* Header */}
-              <div className="shrink-0 bg-[#07152f] px-5 pb-5 pt-4 text-white sm:px-6">
+              <div className="shrink-0 border-b border-slate-200 border-t-4 border-blue-600 bg-white px-5 pb-4 pt-3 text-slate-950 sm:px-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border border-blue-300/25 bg-blue-400/10 text-blue-200">
+                    <div className="order-detail-control flex h-11 w-11 shrink-0 items-center justify-center border border-blue-100 bg-blue-50 text-blue-600">
                       <FiFileText size={19} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-300">Hóa đơn bán lẻ</p>
-                      <h2 id="order-detail-title" className="mt-1 text-xl font-black tracking-tight text-white">Chi tiết hóa đơn</h2>
-                      <p className="mt-1 truncate font-mono text-[11px] font-semibold text-slate-400">{selected.order_number}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">Hóa đơn bán lẻ</p>
+                      <h2 id="order-detail-title" className="mt-1 text-xl font-black tracking-tight text-slate-950">Chi tiết hóa đơn</h2>
+                      <p className="mt-1 truncate font-mono text-[11px] font-semibold text-slate-500">{selected.order_number}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelected(null)}
                     aria-label="Đóng chi tiết hóa đơn"
-                    className="order-detail-control inline-flex h-9 w-9 shrink-0 items-center justify-center border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                    className="order-detail-control inline-flex h-9 w-9 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
                   >
                     <FiX size={17} />
                   </button>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                    <FiClock size={13} className="text-blue-300" />
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                    <FiClock size={13} className="text-blue-600" />
                     <span>{formatDate(selected.created_at)}</span>
                   </div>
-                  <span className={`order-detail-chip inline-flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${selected.status === 'completed' ? 'border-emerald-300/25 bg-emerald-400/10 text-emerald-200' : 'border-rose-300/25 bg-rose-400/10 text-rose-200'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${selected.status === 'completed' ? 'bg-emerald-300' : 'bg-rose-300'}`} />
+                  <span className={`order-detail-chip inline-flex items-center gap-1.5 border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${selected.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${selected.status === 'completed' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                     {selected.status === 'completed' ? 'Thành công' : 'Đã hủy'}
                   </span>
                 </div>
               </div>
 
               {/* Body */}
-              <div className="min-h-0 flex-1 overflow-y-auto bg-[#f4f7fb] px-4 py-5 sm:px-6">
+              <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6">
                 {detailLoading ? (
                   <div className="animate-pulse space-y-4">
                     <div className="order-detail-card h-48 border border-slate-200 bg-white" />
                     <div className="order-detail-card h-64 border border-slate-200 bg-white" />
-                    <div className="order-detail-card h-40 border border-slate-200 bg-slate-900" />
+                    <div className="order-detail-card h-40 border border-blue-100 bg-blue-50/70" />
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -706,27 +706,27 @@ const OrdersPage = () => {
                       </div>
                     </section>
 
-                    <section className="order-detail-card bg-[#07152f] p-5 text-white shadow-[0_12px_30px_rgba(7,21,47,0.18)]">
+                    <section className="order-detail-card border border-blue-100 bg-blue-50/70 p-5 text-slate-900 shadow-[0_10px_24px_rgba(37,99,235,0.06)]">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-300">Thanh toán</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">Thanh toán</p>
                           <h3 className="mt-1 text-lg font-black tracking-tight">Tóm tắt giao dịch</h3>
                         </div>
-                        <FiCreditCard className="text-blue-300" size={22} />
+                        <FiCreditCard className="text-blue-600" size={22} />
                       </div>
 
                       <div className="mt-5 space-y-3 text-xs font-semibold">
-                        <div className="flex items-center justify-between gap-4 text-slate-400">
+                        <div className="flex items-center justify-between gap-4 text-slate-500">
                           <span>Tổng tiền hàng</span>
-                          <span className="font-mono font-bold text-slate-200">{money(selected.total_amount || 0)}</span>
+                          <span className="font-mono font-bold text-slate-700">{money(selected.total_amount || 0)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-4 text-slate-400">
+                        <div className="flex items-center justify-between gap-4 text-slate-500">
                           <span>Chiết khấu / Giảm giá</span>
-                          <span className="font-mono font-bold text-rose-300">-{money(selected.discount_amount || 0)}</span>
+                          <span className="font-mono font-bold text-rose-600">-{money(selected.discount_amount || 0)}</span>
                         </div>
-                        <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
-                          <span className="font-black text-slate-100">Khách thanh toán</span>
-                          <span className="font-mono text-xl font-black text-blue-200">{money(selected.final_amount)}</span>
+                        <div className="flex items-end justify-between gap-4 border-t border-blue-100 pt-4">
+                          <span className="font-black text-slate-800">Khách thanh toán</span>
+                          <span className="font-mono text-xl font-black text-blue-700">{money(selected.final_amount)}</span>
                         </div>
                       </div>
                     </section>
