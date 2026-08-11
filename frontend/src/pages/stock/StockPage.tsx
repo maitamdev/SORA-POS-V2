@@ -440,13 +440,17 @@ const StockPage = () => {
   // Statistics calculation
   const stats = useMemo(() => {
     const totalCount = inventory.length;
-    const lowStockCount = alerts.filter(a => a.status === 'low_stock' || a.status === 'out_of_stock').length;
+    // KPI phải phản ánh tồn thực tế của sản phẩm. `stock_alerts` có thể chưa
+    // được tạo, đã được resolve, hoặc bị lệch dữ liệu nên không dùng để đếm.
+    const lowStockCount = inventory.filter((item) =>
+      Number(item.stock_quantity ?? 0) <= Number(item.min_stock_level ?? 0)
+    ).length;
     const safeCount = Math.max(totalCount - lowStockCount, 0);
     const expiryWarningCount = expiryAlerts.filter((batch) => getRemainingExpiryDays(batch.expiry_date) <= 30).length;
     const txCount = txPagination.total || transactions.length;
 
     return { totalCount, lowStockCount, safeCount, expiryWarningCount, txCount };
-  }, [inventory, alerts, transactions, expiryAlerts, txPagination.total]);
+  }, [inventory, transactions, expiryAlerts, txPagination.total]);
 
   // Expiry statistics calculation
   const expiryStats = useMemo(() => {
