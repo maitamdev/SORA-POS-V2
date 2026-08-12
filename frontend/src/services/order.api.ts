@@ -15,6 +15,7 @@ export interface PublicReceiptOrder {
   loyalty_points_used?: number;
   loyalty_points_earned?: number;
   created_at: string;
+  public_receipt_token?: string | null;
   customers?: { id: string; name: string } | null;
   order_details?: Array<{
     id: string;
