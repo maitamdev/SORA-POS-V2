@@ -20,6 +20,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
         // Keep the fixed public logo out of precache so it cannot remain stale.
         globIgnores: ['assets/logo.png'],
+        // Public invoices must always load the current customer-facing page.
+        // They are online-only and should not be served from an old app shell.
+        navigateFallbackDenylist: [/^\/invoice(?:\/|$)/],
         // Runtime caching cho Google Fonts CDN
         runtimeCaching: [
           {
