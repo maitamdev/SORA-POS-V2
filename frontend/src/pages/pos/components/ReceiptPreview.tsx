@@ -25,7 +25,8 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
 
     autoPrintedOrderRef.current = checkoutSuccessInfo.orderNumber;
     const timer = window.setTimeout(() => {
-      onPrintInvoice(checkoutSuccessInfo.orderNumber, checkoutSuccessInfo.cart);
+      const savedCart = Array.isArray(checkoutSuccessInfo.cart) ? checkoutSuccessInfo.cart : [];
+      onPrintInvoice(checkoutSuccessInfo.orderNumber, savedCart);
     }, 200);
 
     return () => window.clearTimeout(timer);
@@ -34,6 +35,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
   if (!checkoutSuccessInfo) return null;
 
   const info = checkoutSuccessInfo;
+  const cart = Array.isArray(info.cart) ? info.cart : [];
   const storeName = operationSettings.storeName || 'SORA MART';
 
   const handleDownloadInvoice = async () => {
@@ -78,7 +80,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
               Tải xuống
             </button>
             <button
-              onClick={() => onPrintInvoice(info.orderNumber, info.cart)}
+              onClick={() => onPrintInvoice(info.orderNumber, cart)}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold rounded shadow-sm transition uppercase tracking-wider"
             >
               In hóa đơn
@@ -177,7 +179,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {info.cart.map((item, idx) => (
+                  {cart.map((item, idx) => (
                     <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'} border-b border-slate-100`}>
                       <td className="px-7 py-2.5">
                         <p className="text-[12px] font-semibold text-slate-800">{item.product.name}</p>
@@ -197,7 +199,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
               <div className="w-64 space-y-1.5">
                 <div className="flex justify-between text-[12px]">
                   <span className="text-slate-500 font-semibold">Tạm tính:</span>
-                  <span className="font-bold text-slate-700">{money(info.cart.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0), operationSettings.currency, operationSettings.locale)}</span>
+                  <span className="font-bold text-slate-700">{money(cart.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0), operationSettings.currency, operationSettings.locale)}</span>
                 </div>
                 {info.discountAmount > 0 && (
                   <div className="flex justify-between text-[12px]">

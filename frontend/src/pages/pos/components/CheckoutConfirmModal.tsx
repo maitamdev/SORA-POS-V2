@@ -16,7 +16,7 @@ interface CheckoutConfirmModalProps {
 
 const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
   const showCheckoutConfirm = usePOSStore((s) => s.showCheckoutConfirm);
-  const cart = usePOSStore((s) => s.cart);
+  const cart = usePOSStore((s) => Array.isArray(s.cart) ? s.cart : []);
   const matchedCustomer = usePOSStore((s) => s.matchedCustomer);
   const newCustName = usePOSStore((s) => s.newCustName);
   const paymentMethod = usePOSStore((s) => s.paymentMethod);

@@ -80,8 +80,9 @@ const POSPage = () => {
   // ── Sync receivedAmount for non-cash payments ──
   useEffect(() => {
     if (paymentMethod !== 'cash') {
+      const cart = usePOSStore.getState().cart;
       usePOSStore.getState().setReceivedAmount(
-        usePOSStore.getState().cart.reduce(
+        (Array.isArray(cart) ? cart : []).reduce(
           (sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0
         )
       );

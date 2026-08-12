@@ -101,9 +101,16 @@ const ProductGrid = () => {
   const sortBy = usePOSStore((s) => s.sortBy);
   const viewMode = usePOSStore((s) => s.viewMode);
   const page = usePOSStore((s) => s.page);
-  const pagination = usePOSStore((s) => s.pagination);
+  const rawPagination = usePOSStore((s) => s.pagination);
   const products = usePOSStore((s) => Array.isArray(s.products) ? s.products : []);
   const operationSettings = usePOSStore((s) => s.operationSettings);
+  const pagination = {
+    page: Number(rawPagination?.page) > 0 ? Number(rawPagination.page) : 1,
+    limit: Number(rawPagination?.limit) > 0
+      ? Number(rawPagination.limit)
+      : Math.max(1, Number(operationSettings.productPageSize) || 20),
+    total: Number(rawPagination?.total) >= 0 ? Number(rawPagination.total) : 0,
+  };
 
   const setSelectedCategoryId = usePOSStore((s) => s.setSelectedCategoryId);
   const setSortBy = usePOSStore((s) => s.setSortBy);

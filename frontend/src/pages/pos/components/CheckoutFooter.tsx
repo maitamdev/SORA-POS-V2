@@ -14,7 +14,7 @@ interface CheckoutFooterProps {
 const CheckoutFooter = ({ onCheckout }: CheckoutFooterProps) => {
   const paymentMethod = usePOSStore((s) => s.paymentMethod);
   const loading = usePOSStore((s) => s.loading);
-  const cart = usePOSStore((s) => s.cart);
+  const cart = usePOSStore((s) => Array.isArray(s.cart) ? s.cart : []);
   const operationSettings = usePOSStore((s) => s.operationSettings);
   const setPaymentMethod = usePOSStore((s) => s.setPaymentMethod);
   const setShowCashPayment = usePOSStore((s) => s.setShowCashPayment);

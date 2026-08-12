@@ -79,8 +79,9 @@ export const usePOSProducts = () => {
         page,
         operationSettings.productPageSize
       );
-      if (offlineItems && offlineItems.length > 0) {
-        setProducts(offlineItems);
+      const safeOfflineItems = Array.isArray(offlineItems) ? offlineItems : [];
+      if (safeOfflineItems.length > 0) {
+        setProducts(safeOfflineItems);
         setPagination({ page, limit: operationSettings.productPageSize, total: offlineTotal });
       }
     } catch (err) {
@@ -116,10 +117,12 @@ export const usePOSProducts = () => {
     // 1. Fast boot from IndexedDB
     try {
       const offlineCategories = await getCategoriesOffline();
-      if (offlineCategories.length > 0) setCategories(offlineCategories);
+      const safeOfflineCategories = Array.isArray(offlineCategories) ? offlineCategories : [];
+      if (safeOfflineCategories.length > 0) setCategories(safeOfflineCategories);
       if (canManageCustomerData) {
         const offlineCustomers = await getCustomersOffline();
-        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+        const safeOfflineCustomers = Array.isArray(offlineCustomers) ? offlineCustomers : [];
+        if (safeOfflineCustomers.length > 0) setCustomers(safeOfflineCustomers);
       } else {
         setCustomers([]);
       }

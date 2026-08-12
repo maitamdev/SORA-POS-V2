@@ -86,7 +86,7 @@ interface CartPanelProps {
 const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
   const user = useAuthStore((state) => state.user);
   const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
-  const cart = usePOSStore((s) => s.cart);
+  const cart = usePOSStore((s) => Array.isArray(s.cart) ? s.cart : []);
   const customerPhone = usePOSStore((s) => s.customerPhone);
   const matchedCustomer = usePOSStore((s) => s.matchedCustomer);
   const newCustName = usePOSStore((s) => s.newCustName);

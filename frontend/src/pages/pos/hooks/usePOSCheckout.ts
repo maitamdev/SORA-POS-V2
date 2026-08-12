@@ -49,7 +49,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
     }
 
     // 1. Local search
-    const localMatch = store.customers.find((c) => {
+    const localMatch = (Array.isArray(store.customers) ? store.customers : []).find((c) => {
       const p = (c.phone || '').trim().replace(/[\s.-]/g, '');
       return p === normalized;
     });
@@ -153,7 +153,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
   // ─── Clear Cart ───
   const handleClearCart = () => {
     const store = usePOSStore.getState();
-    if (store.cart.length === 0) return;
+    if (!Array.isArray(store.cart) || store.cart.length === 0) return;
     store.setShowClearCartConfirm(true);
   };
 
@@ -165,7 +165,9 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       return;
     }
 
-    const itemsToRender = savedCart || store.cart;
+    const itemsToRender = Array.isArray(savedCart)
+      ? savedCart
+      : (Array.isArray(store.cart) ? store.cart : []);
     if (itemsToRender.length === 0) {
       toast.error('Không có dữ liệu sản phẩm để in hóa đơn!');
       return;
@@ -173,7 +175,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
 
     const checkoutInfo = store.checkoutSuccessInfo;
     const customerName = checkoutInfo?.customerName ??
-      (store.customers.find((c) => c.id === store.customerId)?.name || 'Khách lẻ');
+      ((Array.isArray(store.customers) ? store.customers : []).find((c) => c.id === store.customerId)?.name || 'Khách lẻ');
     const customerPhoneStr = '';
 
     const printTotal = itemsToRender.reduce(
@@ -218,7 +220,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
   const checkout = async (isTransferConfirmed = false, isCheckoutConfirmed = false) => {
     const store = usePOSStore.getState();
     const {
-      cart,
+      cart: rawCart,
       matchedCustomer,
       activeShift,
       operationSettings,
@@ -233,6 +235,8 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       isRedeemingPoints,
       usedPoints,
     } = store;
+    const cart = Array.isArray(rawCart) ? rawCart : [];
+    const safeAutoPromotionIds = Array.isArray(autoPromotionIds) ? autoPromotionIds : [];
 
     if (cart.length === 0) {
       toast.error('Giỏ hàng đang trống');
@@ -288,7 +292,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
         : Math.min(discountValue, maxDiscountValue);
 
     const promotionIds = Array.from(new Set([
-      ...autoPromotionIds,
+      ...safeAutoPromotionIds,
       ...(voucherPromotionId ? [voucherPromotionId] : []),
     ]));
 
@@ -395,7 +399,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       }
 
       const customerObj = finalCustomerId
-        ? store.customers.find((c) => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone, email: '' }
+        ? (Array.isArray(store.customers) ? store.customers : []).find((c) => c.id === finalCustomerId) || { name: newCustName, phone: customerPhone, email: '' }
         : null;
 
       const pBefore = matchedCustomer ? matchedCustomer.points : 0;
@@ -451,7 +455,8 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
 /* ------------------------------------------------------------------ */
 
 function _computeDiscountAmount(s: ReturnType<typeof usePOSStore.getState>) {
-  const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
+  const cart = Array.isArray(s.cart) ? s.cart : [];
+  const total = cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
   const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
   const maxDiscountValue = Math.floor((total * maxPercent) / 100);
   const safeValue =
@@ -463,7 +468,8 @@ function _computeDiscountAmount(s: ReturnType<typeof usePOSStore.getState>) {
 }
 
 function _computeFinalAmount(s: ReturnType<typeof usePOSStore.getState>) {
-  const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
+  const cart = Array.isArray(s.cart) ? s.cart : [];
+  const total = cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
   const discount = _computeDiscountAmount(s);
   const pointsDiscount = s.isRedeemingPoints ? s.usedPoints * 1000 : 0;
   return Math.max(total - discount - pointsDiscount, 0);

@@ -14,7 +14,7 @@ export const usePOSBarcode = () => {
   const barcodeSubmittingRef = useRef(false);
 
   const {
-    products,
+    products: rawProducts,
     barcodeSearch,
     operationSettings,
     activeShift,
@@ -23,6 +23,7 @@ export const usePOSBarcode = () => {
     setPage,
     addToCart,
   } = usePOSStore();
+  const products = Array.isArray(rawProducts) ? rawProducts : [];
 
   const user = usePOSStore((s) => s.activeShift); // for role check we need auth store
   // Note: user role is checked via useAuthStore in POSPage

@@ -10,7 +10,7 @@ const CashPaymentModal = ({ onCheckout }: CashPaymentModalProps) => {
   const showCashPayment = usePOSStore((s) => s.showCashPayment);
   const receivedAmount = usePOSStore((s) => s.receivedAmount);
   const loading = usePOSStore((s) => s.loading);
-  const cart = usePOSStore((s) => s.cart);
+  const cart = usePOSStore((s) => Array.isArray(s.cart) ? s.cart : []);
   const operationSettings = usePOSStore((s) => s.operationSettings);
   const setShowCashPayment = usePOSStore((s) => s.setShowCashPayment);
   const setReceivedAmount = usePOSStore((s) => s.setReceivedAmount);

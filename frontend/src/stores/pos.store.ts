@@ -75,7 +75,7 @@ interface POSState {
   setSortBy: (sortBy: string) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setPage: (page: number | ((prev: number) => number)) => void;
-  setPagination: (pagination: { page: number; limit: number; total: number }) => void;
+  setPagination: (pagination: Partial<{ page: number; limit: number; total: number }> | null | undefined) => void;
 
   // Actions — Cart
   addToCart: (product: Product) => void;
@@ -210,7 +210,22 @@ export const usePOSStore = create<POSState>()((set, get) => ({
     set((s) => ({
       page: typeof page === 'function' ? page(s.page) : page,
     })),
-  setPagination: (pagination) => set({ pagination }),
+  setPagination: (pagination) =>
+    set((s) => {
+      const next = pagination && typeof pagination === 'object' ? pagination : {};
+      const page = Number(next.page);
+      const limit = Number(next.limit);
+      const total = Number(next.total);
+      return {
+        pagination: {
+          page: Number.isFinite(page) && page > 0 ? page : 1,
+          limit: Number.isFinite(limit) && limit > 0
+            ? limit
+            : s.pagination?.limit || defaultOperationSettings.productPageSize,
+          total: Number.isFinite(total) && total >= 0 ? total : 0,
+        },
+      };
+    }),
 
   // ── Actions — Cart ──
   addToCart: (product) => {
@@ -223,18 +238,19 @@ export const usePOSStore = create<POSState>()((set, get) => ({
     }
 
     set((s) => {
-      const existing = s.cart.find((item) => item.product.id === product.id);
+      const cart = Array.isArray(s.cart) ? s.cart : [];
+      const existing = cart.find((item) => item.product.id === product.id);
       if (existing) {
         if (!allowOutOfStock && existing.quantity >= Number(product.stock_quantity)) {
           return s; // Caller should handle toast
         }
         return {
-          cart: s.cart.map((item) =>
+          cart: cart.map((item) =>
             item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
           ),
         };
       }
-      return { cart: [...s.cart, { product, quantity: 1 }] };
+      return { cart: [...cart, { product, quantity: 1 }] };
     });
   },
 
@@ -243,7 +259,7 @@ export const usePOSStore = create<POSState>()((set, get) => ({
     const allowOutOfStock = operationSettings.allowSellOutOfStock ?? false;
 
     set((s) => ({
-      cart: s.cart
+      cart: (Array.isArray(s.cart) ? s.cart : [])
         .map((item) => {
           if (item.product.id !== productId) return item;
           const maxQuantity = allowOutOfStock
@@ -275,7 +291,7 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   setVoucherCode: (code) => set({ voucherCode: code }),
   setAutoPromoDiscount: (value) => set({ autoPromoDiscount: value }),
   setVoucherDiscount: (value) => set({ voucherDiscount: value }),
-  setAutoPromotionIds: (ids) => set({ autoPromotionIds: ids }),
+  setAutoPromotionIds: (ids) => set({ autoPromotionIds: Array.isArray(ids) ? ids : [] }),
   setVoucherPromotionId: (id) => set({ voucherPromotionId: id }),
 
   // ── Actions — Customer ──
