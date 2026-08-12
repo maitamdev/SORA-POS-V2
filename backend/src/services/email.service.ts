@@ -80,16 +80,43 @@ export class EmailService {
   static async sendShiftNotification(
     email: string,
     employeeName: string | null | undefined,
-    shift: { shift_date?: string; shift_name?: string | null; shift_code?: string | null }
+    shift: {
+      shift_date?: string;
+      shift_name?: string | null;
+      shift_code?: string | null;
+      created_at?: string | null;
+      employee?: { email?: string | null } | null;
+      opener?: { full_name?: string | null } | null;
+    }
   ): Promise<boolean> {
     const safeName = this.escapeHtml(employeeName || 'nhân viên');
-    const shiftName = this.escapeHtml(shift.shift_name || 'Ca bán hàng');
+    const shiftNameRaw = shift.shift_name || 'Ca bán hàng';
+    const shiftName = this.escapeHtml(shiftNameRaw);
     const shiftDate = this.escapeHtml(
       shift.shift_date
         ? new Date(`${shift.shift_date}T00:00:00`).toLocaleDateString('vi-VN')
         : 'Chưa xác định'
     );
     const shiftCode = this.escapeHtml(shift.shift_code || '—');
+    const timeRange = shiftNameRaw.match(/\(([^)]+)\)/)?.[1] || '';
+    const [startTimeRaw = '', endTimeRaw = ''] = timeRange.split(/\s*-\s*/);
+    const startTime = this.escapeHtml(startTimeRaw || 'Theo lịch');
+    const endTime = this.escapeHtml(endTimeRaw || 'Theo lịch');
+    const [startHour, startMinute] = startTimeRaw.split(':').map(Number);
+    const [endHour, endMinute] = endTimeRaw.split(':').map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    let durationMinutes = endMinutes - startMinutes;
+    if (Number.isFinite(durationMinutes) && durationMinutes <= 0) durationMinutes += 24 * 60;
+    const durationText = Number.isFinite(durationMinutes) && durationMinutes > 0
+      ? `${Math.floor(durationMinutes / 60)} giờ${durationMinutes % 60 ? ` ${durationMinutes % 60} phút` : ''}`
+      : 'Theo lịch cửa hàng';
+    const loginCode = this.escapeHtml(shift.employee?.email || 'Chưa cập nhật');
+    const managerName = this.escapeHtml(shift.opener?.full_name || 'Quản lý cửa hàng');
+    const createdAt = shift.created_at
+      ? this.escapeHtml(new Date(shift.created_at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }))
+      : 'Vừa tạo';
+    const frontendUrl = this.escapeHtml(env.frontendUrl);
     const html = `
       <!DOCTYPE html>
       <html lang="vi">
@@ -102,6 +129,7 @@ export class EmailService {
           .email-wrapper { max-width:600px; margin:20px auto; background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; box-shadow:0 4px 6px -1px rgba(0,0,0,.05); }
           .header { background:#0f172a; color:#fff; padding:30px 24px; text-align:center; }
           .content { padding:24px; }
+          .info-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; }
           .footer { background:#f1f5f9; padding:20px; text-align:center; font-size:11px; color:#64748b; border-top:1px solid #e2e8f0; }
         </style>
       </head>
@@ -113,14 +141,31 @@ export class EmailService {
             <p style="margin:15px 0 0;font-size:14px;font-weight:bold;color:#38bdf8">Mã ca: ${shiftCode}</p>
           </div>
           <div class="content">
-            <p style="margin:0 0 18px;color:#475569;line-height:1.6">Xin chào <strong>${safeName}</strong>, quản lý đã tạo ca làm cho tài khoản của bạn.</p>
-            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">
-              <tr><td style="padding:7px 0;color:#64748b">Nhân viên:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${safeName}</td></tr>
-              <tr><td style="padding:7px 0;color:#64748b">Ca làm:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${shiftName}</td></tr>
-              <tr><td style="padding:7px 0;color:#64748b">Ngày làm:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${shiftDate}</td></tr>
-            </table>
-            <div style="margin-top:18px;padding:14px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;color:#1d4ed8;line-height:1.6;font-size:13px">
-              Vui lòng đăng nhập SORA POS, nhận ca và nhập tiền đầu ca trước khi bán hàng.
+            <p style="margin:0 0 8px;color:#0f172a;font-size:18px;font-weight:700">Lịch làm việc mới của bạn</p>
+            <p style="margin:0 0 20px;color:#475569;line-height:1.6">Xin chào <strong>${safeName}</strong>, quản lý đã tạo một ca làm mới cho bạn. Vui lòng kiểm tra thông tin bên dưới.</p>
+
+            <div class="info-card">
+              <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <tr><td style="padding:6px 0;color:#64748b">Nhân viên</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:700">${safeName}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Mã đăng nhập</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-family:monospace;font-weight:700">${loginCode}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Ngày làm</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:700">${shiftDate}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Tên ca</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:700">${shiftName}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Khung giờ</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:700">${startTime} - ${endTime}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Thời lượng dự kiến</td><td style="padding:6px 0;text-align:right;color:#059669;font-weight:700">${durationText}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Người tạo ca</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:700">${managerName}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b">Tạo lúc</td><td style="padding:6px 0;text-align:right;color:#64748b">${createdAt}</td></tr>
+              </table>
+            </div>
+
+            <div style="margin-top:18px;padding:16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;color:#1e40af;line-height:1.6;font-size:13px">
+              <strong style="display:block;margin-bottom:8px;color:#1d4ed8">Việc cần làm trước khi vào ca</strong>
+              <div>1. Đăng nhập SORA POS bằng mã đăng nhập của bạn.</div>
+              <div>2. Chọn <strong>Nhận ca</strong> và nhập tiền đầu ca.</div>
+              <div>3. Kiểm tra quầy, hàng hóa và bắt đầu bán hàng.</div>
+            </div>
+
+            <div style="margin-top:20px;text-align:center">
+              <a href="${frontendUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-size:13px;font-weight:700">Mở SORA POS</a>
             </div>
           </div>
           <div class="footer">Email tự động từ hệ thống SORA POS.</div>
