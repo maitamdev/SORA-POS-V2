@@ -4,7 +4,12 @@ import { env } from './env';
 let supabaseInstance: SupabaseClient | null = null;
 const SUPABASE_REQUEST_TIMEOUT_MS = 12_000;
 
-const fetchWithTimeout: typeof fetch = async (input, init = {}) => {
+type SupabaseFetchInit = NonNullable<Parameters<typeof fetch>[1]>;
+
+const fetchWithTimeout: typeof fetch = async (
+  input,
+  init: SupabaseFetchInit = {},
+) => {
   const controller = new AbortController();
   let timedOut = false;
   const parentSignal = init.signal;
