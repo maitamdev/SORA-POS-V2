@@ -187,14 +187,19 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   logoError: false,
 
   // ── Actions — Products ──
-  setProducts: (products) => set({ products }),
-  setCategories: (categories) => set({ categories }),
-  setCustomers: (customers) => set({ customers }),
+  // API/cache data can be malformed during a deployment or an offline restore.
+  // Keep collection state valid so POS components never call .length/.map on undefined.
+  setProducts: (products) => set({ products: Array.isArray(products) ? products : [] }),
+  setCategories: (categories) => set({ categories: Array.isArray(categories) ? categories : [] }),
+  setCustomers: (customers) => set({ customers: Array.isArray(customers) ? customers : [] }),
   addCustomer: (customer) =>
     set((s) => ({
-      customers: s.customers.some((c) => c.id === customer.id)
-        ? s.customers
-        : [customer, ...s.customers],
+      customers: (() => {
+        const customers = Array.isArray(s.customers) ? s.customers : [];
+        return customers.some((c) => c.id === customer.id)
+          ? customers
+          : [customer, ...customers];
+      })(),
     })),
   setSearch: (search) => set({ search }),
   setBarcodeSearch: (barcodeSearch) => set({ barcodeSearch }),
@@ -336,7 +341,8 @@ export const usePOSStore = create<POSState>()((set, get) => ({
 /* ------------------------------------------------------------------ */
 
 function computePOS(s: POSState) {
-  const total = s.cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
+  const cart = Array.isArray(s.cart) ? s.cart : [];
+  const total = cart.reduce((sum, item) => sum + Number(item.product.sell_price) * item.quantity, 0);
   const maxPercent = s.operationSettings.maxDiscountPercent ?? 100;
   const maxDiscountValue = Math.floor((total * maxPercent) / 100);
   const safeValue =
@@ -391,7 +397,7 @@ export const usePOSCashSuggestions = () =>
 export const usePOSSortedProducts = () =>
   usePOSStore(
     useShallow((s) => {
-      const items = [...s.products];
+      const items = Array.isArray(s.products) ? [...s.products] : [];
       if (s.sortBy === 'price-asc') {
         items.sort((a, b) => Number(a.sell_price) - Number(b.sell_price));
       } else if (s.sortBy === 'price-desc') {

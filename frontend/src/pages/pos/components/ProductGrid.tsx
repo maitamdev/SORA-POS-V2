@@ -96,13 +96,13 @@ const ProductRowItem = memo(({ product, operationSettings, onAddToCart }: Produc
 });
 
 const ProductGrid = () => {
-  const categories = usePOSStore((s) => s.categories);
+  const categories = usePOSStore((s) => Array.isArray(s.categories) ? s.categories : []);
   const selectedCategoryId = usePOSStore((s) => s.selectedCategoryId);
   const sortBy = usePOSStore((s) => s.sortBy);
   const viewMode = usePOSStore((s) => s.viewMode);
   const page = usePOSStore((s) => s.page);
   const pagination = usePOSStore((s) => s.pagination);
-  const products = usePOSStore((s) => s.products);
+  const products = usePOSStore((s) => Array.isArray(s.products) ? s.products : []);
   const operationSettings = usePOSStore((s) => s.operationSettings);
 
   const setSelectedCategoryId = usePOSStore((s) => s.setSelectedCategoryId);

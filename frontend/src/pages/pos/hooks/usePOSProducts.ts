@@ -14,6 +14,38 @@ import {
   getCategoriesOffline,
   getCustomersOffline,
 } from '../../../services/offlineDB';
+import type { Category, Customer, Product } from '../../../types/domain.type';
+
+type ListPayload = {
+  items?: unknown;
+  pagination?: {
+    page?: unknown;
+    limit?: unknown;
+    total?: unknown;
+  };
+};
+
+const readItems = <T,>(payload: unknown): T[] => {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && typeof payload === 'object' && Array.isArray((payload as ListPayload).items)) {
+    return (payload as ListPayload).items as T[];
+  }
+  return [];
+};
+
+const readPagination = (payload: unknown, fallbackPage: number, fallbackLimit: number, fallbackTotal: number) => {
+  const pagination = payload && typeof payload === 'object'
+    ? (payload as ListPayload).pagination
+    : undefined;
+  const page = Number(pagination?.page);
+  const limit = Number(pagination?.limit);
+  const total = Number(pagination?.total);
+  return {
+    page: Number.isFinite(page) && page > 0 ? page : fallbackPage,
+    limit: Number.isFinite(limit) && limit > 0 ? limit : fallbackLimit,
+    total: Number.isFinite(total) && total >= 0 ? total : fallbackTotal,
+  };
+};
 
 /**
  * Hook that handles loading products, categories, customers, and settings.
@@ -70,8 +102,10 @@ export const usePOSProducts = () => {
       }
 
       const productRes = await catalogAPI.products.list(params);
-      setProducts(productRes.data.data.items);
-      setPagination(productRes.data.data.pagination);
+      const productPayload = productRes?.data?.data;
+      const items = readItems<Product>(productPayload);
+      setProducts(items);
+      setPagination(readPagination(productPayload, page, operationSettings.productPageSize, items.length));
     } catch (err) {
       console.warn('[POS Network] Lỗi fetch sản phẩm từ server:', err);
     }
@@ -98,10 +132,10 @@ export const usePOSProducts = () => {
 
     try {
       const categoryRes = await catalogAPI.categories.list({ is_active: true, limit: 100 });
-      setCategories(categoryRes.data.data.items);
+      setCategories(readItems<Category>(categoryRes?.data?.data));
       if (canManageCustomerData) {
         const customerRes = await catalogAPI.customers.list({ is_active: true, limit: 100 });
-        setCustomers(customerRes.data.data.items);
+        setCustomers(readItems<Customer>(customerRes?.data?.data));
       } else {
         setCustomers([]);
       }
