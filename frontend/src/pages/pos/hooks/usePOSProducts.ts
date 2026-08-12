@@ -9,6 +9,7 @@ import {
 } from '../../../services/settings.api';
 import { usePOSStore } from '../../../stores/pos.store';
 import { useAuthStore } from '../../../stores/auth.store';
+import { subscribeProductMutations } from '../../../services/productEvents';
 import {
   getProductsOffline,
   getCategoriesOffline,
@@ -156,6 +157,13 @@ export const usePOSProducts = () => {
 
   useEffect(() => {
     loadProducts().catch(() => toast.error('Không tải được dữ liệu POS'));
+  }, [page, selectedCategoryId, search, operationSettings.productPageSize]);
+
+  // Refresh the visible POS catalog as soon as a product changes elsewhere in the app.
+  useEffect(() => {
+    return subscribeProductMutations(() => {
+      loadProducts().catch(() => console.warn('[POS] Không thể làm mới sản phẩm sau khi cập nhật'));
+    });
   }, [page, selectedCategoryId, search, operationSettings.productPageSize]);
 
   // Load operation settings on mount

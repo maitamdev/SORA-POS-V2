@@ -4,6 +4,8 @@ import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
 import { useAuthStore } from '../../stores/auth.store';
 import { useSessionTimeout } from '../../hooks/useSessionTimeout';
+import { subscribeProductMutations } from '../../services/productEvents';
+import { usePOSStore } from '../../stores/pos.store';
 import { HiOutlineCalendar } from 'react-icons/hi';
 
 /**
@@ -98,6 +100,13 @@ const MainLayout = () => {
   const isPosPage = location.pathname === '/pos';
 
   useSessionTimeout();
+
+  // Keep the POS cart synchronized even while the user is on the product page.
+  useEffect(() => {
+    return subscribeProductMutations((mutation) => {
+      usePOSStore.getState().applyProductMutation(mutation);
+    });
+  }, []);
 
   // Khởi chạy auto-sync + realtime subscriptions khi mount
   useEffect(() => {

@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Category, Customer, Product, ShiftSession } from '../types/domain.type';
 import { defaultOperationSettings, OperationSettings } from '../services/settings.api';
 import { CartItem, CheckoutSuccessInfo } from '../pages/pos/utils/posHelpers';
+import type { ProductMutation } from '../services/productEvents';
 
 /* ------------------------------------------------------------------ */
 /*  State Interface                                                    */
@@ -66,6 +67,7 @@ interface POSState {
 
   // Actions — Products
   setProducts: (products: Product[]) => void;
+  applyProductMutation: (mutation: ProductMutation) => void;
   setCategories: (categories: Category[]) => void;
   setCustomers: (customers: Customer[]) => void;
   addCustomer: (customer: Customer) => void;
@@ -190,6 +192,46 @@ export const usePOSStore = create<POSState>()((set, get) => ({
   // API/cache data can be malformed during a deployment or an offline restore.
   // Keep collection state valid so POS components never call .length/.map on undefined.
   setProducts: (products) => set({ products: Array.isArray(products) ? products : [] }),
+  applyProductMutation: (mutation) =>
+    set((s) => {
+      const products = Array.isArray(s.products) ? s.products : [];
+      const cart = Array.isArray(s.cart) ? s.cart : [];
+      const productId = mutation.productId || mutation.product?.id;
+
+      if (mutation.action === 'deleted' && productId) {
+        return {
+          products: products.filter((product) => product.id !== productId),
+          cart: cart.filter((item) => item.product.id !== productId),
+        };
+      }
+
+      const changedProduct = mutation.product;
+      if (!changedProduct?.id || mutation.action === 'bulk') return s;
+
+      const nextProducts = mutation.action === 'created'
+        ? products.some((product) => product.id === changedProduct.id)
+          ? products.map((product) => product.id === changedProduct.id ? { ...product, ...changedProduct } : product)
+          : [changedProduct, ...products]
+        : products.map((product) => product.id === changedProduct.id ? { ...product, ...changedProduct } : product);
+
+      const allowOutOfStock = s.operationSettings.allowSellOutOfStock ?? false;
+      const nextCart = cart.flatMap((item) => {
+        if (item.product.id !== changedProduct.id) return [item];
+
+        const latestProduct = { ...item.product, ...changedProduct };
+        if (latestProduct.is_active === false) return [];
+
+        const stockQuantity = Number(latestProduct.stock_quantity);
+        const maxQuantity = allowOutOfStock || !Number.isFinite(stockQuantity)
+          ? item.quantity
+          : Math.min(item.quantity, Math.max(stockQuantity, 0));
+        return maxQuantity > 0
+          ? [{ ...item, product: latestProduct, quantity: maxQuantity }]
+          : [];
+      });
+
+      return { products: nextProducts, cart: nextCart };
+    }),
   setCategories: (categories) => set({ categories: Array.isArray(categories) ? categories : [] }),
   setCustomers: (customers) => set({ customers: Array.isArray(customers) ? customers : [] }),
   addCustomer: (customer) =>

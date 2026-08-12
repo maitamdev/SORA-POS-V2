@@ -3,6 +3,7 @@ import { ApiResponse } from '../types/user.type';
 import { Category, Customer, ListResponse, Product, Supplier } from '../types/domain.type';
 import { queryCache } from '../utils/queryCache';
 import { useAuthStore } from '../stores/auth.store';
+import { publishProductMutation } from './productEvents';
 
 const CUSTOMER_CACHE_VERSION = 'v2';
 
@@ -140,21 +141,25 @@ export const catalogAPI = {
     create: async (data: Partial<Product>) => {
       const res = await api.post<ApiResponse<Product>>('/products', data);
       queryCache.invalidatePrefix('products:');
+      publishProductMutation({ action: 'created', product: res.data.data });
       return res;
     },
     createBulk: async (products: Partial<Product>[]) => {
       const res = await api.post<ApiResponse<{ imported: number; skipped: number; skippedSkus: string[] }>>('/products/bulk', { products });
       queryCache.invalidatePrefix('products:');
+      publishProductMutation({ action: 'bulk' });
       return res;
     },
     update: async (id: string, data: Partial<Product>) => {
       const res = await api.put<ApiResponse<Product>>(`/products/${id}`, data);
       queryCache.invalidatePrefix('products:');
+      publishProductMutation({ action: 'updated', product: res.data.data, productId: id });
       return res;
     },
     remove: async (id: string) => {
       const res = await api.delete<ApiResponse<null>>(`/products/${id}`);
       queryCache.invalidatePrefix('products:');
+      publishProductMutation({ action: 'deleted', productId: id });
       return res;
     },
     /** Tra cứu nhanh bằng barcode hoặc SKU — 1 API call thay vì 3 */
