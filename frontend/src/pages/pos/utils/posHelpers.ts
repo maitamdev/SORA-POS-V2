@@ -147,3 +147,41 @@ export const getQRCode = async () => {
   }
   return _QRCode;
 };
+
+export interface InvoiceQrData {
+  storeName: string;
+  orderNumber: string;
+  total: number;
+  finalAmount: number;
+  date: string;
+  currency?: string;
+  locale?: string;
+}
+
+/**
+ * Keep the receipt QR self-contained so it works even when the customer is
+ * offline and does not expose the customer's phone number.
+ */
+export const buildInvoiceQrText = (data: InvoiceQrData) => [
+  'SORA POS - THONG TIN HOA DON',
+  `Cua hang: ${data.storeName || 'SORA MART'}`,
+  `Ma hoa don: ${data.orderNumber}`,
+  `Tam tinh: ${money(data.total, data.currency, data.locale)}`,
+  `Thanh toan: ${money(data.finalAmount, data.currency, data.locale)}`,
+  `Ngay: ${data.date}`,
+].join('\n');
+
+export const buildInvoiceQrDataUrl = async (data: InvoiceQrData): Promise<string> => {
+  try {
+    const QR = await getQRCode();
+    return await QR.toDataURL(buildInvoiceQrText(data), {
+      width: 180,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0f172a', light: '#ffffff' },
+    });
+  } catch (error) {
+    console.warn('[Receipt QR] Khong the tao QR hoa don:', error);
+    return '';
+  }
+};

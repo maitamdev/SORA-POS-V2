@@ -23,6 +23,7 @@ interface ReceiptData {
   pointsUsed?: number;
   pointsEarned?: number;
   pointsAfter?: number;
+  qrCodeDataUrl?: string;
 }
 
 const money = (value: number, currency = 'VND', locale = 'vi-VN') => {
@@ -213,6 +214,28 @@ export const buildReceiptHtml = (
             color: #0f172a;
             margin-bottom: 3px;
           }
+          .invoice-qr {
+            text-align: center;
+            margin: 14px auto 0;
+            padding-top: 12px;
+            border-top: 1px dashed #cbd5e1;
+          }
+          .invoice-qr img {
+            display: block;
+            width: 132px;
+            height: 132px;
+            margin: 0 auto 6px;
+            image-rendering: pixelated;
+          }
+          .invoice-qr p {
+            margin: 2px 0;
+            font-size: 9px;
+            color: #64748b;
+          }
+          .invoice-qr .qr-title {
+            font-weight: 700;
+            color: #334155;
+          }
           @media print {
             body { padding: 0; }
             .receipt-copy { break-after: page; page-break-after: always; }
@@ -323,6 +346,13 @@ export const buildReceiptHtml = (
           ` : ''}
 
           <div class="invoice-footer">
+            ${data.qrCodeDataUrl ? `
+              <div class="invoice-qr">
+                <img src="${escapeHtml(data.qrCodeDataUrl)}" alt="QR thông tin hóa đơn" />
+                <p class="qr-title">Quét QR để xem thông tin hóa đơn</p>
+                <p>Mã hóa đơn: ${escapeHtml(data.orderNumber)}</p>
+              </div>
+            ` : ''}
             <div class="thank-you">${safeReceiptFooter}</div>
             <div>Hẹn gặp lại quý khách!</div>
             <div style="font-size: 8px; color: #cbd5e1; margin-top: 10px; letter-spacing: 0.5px;">POWERED BY SORA POS</div>

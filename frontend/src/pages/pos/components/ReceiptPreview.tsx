@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { HiOutlineCheck } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 import { usePOSStore } from '../../../stores/pos.store';
 import { orderAPI } from '../../../services/order.api';
-import { money, CartItem } from '../utils/posHelpers';
+import { money, CartItem, buildInvoiceQrDataUrl } from '../utils/posHelpers';
 
 interface ReceiptPreviewProps {
   onPrintInvoice: (orderNumber?: string, savedCart?: CartItem[]) => void;
@@ -18,6 +18,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
   const setCustomerEmail = usePOSStore((s) => s.setCustomerEmail);
   const setIsSendingEmail = usePOSStore((s) => s.setIsSendingEmail);
   const autoPrintedOrderRef = useRef<string | null>(null);
+  const [invoiceQrCode, setInvoiceQrCode] = useState('');
 
   useEffect(() => {
     if (!checkoutSuccessInfo || !operationSettings.autoPrintReceipt) return undefined;
@@ -31,6 +32,35 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
 
     return () => window.clearTimeout(timer);
   }, [checkoutSuccessInfo, onPrintInvoice, operationSettings.autoPrintReceipt]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setInvoiceQrCode('');
+
+    if (!checkoutSuccessInfo) return () => { cancelled = true; };
+
+    buildInvoiceQrDataUrl({
+      storeName: operationSettings.storeName,
+      orderNumber: checkoutSuccessInfo.orderNumber,
+      total: checkoutSuccessInfo.total,
+      finalAmount: checkoutSuccessInfo.finalAmount,
+      date: checkoutSuccessInfo.date,
+      currency: operationSettings.currency,
+      locale: operationSettings.locale,
+    }).then((dataUrl) => {
+      if (!cancelled) setInvoiceQrCode(dataUrl);
+    });
+
+    return () => { cancelled = true; };
+  }, [
+    checkoutSuccessInfo?.orderNumber,
+    checkoutSuccessInfo?.total,
+    checkoutSuccessInfo?.finalAmount,
+    checkoutSuccessInfo?.date,
+    operationSettings.storeName,
+    operationSettings.currency,
+    operationSettings.locale,
+  ]);
 
   if (!checkoutSuccessInfo) return null;
 
@@ -264,6 +294,17 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
 
             {/* Footer */}
             <div className="text-center py-5 bg-slate-50/60 border-t border-slate-200">
+              {invoiceQrCode && (
+                <div className="mx-auto mb-4 border-t border-slate-200 pt-4">
+                  <img
+                    src={invoiceQrCode}
+                    alt="QR thông tin hóa đơn"
+                    className="mx-auto h-32 w-32 [image-rendering:pixelated]"
+                  />
+                  <p className="mt-1 text-[10px] font-bold text-slate-700">Quét QR để xem thông tin hóa đơn</p>
+                  <p className="mt-0.5 text-[9px] text-slate-500">Mã hóa đơn: {info.orderNumber}</p>
+                </div>
+              )}
               <p className="text-xs font-bold text-slate-700">{operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!'}</p>
               <p className="text-[10px] text-slate-500 font-medium mt-0.5">Hẹn gặp lại quý khách!</p>
               <p className="text-[8px] text-slate-400 font-bold mt-3 uppercase tracking-wider">Powered by Sora POS</p>

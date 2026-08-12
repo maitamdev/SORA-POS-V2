@@ -12,7 +12,7 @@ import {
 } from '../../../services/offlineDB';
 import { buildReceiptHtml } from '../utils/receiptTemplate';
 import { printReceipt } from '../utils/receiptPrinter';
-import { CartItem } from '../utils/posHelpers';
+import { CartItem, buildInvoiceQrDataUrl } from '../utils/posHelpers';
 import { recordDemoPromotionUsage } from '../../../utils/promotionUsage';
 
 /**
@@ -158,7 +158,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
   };
 
   // ─── Print Invoice ───
-  const handlePrintInvoice = (orderNumber?: string, savedCart?: CartItem[]) => {
+  const handlePrintInvoice = async (orderNumber?: string, savedCart?: CartItem[]) => {
     const store = usePOSStore.getState();
     if (!orderNumber) {
       toast.error('Thanh toán xong mới có mã hóa đơn để in');
@@ -187,6 +187,15 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
     const printPaymentMethod = checkoutInfo?.paymentMethod ?? store.paymentMethod;
     const printChange = checkoutInfo?.change ??
       Math.max((store.receivedAmount || printFinal) - printFinal, 0);
+    const invoiceQrCode = await buildInvoiceQrDataUrl({
+      storeName: store.operationSettings.storeName,
+      orderNumber,
+      total: printTotal,
+      finalAmount: printFinal,
+      date: checkoutInfo?.date || new Date().toLocaleString(store.operationSettings.locale || 'vi-VN'),
+      currency: store.operationSettings.currency,
+      locale: store.operationSettings.locale,
+    });
 
     const htmlContent = buildReceiptHtml(
       {
@@ -209,6 +218,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
         pointsUsed: checkoutInfo?.pointsUsed ?? 0,
         pointsEarned: checkoutInfo?.pointsEarned ?? 0,
         pointsAfter: checkoutInfo?.pointsAfter ?? 0,
+        qrCodeDataUrl: invoiceQrCode,
       },
       store.operationSettings
     );
