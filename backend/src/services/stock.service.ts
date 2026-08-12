@@ -51,6 +51,7 @@ export class StockService {
       .single();
 
     if (txError) throw new AppError(400, txError.message);
+    await CatalogService.syncStockAlert(params.productId, Number(transaction.previous_stock));
     return transaction;
   }
 

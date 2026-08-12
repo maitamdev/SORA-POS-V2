@@ -195,20 +195,53 @@ export class OrderService {
       );
     }
 
-    // Đồng bộ cảnh báo tồn kho & gửi thông báo Telegram cho các sản phẩm trong hóa đơn
-    if (input.items && Array.isArray(input.items)) {
-      Promise.all(
-        input.items
-          .filter((item) => item.product_id)
-          .map((item) =>
-            CatalogService.syncStockAlert(item.product_id).catch((err) => {
-              console.error('[OrderService.create] Lỗi đồng bộ cảnh báo tồn kho:', err);
-            })
-          )
-      );
-    }
+    // The checkout RPC updates products and stock_alerts atomically. Read the
+    // stock transactions created for this order so the alert sync still knows
+    // the previous stock and can notify on safe -> low/out or low -> out.
+    await this.syncOrderStockAlerts(String(orderId), input.items || []);
 
     return this.getById(String(orderId));
+  }
+
+  private static async syncOrderStockAlerts(orderId: string, items: OrderItemInput[]) {
+    const fallbackProductIds = Array.from(new Set(
+      items
+        .map((item) => item.product_id)
+        .filter((productId): productId is string => typeof productId === 'string' && productId.length > 0),
+    ));
+
+    const { data: transactions, error } = await supabase
+      .from('stock_transactions')
+      .select('product_id, previous_stock')
+      .eq('reference_id', orderId)
+      .eq('type', 'sale');
+
+    if (error) {
+      console.error('[OrderService.create] Không đọc được biến động tồn của hóa đơn:', error);
+      // Keep the sale successful even if an older database schema does not
+      // expose the transaction reference. The regular sync still repairs the
+      // alert row for the next inventory refresh.
+      await Promise.all(fallbackProductIds.map((productId) => CatalogService.syncStockAlert(productId)));
+      return;
+    }
+
+    const rows = Array.isArray(transactions) ? transactions : [];
+    if (rows.length === 0) {
+      await Promise.all(fallbackProductIds.map((productId) => CatalogService.syncStockAlert(productId)));
+      return;
+    }
+
+    const uniqueTransitions = new Map<string, number>();
+    for (const row of rows as Array<{ product_id?: string; previous_stock?: number }>) {
+      if (!row.product_id || uniqueTransitions.has(row.product_id)) continue;
+      uniqueTransitions.set(row.product_id, Number(row.previous_stock || 0));
+    }
+
+    await Promise.all(
+      Array.from(uniqueTransitions.entries()).map(([productId, previousStock]) =>
+        CatalogService.syncStockAlert(productId, previousStock)
+      )
+    );
   }
 
   static async cancel(id: string, userId: string, restock = true, note?: string | null) {

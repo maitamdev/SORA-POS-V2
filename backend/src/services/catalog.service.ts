@@ -4,6 +4,7 @@ import { emptyToNull, parsePagination } from '../utils/query';
 import { appCache, stableCacheKey } from '../utils/cache';
 import { NotificationService } from './notification.service';
 import { JwtPayload } from '../types/user.type';
+import { getStockAlertStatus, StockAlertStatus } from '../utils/stockAlert';
 
 type Query = Record<string, unknown>;
 type Entity = Record<string, unknown>;
@@ -50,7 +51,7 @@ export class CatalogService {
    * FIX: Xử lý TẤT CẢ active alerts (không chỉ latest) để ngăn duplicate.
    * Nếu stock đủ → resolve hết. Nếu thiếu → update alert đầu tiên, resolve các alert thừa.
    */
-  static async syncStockAlert(productId: string) {
+  static async syncStockAlert(productId: string, previousStock?: number) {
     const { data: product, error } = await supabase
       .from('products')
       .select('id, stock_quantity, min_stock_level')
@@ -61,7 +62,7 @@ export class CatalogService {
 
     const currentStock = Number(product.stock_quantity);
     const minStock = Number(product.min_stock_level);
-    const status = currentStock <= 0 ? 'out_of_stock' : currentStock <= minStock ? 'low_stock' : null;
+    const status = getStockAlertStatus(currentStock, minStock);
 
     // Lấy TẤT CẢ active alerts (không chỉ 1) để xử lý duplicate, đồng thời lấy cột status để nhận diện chuyển trạng thái
     const { data: activeAlerts } = await supabase
@@ -93,19 +94,25 @@ export class CatalogService {
     };
 
     if (allActiveAlerts.length > 0) {
-      const oldStatus = allActiveAlerts[0].status;
+      // The POS checkout RPC updates stock_alerts inside the same transaction
+      // as the sale. When this method runs afterwards, the row already has
+      // the new status. Prefer the transaction's previous stock when supplied
+      // so a safe -> low/out or low -> out transition still sends Telegram.
+      const oldStatus: StockAlertStatus = previousStock === undefined
+        ? allActiveAlerts[0].status as StockAlertStatus
+        : getStockAlertStatus(previousStock, minStock);
 
       // Update alert đầu tiên (mới nhất)
       await supabase.from('stock_alerts').update(payload).eq('id', allActiveAlerts[0].id);
 
       // Nếu trạng thái chuyển đổi (ví dụ từ low_stock thành out_of_stock), kích hoạt thông báo mới
       if (oldStatus !== status) {
-        NotificationService.sendStockAlertNotification(
+        await NotificationService.sendStockAlertNotification(
           productId,
           currentStock,
           minStock,
-          status as 'low_stock' | 'out_of_stock'
-        ).catch(err => console.error('[NotificationService Error]', err));
+          status
+        );
       }
 
       // Resolve các alert thừa (duplicate) nếu có
@@ -121,12 +128,12 @@ export class CatalogService {
       await supabase.from('stock_alerts').insert(payload);
 
       // Kích hoạt gửi thông báo Telegram
-      NotificationService.sendStockAlertNotification(
+      await NotificationService.sendStockAlertNotification(
         productId,
         currentStock,
         minStock,
-        status as 'low_stock' | 'out_of_stock'
-      ).catch(err => console.error('[NotificationService Error]', err));
+        status
+      );
     }
   }
 
