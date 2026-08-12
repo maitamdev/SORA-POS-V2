@@ -93,24 +93,39 @@ export class EmailService {
     const html = `
       <!DOCTYPE html>
       <html lang="vi">
-        <body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;padding:24px">
-          <div style="max-width:560px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
-            <div style="background:#0f172a;color:#fff;padding:24px 28px">
-              <p style="margin:0;color:#93c5fd;font-weight:700;letter-spacing:.08em;font-size:12px">SORA POS</p>
-              <h1 style="font-size:22px;margin:10px 0 0">Bạn đã được tạo ca làm</h1>
-            </div>
-            <div style="padding:28px">
-              <p style="color:#475569;line-height:1.6">Xin chào ${safeName}, quản lý đã tạo ca làm cho tài khoản của bạn.</p>
-              <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px">
-                <tr><td style="padding:9px 0;color:#64748b">Ca làm</td><td style="padding:9px 0;text-align:right;font-weight:700">${shiftName}</td></tr>
-                <tr><td style="padding:9px 0;color:#64748b">Ngày</td><td style="padding:9px 0;text-align:right;font-weight:700">${shiftDate}</td></tr>
-                <tr><td style="padding:9px 0;color:#64748b">Mã ca</td><td style="padding:9px 0;text-align:right;font-weight:700;font-family:monospace">${shiftCode}</td></tr>
-              </table>
-              <p style="color:#475569;line-height:1.6">Vui lòng đăng nhập SORA POS, nhận ca và nhập tiền đầu ca trước khi bán hàng.</p>
-            </div>
-            <div style="background:#f1f5f9;padding:18px 28px;color:#64748b;font-size:12px">Email tự động từ hệ thống SORA POS.</div>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Thông báo ca làm Sora POS</title>
+        <style>
+          body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background:#f8fafc; margin:0; padding:0; color:#0f172a; }
+          .email-wrapper { max-width:600px; margin:20px auto; background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; box-shadow:0 4px 6px -1px rgba(0,0,0,.05); }
+          .header { background:#0f172a; color:#fff; padding:30px 24px; text-align:center; }
+          .content { padding:24px; }
+          .footer { background:#f1f5f9; padding:20px; text-align:center; font-size:11px; color:#64748b; border-top:1px solid #e2e8f0; }
+        </style>
+      </head>
+      <body>
+        <div class="email-wrapper">
+          <div class="header">
+            <h1 style="margin:0;font-size:20px;text-transform:uppercase;letter-spacing:1px">SORA MART</h1>
+            <p style="margin:5px 0 0;font-size:12px;color:#94a3b8;font-weight:500">THÔNG BÁO CA LÀM VIỆC</p>
+            <p style="margin:15px 0 0;font-size:14px;font-weight:bold;color:#38bdf8">Mã ca: ${shiftCode}</p>
           </div>
-        </body>
+          <div class="content">
+            <p style="margin:0 0 18px;color:#475569;line-height:1.6">Xin chào <strong>${safeName}</strong>, quản lý đã tạo ca làm cho tài khoản của bạn.</p>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px">
+              <tr><td style="padding:7px 0;color:#64748b">Nhân viên:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${safeName}</td></tr>
+              <tr><td style="padding:7px 0;color:#64748b">Ca làm:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${shiftName}</td></tr>
+              <tr><td style="padding:7px 0;color:#64748b">Ngày làm:</td><td style="padding:7px 0;text-align:right;color:#1f2937;font-weight:bold">${shiftDate}</td></tr>
+            </table>
+            <div style="margin-top:18px;padding:14px;background:#eff6ff;border:1px solid #dbeafe;border-radius:8px;color:#1d4ed8;line-height:1.6;font-size:13px">
+              Vui lòng đăng nhập SORA POS, nhận ca và nhập tiền đầu ca trước khi bán hàng.
+            </div>
+          </div>
+          <div class="footer">Email tự động từ hệ thống SORA POS.</div>
+        </div>
+      </body>
       </html>
     `;
 
