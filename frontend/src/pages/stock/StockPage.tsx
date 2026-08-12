@@ -759,20 +759,23 @@ const StockPage = () => {
     const formEl = event.currentTarget;
     const form = new FormData(formEl);
     const productId = String(form.get('product_id') || '');
-    const quantity = Number(form.get('quantity') || 0);
-    const batchNumber = String(form.get('batch_number') || '').trim();
-    const expiryDate = String(form.get('expiry_date') || '');
+    const newStockValue = String(form.get('new_stock') || '').trim();
+    const newStock = Number(newStockValue);
     const note = String(form.get('note') || '');
 
-    if (!batchNumber || !expiryDate) {
-      toast.error('Vui lòng nhập số lô và hạn sử dụng');
+    if (!productId) {
+      toast.error('Vui lòng chọn sản phẩm cần cập nhật');
+      return;
+    }
+    if (!newStockValue || !Number.isInteger(newStock) || newStock < 0) {
+      toast.error('Tồn kho mới phải là số nguyên lớn hơn hoặc bằng 0');
       return;
     }
     
     setLoading(true);
     try {
-      await stockAPI.importStock({ product_id: productId, quantity, batch_number: batchNumber, expiry_date: expiryDate, note });
-      toast.success('Đã nhập kho theo lô thành công');
+      await stockAPI.adjustStock({ product_id: productId, new_stock: newStock, note });
+      toast.success('Đã cập nhật tồn kho thành công');
       formEl.reset();
       setShowActionModal(false);
       setTxPage(1);
@@ -1392,7 +1395,7 @@ const StockPage = () => {
                               className="mt-3 flex h-9 w-full items-center justify-center gap-1.5 border border-blue-600 bg-blue-600 text-[11px] font-black text-white transition hover:bg-blue-700 active:translate-y-px"
                             >
                               <FiPlus size={14} />
-                              Nhập kho
+                              Cập nhật kho
                             </button>
                           )}
                         </div>
@@ -1576,7 +1579,7 @@ const StockPage = () => {
                             className="flex-1 border border-blue-200 bg-blue-50 py-2 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/80 active:bg-blue-100 flex items-center justify-center gap-1.5"
                           >
                             <FiPlus size={12} />
-                            Nhập kho
+                            Cập nhật kho
                           </button>
                           <button
                             onClick={() => resolveAlert(alert.id)}
@@ -2185,7 +2188,7 @@ const StockPage = () => {
             <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
               <h3 className="text-base font-black text-slate-800 flex items-center gap-1.5">
                 <FiSettings className="text-blue-500" />
-                Nhập kho nhanh theo lô
+                Cập nhật kho
               </h3>
               <button
                 onClick={() => setShowActionModal(false)}
@@ -2193,6 +2196,10 @@ const StockPage = () => {
               >
                 <FiX size={16} />
               </button>
+            </div>
+
+            <div className="mb-4 border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs font-semibold leading-relaxed text-amber-800">
+              Dùng để điều chỉnh tồn kho thực tế. Muốn nhập hàng mới, vui lòng tạo phiếu nhập kho.
             </div>
 
             {/* Modal Form */}
@@ -2209,7 +2216,7 @@ const StockPage = () => {
                     onChange={(event) => setActionProductId(event.target.value)}
                     className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs sm:text-sm font-semibold outline-none focus:border-slate-400 bg-white appearance-none cursor-pointer"
                   >
-                    <option value="">Chọn sản phẩm cần nhập</option>
+                    <option value="">Chọn sản phẩm cần cập nhật</option>
                     {inventory.map((product) => (
                       <option key={product.id} value={product.id}>
                         [{product.sku}] {product.name} (Tồn hiện tại: {product.stock_quantity})
@@ -2221,39 +2228,17 @@ const StockPage = () => {
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Số lượng nhập thêm *</span>
+                <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Tồn kho mới *</span>
                 <input
-                  name="quantity"
+                  name="new_stock"
                   type="number"
-                  min={1}
+                  min={0}
+                  step={1}
                   required
-                  placeholder="Ví dụ: 120"
+                  placeholder="Ví dụ: 10"
                   className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
                 />
               </label>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Số lô *</span>
-                  <input
-                    name="batch_number"
-                    required
-                    maxLength={100}
-                    placeholder="VD: LOT-2026-08"
-                    className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Hạn sử dụng *</span>
-                  <input
-                    name="expiry_date"
-                    type="date"
-                    required
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 outline-none focus:border-slate-400 shadow-inner"
-                  />
-                </label>
-              </div>
 
               <label className="block">
                 <span className="mb-1 block text-xs font-black uppercase text-slate-400 tracking-wider">Lý do / Ghi chú</span>
