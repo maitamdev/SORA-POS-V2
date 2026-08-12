@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AuthController } from '../controllers/auth.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { rateLimitMiddleware } from '../middlewares/rateLimit.middleware';
+import { roleMiddleware } from '../middlewares/role.middleware';
 import { validateMiddleware } from '../middlewares/validate.middleware';
 import {
   changePasswordSchema,
@@ -37,6 +38,7 @@ router.post('/logout', authMiddleware, AuthController.logout);
 router.post(
   '/change-password',
   authMiddleware,
+  roleMiddleware('admin'),
   validateMiddleware(changePasswordSchema),
   AuthController.changePassword
 );

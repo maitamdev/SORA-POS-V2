@@ -116,7 +116,7 @@ const menuItems = [
     label: 'Đổi mật khẩu',
     icon: HiOutlineLockClosed,
     path: '/change-password',
-    roles: ['admin', 'manager', 'cashier'],
+    roles: ['admin'],
   },
 ];
 

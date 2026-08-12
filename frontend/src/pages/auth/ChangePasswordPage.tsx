@@ -44,7 +44,9 @@ const ChangePasswordPage = () => {
         </Link>
         <p className="mt-6 text-xs font-black uppercase tracking-[0.16em] text-blue-600">Bảo mật tài khoản</p>
         <h1 className="mt-1 text-2xl font-black text-slate-900">Đổi mật khẩu</h1>
-        <p className="mt-2 text-sm font-medium text-slate-500">Áp dụng cho tài khoản admin, quản lý và nhân viên.</p>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Chỉ tài khoản admin được đổi mật khẩu tại đây. Mật khẩu quản lý và nhân viên được quản lý trong mục Nhân viên.
+        </p>
       </header>
 
       <form onSubmit={submit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">

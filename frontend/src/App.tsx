@@ -99,7 +99,14 @@ function App() {
           >
             <Route path="/" element={<HomePage />} />
             <Route path="/pos" element={<POSPage />} />
-            <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute requiredRoles={['admin']}>
+                  <ChangePasswordPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/my-shift"
               element={
