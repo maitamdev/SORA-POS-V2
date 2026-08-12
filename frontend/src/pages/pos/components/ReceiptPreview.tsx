@@ -303,7 +303,7 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
                   <img
                     src={invoiceQrCode}
                     alt="QR mở hóa đơn online"
-                    className="mx-auto h-32 w-32 [image-rendering:pixelated]"
+                    className="mx-auto h-44 w-44 [image-rendering:pixelated]"
                   />
                   <p className="mt-1 text-[10px] font-bold text-slate-700">Quét QR để xem hóa đơn online</p>
                   <p className="mt-0.5 text-[9px] text-slate-500">Mã hóa đơn: {info.orderNumber}</p>

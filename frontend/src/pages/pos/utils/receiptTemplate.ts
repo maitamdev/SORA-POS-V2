@@ -222,8 +222,8 @@ export const buildReceiptHtml = (
           }
           .invoice-qr img {
             display: block;
-            width: 132px;
-            height: 132px;
+            width: 180px;
+            height: 180px;
             margin: 0 auto 6px;
             image-rendering: pixelated;
           }

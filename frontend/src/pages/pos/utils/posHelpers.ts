@@ -187,8 +187,8 @@ export const buildInvoiceQrDataUrl = async (data: InvoiceQrData): Promise<string
 
     const QR = await getQRCode();
     return await QR.toDataURL(publicReceiptUrl, {
-      width: 180,
-      margin: 1,
+      width: 512,
+      margin: 4,
       errorCorrectionLevel: 'M',
       color: { dark: '#0f172a', light: '#ffffff' },
     });

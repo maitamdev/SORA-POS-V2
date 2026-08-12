@@ -10,6 +10,7 @@ import { orderAPI } from '../../services/order.api';
 import { Order } from '../../types/domain.type';
 import { useAuthStore } from '../../stores/auth.store';
 import { usePOSStore } from '../../stores/pos.store';
+import { buildInvoiceQrDataUrl } from '../pos/utils/posHelpers';
 
 const money = (value: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -69,6 +70,7 @@ const OrdersPage = () => {
   const [selected, setSelected] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailQrCode, setDetailQrCode] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [isSending, setIsSending] = useState(false);
 
@@ -117,6 +119,46 @@ const OrdersPage = () => {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailQrCode('');
+
+    if (!selected || selected.status === 'cancelled' || !selected.public_receipt_token) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    buildInvoiceQrDataUrl({
+      storeName: operationSettings.storeName,
+      orderId: selected.id,
+      publicReceiptToken: selected.public_receipt_token,
+      orderNumber: selected.order_number,
+      total: Number(selected.total_amount || 0),
+      finalAmount: Number(selected.final_amount || 0),
+      date: formatDate(selected.created_at),
+      currency: operationSettings.currency,
+      locale: operationSettings.locale,
+    }).then((dataUrl) => {
+      if (!cancelled) setDetailQrCode(dataUrl);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selected?.id,
+    selected?.public_receipt_token,
+    selected?.order_number,
+    selected?.total_amount,
+    selected?.final_amount,
+    selected?.created_at,
+    selected?.status,
+    operationSettings.storeName,
+    operationSettings.currency,
+    operationSettings.locale,
+  ]);
 
   const cancel = async (order: Order) => {
     if (!window.confirm(`Hủy hóa đơn ${order.order_number} và hoàn trả lại số lượng tồn kho?`)) return;
@@ -777,6 +819,18 @@ const OrdersPage = () => {
                         <div className="mx-5 mb-3 border border-slate-200 bg-slate-50 px-3 py-2">
                           <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Ghi chú</p>
                           <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-700">"{selected.note}"</p>
+                        </div>
+                      )}
+
+                      {detailQrCode && (
+                        <div className="border-t border-slate-200 bg-white px-4 py-4 text-center">
+                          <img
+                            src={detailQrCode}
+                            alt="QR mở hóa đơn online"
+                            className="mx-auto h-40 w-40 [image-rendering:pixelated]"
+                          />
+                          <p className="mt-2 text-[10px] font-black text-slate-700">Quét QR để xem hóa đơn online</p>
+                          <p className="mt-0.5 text-[9px] font-semibold text-slate-400">Mã hóa đơn: {selected.order_number}</p>
                         </div>
                       )}
 

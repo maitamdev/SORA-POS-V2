@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
 import { env } from '../config/env';
@@ -61,22 +62,37 @@ const mapRpcError = (message?: string) => {
 };
 
 export class OrderService {
+  /**
+   * Keep the public receipt token short so the QR stays easy to scan on an
+   * 80mm receipt. The token is deterministic, so it does not need a new DB
+   * column and every invoice can regenerate the same QR later.
+   */
   static createPublicReceiptToken(orderId: string) {
-    return jwt.sign(
-      { orderId, purpose: 'public-receipt' },
-      env.jwtSecret,
-      { expiresIn: 60 * 60 * 24 * 365 * 5 }
-    );
+    return createHmac('sha256', env.jwtSecret)
+      .update(`public-receipt:${orderId}`)
+      .digest('hex')
+      .slice(0, 32);
   }
 
   static async getPublicReceipt(id: string, token: string) {
-    let isValidToken = false;
+    const expectedToken = this.createPublicReceiptToken(id);
+    let isValidToken = token.length === expectedToken.length;
 
-    try {
-      const payload = jwt.verify(token, env.jwtSecret) as PublicReceiptTokenPayload;
-      isValidToken = payload.orderId === id && payload.purpose === 'public-receipt';
-    } catch {
-      isValidToken = false;
+    if (isValidToken) {
+      isValidToken = timingSafeEqual(
+        Buffer.from(token, 'utf8'),
+        Buffer.from(expectedToken, 'utf8')
+      );
+    }
+
+    // Keep QR codes issued by the previous JWT implementation working.
+    if (!isValidToken) {
+      try {
+        const payload = jwt.verify(token, env.jwtSecret) as PublicReceiptTokenPayload;
+        isValidToken = payload.orderId === id && payload.purpose === 'public-receipt';
+      } catch {
+        isValidToken = false;
+      }
     }
 
     if (!isValidToken) throw publicReceiptError();
@@ -89,7 +105,10 @@ export class OrderService {
       .single();
 
     if (error || !order) throw publicReceiptError();
-    return order;
+    return {
+      ...(order as unknown as Record<string, unknown>),
+      public_receipt_token: this.createPublicReceiptToken(id),
+    };
   }
 
   static async list(queryParams: Record<string, unknown>, currentUser?: JwtPayload) {
@@ -141,7 +160,10 @@ export class OrderService {
       throw new AppError(403, 'Cashiers can only view their own orders');
     }
 
-    return order;
+    return {
+      ...order,
+      public_receipt_token: this.createPublicReceiptToken(order.id),
+    };
   }
 
   static async create(input: CreateOrderInput, userId: string) {
