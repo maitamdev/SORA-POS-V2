@@ -189,6 +189,8 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       Math.max((store.receivedAmount || printFinal) - printFinal, 0);
     const invoiceQrCode = await buildInvoiceQrDataUrl({
       storeName: store.operationSettings.storeName,
+      orderId: checkoutInfo?.orderId,
+      publicReceiptToken: checkoutInfo?.publicReceiptToken,
       orderNumber,
       total: printTotal,
       finalAmount: printFinal,
@@ -421,6 +423,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
 
       store.setCheckoutSuccessInfo({
         orderId,
+        publicReceiptToken: response.data.data.public_receipt_token,
         orderNumber,
         finalAmount,
         total,

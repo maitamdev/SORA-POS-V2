@@ -1,4 +1,6 @@
+import jwt from 'jsonwebtoken';
 import { supabase } from '../config/supabase';
+import { env } from '../config/env';
 import { parsePagination } from '../utils/query';
 import { AppError } from '../utils/AppError';
 import { appCache } from '../utils/cache';
@@ -34,6 +36,14 @@ type CreateOrderInput = {
 const CASHIER_ORDER_FIELDS = 'id, order_number, user_id, shift_id, shift_code, total_amount, discount_amount, final_amount, status, payment_status, note, loyalty_points_used, loyalty_points_earned, cancelled_at, cancelled_by, created_at, updated_at';
 const orderSelect = '*, customers(id, name, email), users!orders_user_id_fkey(id, full_name, email), order_details(*), payments(*)';
 const orderSelectForCashier: string = `${CASHIER_ORDER_FIELDS}, users!orders_user_id_fkey(id, full_name), order_details(*), payments(*)`;
+const publicReceiptSelect = 'id, order_number, total_amount, discount_amount, final_amount, status, payment_status, note, loyalty_points_used, loyalty_points_earned, created_at, customers(id, name), order_details(id, product_name, quantity, unit_price, discount, subtotal), payments(method, amount, received_amount, change_amount, reference_code, status)';
+
+type PublicReceiptTokenPayload = {
+  orderId?: string;
+  purpose?: string;
+};
+
+const publicReceiptError = () => new AppError(404, 'Không tìm thấy hóa đơn hoặc liên kết đã hết hạn');
 
 const mapRpcError = (message?: string) => {
   const text = message || 'Database transaction failed';
@@ -51,6 +61,37 @@ const mapRpcError = (message?: string) => {
 };
 
 export class OrderService {
+  static createPublicReceiptToken(orderId: string) {
+    return jwt.sign(
+      { orderId, purpose: 'public-receipt' },
+      env.jwtSecret,
+      { expiresIn: 60 * 60 * 24 * 365 * 5 }
+    );
+  }
+
+  static async getPublicReceipt(id: string, token: string) {
+    let isValidToken = false;
+
+    try {
+      const payload = jwt.verify(token, env.jwtSecret) as PublicReceiptTokenPayload;
+      isValidToken = payload.orderId === id && payload.purpose === 'public-receipt';
+    } catch {
+      isValidToken = false;
+    }
+
+    if (!isValidToken) throw publicReceiptError();
+
+    const { data: order, error } = await supabase
+      .from('orders')
+      .select(publicReceiptSelect as any)
+      .eq('id', id)
+      .eq('status', 'completed')
+      .single();
+
+    if (error || !order) throw publicReceiptError();
+    return order;
+  }
+
   static async list(queryParams: Record<string, unknown>, currentUser?: JwtPayload) {
     const { page, limit, from, to } = parsePagination(queryParams);
     const select: string = currentUser?.role === 'cashier'

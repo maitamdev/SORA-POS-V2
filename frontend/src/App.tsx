@@ -26,6 +26,7 @@ const AIRecommendationsPage = lazy(() => import('./pages/ai/AIRecommendationsPag
 const AuditLogsPage = lazy(() => import('./pages/audit/AuditLogsPage'));
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'));
 const StaffPage = lazy(() => import('./pages/staff/StaffPage'));
+const PublicInvoicePage = lazy(() => import('./pages/invoice/PublicInvoicePage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 const PageLoader = () => (
@@ -90,6 +91,7 @@ function App() {
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
           <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
           <Route path="/reset-password" element={isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />} />
+          <Route path="/invoice/:orderId" element={<PublicInvoicePage />} />
           <Route
             element={
               <ProtectedRoute>

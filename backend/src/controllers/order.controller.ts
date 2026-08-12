@@ -14,12 +14,25 @@ export class OrderController {
     successResponse(res, await OrderService.getById(req.params.id, req.user), 'Lấy hóa đơn thành công');
   });
 
+  static getPublicReceipt = asyncHandler(async (req: Request, res: Response) => {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    successResponse(
+      res,
+      await OrderService.getPublicReceipt(req.params.id, token),
+      'Lấy hóa đơn công khai thành công'
+    );
+  });
+
   static create = asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     const fullOrder = await OrderService.create(req.body, req.user.userId);
     const order = req.user.role === 'cashier'
       ? await OrderService.getById(fullOrder.id, req.user)
       : fullOrder;
+    const orderWithPublicReceiptToken = {
+      ...order,
+      public_receipt_token: OrderService.createPublicReceiptToken(fullOrder.id),
+    };
 
     // Tự động gửi email hóa đơn cho khách hàng nếu có địa chỉ email
     if (fullOrder.customers?.email) {
@@ -28,7 +41,7 @@ export class OrderController {
       });
     }
 
-    successResponse(res, order, 'Tạo hóa đơn thành công', 201);
+    successResponse(res, orderWithPublicReceiptToken, 'Tạo hóa đơn thành công', 201);
   });
 
   static sendInvoiceEmail = asyncHandler(async (req: Request, res: Response) => {

@@ -12,6 +12,7 @@ export interface CartItem {
 
 export interface CheckoutSuccessInfo {
   orderId?: string;
+  publicReceiptToken?: string | null;
   orderNumber: string;
   finalAmount: number;
   total: number;
@@ -156,11 +157,13 @@ export interface InvoiceQrData {
   date: string;
   currency?: string;
   locale?: string;
+  orderId?: string;
+  publicReceiptToken?: string | null;
 }
 
 /**
- * Keep the receipt QR self-contained so it works even when the customer is
- * offline and does not expose the customer's phone number.
+ * The online QR opens the public invoice page. Offline receipts do not show
+ * a QR because there is no server-side invoice page to open yet.
  */
 export const buildInvoiceQrText = (data: InvoiceQrData) => [
   'SORA POS - THONG TIN HOA DON',
@@ -171,10 +174,19 @@ export const buildInvoiceQrText = (data: InvoiceQrData) => [
   `Ngay: ${data.date}`,
 ].join('\n');
 
+export const buildInvoiceQrUrl = (data: InvoiceQrData) => {
+  if (typeof window === 'undefined' || !data.orderId || !data.publicReceiptToken) return '';
+
+  return `${window.location.origin}/invoice/${encodeURIComponent(data.orderId)}?token=${encodeURIComponent(data.publicReceiptToken)}`;
+};
+
 export const buildInvoiceQrDataUrl = async (data: InvoiceQrData): Promise<string> => {
   try {
+    const publicReceiptUrl = buildInvoiceQrUrl(data);
+    if (!publicReceiptUrl) return '';
+
     const QR = await getQRCode();
-    return await QR.toDataURL(buildInvoiceQrText(data), {
+    return await QR.toDataURL(publicReceiptUrl, {
       width: 180,
       margin: 1,
       errorCorrectionLevel: 'M',

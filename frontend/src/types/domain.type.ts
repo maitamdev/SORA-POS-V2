@@ -72,6 +72,7 @@ export interface Order {
   payment_status: string;
   note?: string | null;
   created_at: string;
+  public_receipt_token?: string | null;
   customers?: Customer | null;
   users?: { id: string; full_name: string; email?: string | null } | null;
   order_details?: OrderDetail[];

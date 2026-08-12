@@ -414,6 +414,9 @@ export const openApiSpec: OpenApiSpec = {
       get: { tags: ['Orders'], summary: 'List orders', security: auth, parameters: pagingParams, responses: { '200': ok() } },
       post: { tags: ['Orders'], summary: 'Create order', description: 'Roles: admin, manager, cashier', security: auth, requestBody: refBody('OrderCreate'), responses: { '201': ok('Created') } },
     },
+    '/orders/public/{id}': {
+      get: { tags: ['Orders'], summary: 'View a customer invoice from a receipt QR', description: 'Public route protected by the token embedded in the QR. Only completed order data is returned and customer phone is never included.', parameters: [idParam(), { name: 'token', in: 'query', required: true, schema: { type: 'string' } }], responses: { '200': ok(), '404': ok('Not found') } },
+    },
     '/orders/{id}': {
       get: { tags: ['Orders'], summary: 'Get order', security: auth, parameters: [idParam()], responses: { '200': ok() } },
       delete: { tags: ['Orders'], summary: 'Blocked hard delete order', description: 'Enterprise mode returns 403. Use cancel/refund to preserve audit trail.', security: auth, parameters: [idParam()], responses: { '403': ok('Forbidden') } },

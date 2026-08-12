@@ -41,6 +41,8 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
 
     buildInvoiceQrDataUrl({
       storeName: operationSettings.storeName,
+      orderId: checkoutSuccessInfo.orderId,
+      publicReceiptToken: checkoutSuccessInfo.publicReceiptToken,
       orderNumber: checkoutSuccessInfo.orderNumber,
       total: checkoutSuccessInfo.total,
       finalAmount: checkoutSuccessInfo.finalAmount,
@@ -54,6 +56,8 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
     return () => { cancelled = true; };
   }, [
     checkoutSuccessInfo?.orderNumber,
+    checkoutSuccessInfo?.orderId,
+    checkoutSuccessInfo?.publicReceiptToken,
     checkoutSuccessInfo?.total,
     checkoutSuccessInfo?.finalAmount,
     checkoutSuccessInfo?.date,
@@ -298,10 +302,10 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
                 <div className="mx-auto mb-4 border-t border-slate-200 pt-4">
                   <img
                     src={invoiceQrCode}
-                    alt="QR thông tin hóa đơn"
+                    alt="QR mở hóa đơn online"
                     className="mx-auto h-32 w-32 [image-rendering:pixelated]"
                   />
-                  <p className="mt-1 text-[10px] font-bold text-slate-700">Quét QR để xem thông tin hóa đơn</p>
+                  <p className="mt-1 text-[10px] font-bold text-slate-700">Quét QR để xem hóa đơn online</p>
                   <p className="mt-0.5 text-[9px] text-slate-500">Mã hóa đơn: {info.orderNumber}</p>
                 </div>
               )}

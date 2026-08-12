@@ -7,6 +7,8 @@ import { cancelOrderSchema, orderCreateSchema } from '../validations/order.valid
 
 const router = Router();
 
+// Public, token-protected endpoint used by the QR printed on a receipt.
+router.get('/public/:id', OrderController.getPublicReceipt);
 router.use(authMiddleware);
 router.get('/', OrderController.list);
 router.post('/', roleMiddleware('admin', 'manager', 'cashier'), validateMiddleware(orderCreateSchema), OrderController.create);

@@ -233,11 +233,6 @@ const CustomersPage = () => {
               <FiLock size={13} /> Nhân viên chỉ được tra cứu tên và điểm; SĐT và hồ sơ khách hàng được ẩn.
             </p>
           )}
-          {canManageCustomerData && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-800">
-              <FiLock size={13} /> SĐT khách hàng luôn được ẩn; Admin/Quản lý có thể nhập số mới khi cần cập nhật.
-            </p>
-          )}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative">
