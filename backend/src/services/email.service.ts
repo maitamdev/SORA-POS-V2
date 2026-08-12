@@ -13,6 +13,10 @@ export class EmailService {
     },
   });
 
+  static isConfigured(): boolean {
+    return Boolean(env.smtpHost && env.smtpUser && env.smtpPass);
+  }
+
   /**
    * Gửi email hóa đơn bán hàng tới khách hàng
    * @param email Địa chỉ nhận email
@@ -28,7 +32,7 @@ export class EmailService {
       html: html,
     };
 
-    if (!env.smtpUser || !env.smtpPass) {
+    if (!this.isConfigured()) {
       console.warn('⚠️ SMTP config missing. Fallback log email to console in development:');
       console.log('----------------------------------------');
       console.log(`To: ${email}`);
@@ -110,7 +114,7 @@ export class EmailService {
       </html>
     `;
 
-    return this.sendConfiguredEmail(
+    return this.sendConfiguredEmailStrict(
       {
         from: env.smtpFrom || 'Sora POS <noreply@sorapos.com>',
         to: email.trim(),
@@ -121,11 +125,21 @@ export class EmailService {
     );
   }
 
+  private static async sendConfiguredEmailStrict(
+    mailOptions: { from: string; to: string; subject: string; html: string },
+    label: string
+  ): Promise<boolean> {
+    if (!this.isConfigured()) {
+      throw new AppError(503, 'Máy chủ chưa cấu hình SMTP để gửi email');
+    }
+    return this.sendConfiguredEmail(mailOptions, label);
+  }
+
   private static async sendConfiguredEmail(
     mailOptions: { from: string; to: string; subject: string; html: string },
     label: string
   ): Promise<boolean> {
-    if (!env.smtpUser || !env.smtpPass) {
+    if (!this.isConfigured()) {
       console.warn(`⚠️ SMTP config missing. Fallback log ${label} to console in development:`);
       console.log('----------------------------------------');
       console.log(`To: ${mailOptions.to}`);

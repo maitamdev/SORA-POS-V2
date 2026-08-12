@@ -5,6 +5,19 @@ import { AppError } from '../utils/AppError';
 import { ShiftService } from '../services/shift.service';
 import { EmailService } from '../services/email.service';
 
+type EmailNotificationReason = 'sent' | 'missing_email' | 'smtp_not_configured' | 'send_failed';
+
+const getNotificationEmail = (shift: any): string => {
+  const email = typeof shift?.employee?.notification_email === 'string'
+    ? shift.employee.notification_email.trim()
+    : '';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+};
+
+const getEmailFailureReason = (error: unknown): EmailNotificationReason => {
+  return error instanceof AppError && error.status === 503 ? 'smtp_not_configured' : 'send_failed';
+};
+
 export class ShiftController {
   static list = asyncHandler(async (req: Request, res: Response) => {
     successResponse(res, await ShiftService.list(req.query), 'Lấy danh sách ca làm thành công');
@@ -18,10 +31,8 @@ export class ShiftController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     const shift = await ShiftService.open(req.body, req.user.userId);
     let emailNotification: 'sent' | 'skipped' | 'failed' = 'skipped';
-    const configuredEmail = shift.employee?.notification_email || shift.employee?.email;
-    const employeeEmail = typeof configuredEmail === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuredEmail)
-      ? configuredEmail
-      : '';
+    let emailNotificationReason: EmailNotificationReason = 'missing_email';
+    const employeeEmail = getNotificationEmail(shift);
 
     if (employeeEmail) {
       try {
@@ -31,21 +42,36 @@ export class ShiftController {
           shift
         );
         emailNotification = 'sent';
+        emailNotificationReason = 'sent';
       } catch (error) {
         // Creating a shift must not fail just because SMTP is unavailable.
         emailNotification = 'failed';
+        emailNotificationReason = getEmailFailureReason(error);
         console.error('[ShiftController.open] Không thể gửi email thông báo ca:', error);
       }
     }
 
     successResponse(
       res,
-      { ...shift, email_notification: emailNotification },
+      { ...shift, email_notification: emailNotification, email_notification_reason: emailNotificationReason },
       emailNotification === 'sent'
         ? 'Mở ca làm thành công và đã gửi email cho nhân viên'
         : 'Mở ca làm thành công',
       201
     );
+  });
+
+  static sendEmail = asyncHandler(async (req: Request, res: Response) => {
+    const shift = await ShiftService.getById(req.params.id);
+    if (shift.status === 'cancelled') throw new AppError(400, 'Không thể gửi email cho ca đã hủy');
+
+    const employeeEmail = getNotificationEmail(shift);
+    if (!employeeEmail) {
+      throw new AppError(400, 'Nhân viên chưa có email nhận ca. Vào Nhân viên → Sửa để nhập email trước.');
+    }
+
+    await EmailService.sendShiftNotification(employeeEmail, shift.employee?.full_name, shift);
+    successResponse(res, { email_notification: 'sent' }, 'Đã gửi lại email thông báo ca cho nhân viên');
   });
 
   static active = asyncHandler(async (req: Request, res: Response) => {

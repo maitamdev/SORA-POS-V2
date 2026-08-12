@@ -14,6 +14,7 @@ import {
   HiOutlineX,
   HiOutlineBan,
   HiOutlineExclamation,
+  HiOutlineMail,
 } from 'react-icons/hi';
 import { shiftAPI } from '../../services/shift.api';
 import { staffAPI } from '../../services/staff.api';
@@ -150,6 +151,7 @@ const ShiftsPage = () => {
   const [cancellingShift, setCancellingShift] = useState<ShiftSession | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [sendingEmailShiftId, setSendingEmailShiftId] = useState<string | null>(null);
 
   // Detail modal tab
   const [detailTab, setDetailTab] = useState<'overview' | 'orders' | 'cash_drawer'>('overview');
@@ -229,12 +231,16 @@ const ShiftsPage = () => {
         shift_name: finalShiftName,
       });
       const emailNotification = response.data.data.email_notification;
-      toast.success(
-        emailNotification === 'sent'
-          ? 'Đã mở ca và gửi thông báo email cho nhân viên'
-          : 'Đã mở ca cho nhân viên (chưa gửi được email)',
-        { duration: 4500 }
-      );
+      const emailReason = response.data.data.email_notification_reason;
+      if (emailNotification === 'sent') {
+        toast.success('Đã mở ca và gửi thông báo email cho nhân viên', { duration: 4500 });
+      } else if (emailReason === 'missing_email') {
+        toast.error('Đã mở ca nhưng chưa gửi email: nhân viên chưa có email nhận ca. Vào Nhân viên → Sửa để nhập.', { duration: 6000 });
+      } else if (emailReason === 'smtp_not_configured') {
+        toast.error('Đã mở ca nhưng máy chủ chưa cấu hình SMTP nên chưa gửi được email.', { duration: 6000 });
+      } else {
+        toast.error('Đã mở ca nhưng gửi email thất bại. Bạn có thể bấm “Gửi email” để thử lại.', { duration: 6000 });
+      }
       setSelectedEmployee('');
       setShiftPreset('ca_sang');
       setStartHour('08');
@@ -286,6 +292,20 @@ const ShiftsPage = () => {
       toast.error(err.response?.data?.message || 'Hủy ca thất bại');
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleSendShiftEmail = async (shift: ShiftSession) => {
+    setSendingEmailShiftId(shift.id);
+    try {
+      const response = await shiftAPI.sendEmail(shift.id);
+      toast.success(response.data.message || 'Đã gửi email thông báo ca cho nhân viên');
+      await loadData();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Gửi email thông báo ca thất bại');
+    } finally {
+      setSendingEmailShiftId(null);
     }
   };
 
@@ -498,7 +518,7 @@ const ShiftsPage = () => {
                 <option value="">Chọn nhân viên</option>
                 {cashiers.map((cashier) => (
                   <option key={cashier.id} value={cashier.id}>
-                    {cashier.full_name} - {cashier.email}
+                    {cashier.full_name} - mã {cashier.email} - {cashier.notification_email || 'chưa có email nhận ca'}
                   </option>
                 ))}
               </select>
@@ -677,7 +697,10 @@ const ShiftsPage = () => {
                           </div>
                           <div>
                             <p className="font-black text-slate-800 text-sm">{shift.employee?.full_name || 'Nhân viên'}</p>
-                            <p className="text-xs font-semibold text-slate-400">{shift.employee?.email}</p>
+                            <p className="text-xs font-semibold text-slate-400">Mã đăng nhập: {shift.employee?.email}</p>
+                            <p className={`text-xs font-semibold ${shift.employee?.notification_email ? 'text-blue-600' : 'text-amber-600'}`}>
+                              {shift.employee?.notification_email || 'Chưa cấu hình email nhận ca'}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -740,6 +763,16 @@ const ShiftsPage = () => {
                             <HiOutlineEye className="h-3.5 w-3.5" />
                             Chi tiết
                           </button>
+                          {(shift.status === 'checked_in' || shift.status === 'opened') && (
+                            <button
+                              onClick={() => handleSendShiftEmail(shift)}
+                              disabled={sendingEmailShiftId === shift.id}
+                              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-black text-indigo-700 hover:bg-indigo-100 transition disabled:cursor-wait disabled:opacity-60"
+                            >
+                              <HiOutlineMail className="h-3.5 w-3.5" />
+                              {sendingEmailShiftId === shift.id ? 'Đang gửi...' : 'Gửi email'}
+                            </button>
+                          )}
                           {(shift.status === 'checked_in' || shift.status === 'opened') && (
                             <button
                               onClick={() => { setClosingShift(shift); setClosingCashInput(''); setManagerNoteInput(''); }}

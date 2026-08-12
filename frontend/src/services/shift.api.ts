@@ -11,6 +11,7 @@ export interface OpenShiftPayload {
 
 export interface OpenShiftResponse extends ShiftSession {
   email_notification?: 'sent' | 'skipped' | 'failed';
+  email_notification_reason?: 'sent' | 'missing_email' | 'smtp_not_configured' | 'send_failed';
 }
 
 export const shiftAPI = {
@@ -20,6 +21,7 @@ export const shiftAPI = {
     api.get<ApiResponse<ListResponse<ShiftSession>>>(`/shifts/my${buildQuery(params)}`),
   get: (id: string) => api.get<ApiResponse<ShiftSession>>(`/shifts/${id}`),
   open: (data: OpenShiftPayload) => api.post<ApiResponse<OpenShiftResponse>>('/shifts', data),
+  sendEmail: (id: string) => api.post<ApiResponse<{ email_notification: 'sent' }>>(`/shifts/${id}/send-email`),
   active: () => api.get<ApiResponse<ShiftSession | null>>('/shifts/active'),
   checkIn: (opening_cash: number) =>
     api.post<ApiResponse<ShiftSession>>('/shifts/active/check-in', { opening_cash }),

@@ -17,6 +17,7 @@ router.post('/active/cash-drawer', roleMiddleware('cashier'), validateMiddleware
 
 router.get('/', roleMiddleware('admin', 'manager'), ShiftController.list);
 router.post('/', roleMiddleware('admin', 'manager'), validateMiddleware(openShiftSchema), ShiftController.open);
+router.post('/:id/send-email', roleMiddleware('admin', 'manager'), ShiftController.sendEmail);
 router.get('/:id', roleMiddleware('admin', 'manager'), ShiftController.get);
 router.post('/:id/close', roleMiddleware('admin', 'manager'), validateMiddleware(closeShiftSchema), ShiftController.closeByManager);
 router.post('/:id/cancel', roleMiddleware('admin', 'manager'), ShiftController.cancel);
