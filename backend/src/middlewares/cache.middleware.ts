@@ -20,3 +20,17 @@ export const httpCacheMiddleware = (maxAgeSeconds = 60, staleWhileRevalidateSeco
     next();
   };
 };
+
+/**
+ * Settings are operational state, so a browser or proxy must always request
+ * the latest value after an administrator saves a change.
+ */
+export const noStoreHttpCacheMiddleware = () => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET') {
+      res.setHeader('Vary', 'Authorization, Accept-Encoding');
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+    }
+    next();
+  };
+};

@@ -178,6 +178,46 @@ const ReportsPage = () => {
   const revenueLoadedDays = useRef<number | null>(null);
   const invHistoryReady = useRef(false);
 
+  const resolveAiAction = (text: string, fallback: 'revenue' | 'inventory' = 'revenue') => {
+    const normalized = text.toLocaleLowerCase('vi-VN');
+    if (/(khuyến mãi|giảm giá|xả hàng|promotion)/.test(normalized)) {
+      return { label: 'Mở khuyến mãi', path: '/products?tab=promotions' };
+    }
+    if (/(nhập hàng|nhập kho|restock)/.test(normalized)) {
+      return { label: 'Tạo phiếu nhập', path: '/stock/receipts/new' };
+    }
+    if (/(tồn kho|thiếu hàng|hết hàng|cảnh báo kho|stock)/.test(normalized)) {
+      return { label: 'Mở cảnh báo tồn', path: '/stock?tab=alerts' };
+    }
+    if (/(sản phẩm|sku|mặt hàng)/.test(normalized)) {
+      return { label: 'Mở danh mục sản phẩm', path: '/products' };
+    }
+    if (/(khách hàng|khách quen|customer)/.test(normalized)) {
+      return { label: 'Mở khách hàng', path: '/customers' };
+    }
+    return fallback === 'inventory'
+      ? { label: 'Mở tồn kho', path: '/stock?tab=inventory' }
+      : { label: 'Mở đơn hàng', path: '/orders' };
+  };
+
+  const openInventoryRowAction = (item: InventorySkuRow) => {
+    if (invTableTab === 'dead' || item.status === 'dead_stock' || item.status === 'overstock') {
+      navigate('/products?tab=promotions');
+      return;
+    }
+    if (item.recommended_qty > 0) {
+      navigate(`/stock/receipts/new?product_id=${encodeURIComponent(item.id)}&quantity=${encodeURIComponent(String(item.recommended_qty))}`);
+      return;
+    }
+    navigate('/stock?tab=alerts');
+  };
+
+  const inventoryRowActionLabel = (item: InventorySkuRow) => {
+    if (invTableTab === 'dead' || item.status === 'dead_stock' || item.status === 'overstock') return 'Mở khuyến mãi';
+    if (item.recommended_qty > 0) return 'Tạo phiếu nhập';
+    return 'Mở cảnh báo';
+  };
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -1017,7 +1057,16 @@ const ReportsPage = () => {
                         <span className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white ${
                           ['bg-blue-600','bg-emerald-600','bg-amber-500','bg-purple-600','bg-cyan-600'][i % 5]
                         }`}>{i + 1}</span>
-                        <span className="flex-1 text-[13px] font-medium text-slate-700 leading-relaxed">{insight}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-slate-700 leading-relaxed">{insight}</p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(resolveAiAction(insight).path)}
+                            className="mt-2 inline-flex h-7 items-center rounded-md border border-blue-200 bg-white px-2.5 text-[10px] font-black text-blue-700 hover:bg-blue-50"
+                          >
+                            {resolveAiAction(insight).label}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1035,7 +1084,16 @@ const ReportsPage = () => {
                         }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="flex-1 leading-relaxed">{rec}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="leading-relaxed">{rec}</p>
+                          <button
+                            type="button"
+                            onClick={() => navigate(resolveAiAction(rec).path)}
+                            className="mt-2 inline-flex h-8 items-center rounded-md bg-emerald-600 px-3 text-[10px] font-black text-white hover:bg-emerald-700"
+                          >
+                            {resolveAiAction(rec).label}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1390,7 +1448,16 @@ const ReportsPage = () => {
                   {invAnalysis.insights?.map((t, i) => (
                     <div key={i} className="flex gap-2 rounded-lg border border-blue-100 bg-blue-50/40 p-2.5">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-blue-600 text-[10px] font-black text-white">{i + 1}</span>
-                      <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                        <button
+                          type="button"
+                          onClick={() => navigate(resolveAiAction(t, 'inventory').path)}
+                          className="mt-2 inline-flex h-7 items-center rounded-md border border-blue-200 bg-white px-2.5 text-[10px] font-black text-blue-700 hover:bg-blue-50"
+                        >
+                          {resolveAiAction(t, 'inventory').label}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1401,7 +1468,16 @@ const ReportsPage = () => {
                   {invAnalysis.recommendations?.map((t, i) => (
                     <div key={i} className="flex gap-2 rounded-lg border border-emerald-100 bg-emerald-50/40 p-2.5">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-[10px] font-black text-white">{i + 1}</span>
-                      <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-medium text-slate-700 leading-snug">{t}</p>
+                        <button
+                          type="button"
+                          onClick={() => navigate(resolveAiAction(t, 'inventory').path)}
+                          className="mt-2 inline-flex h-7 items-center rounded-md bg-emerald-600 px-2.5 text-[10px] font-black text-white hover:bg-emerald-700"
+                        >
+                          {resolveAiAction(t, 'inventory').label}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1462,6 +1538,7 @@ const ReportsPage = () => {
                           <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Đề xuất</th>
                           <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Chi phí</th>
                           <th className="px-3 py-2.5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">NCC</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1505,6 +1582,15 @@ const ReportsPage = () => {
                               {item.restock_cost > 0 ? money(item.restock_cost) : item.stock_value > 0 && invTableTab === 'dead' ? money(item.stock_value) : 'N/A'}
                             </td>
                             <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-500 max-w-[100px] truncate">{item.supplier}</td>
+                            <td className="px-3 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => openInventoryRowAction(item)}
+                                className="inline-flex h-8 items-center rounded-md bg-blue-600 px-2.5 text-[10px] font-black text-white hover:bg-blue-700"
+                              >
+                                {inventoryRowActionLabel(item)}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

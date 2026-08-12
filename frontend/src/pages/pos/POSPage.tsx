@@ -130,7 +130,7 @@ const POSPage = () => {
 
   // ── Main POS UI ──
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-slate-50 font-sans antialiased text-slate-800">
+    <div className={`pos-shell flex flex-col h-screen overflow-hidden bg-slate-50 font-sans antialiased text-slate-800 ${operationSettings.compactMode ? 'pos-shell-compact' : ''}`}>
       {/* 1. TOP HEADER */}
       <POSHeader onBarcodeSubmit={handleBarcodeSubmit} />
 
@@ -140,7 +140,7 @@ const POSPage = () => {
         <ProductGrid />
 
         {/* RIGHT: Cart Sidebar */}
-        <aside className="flex flex-col h-full min-h-0 bg-white border-l border-slate-200/60 shadow-lg">
+        <aside className="pos-cart-shell flex flex-col h-full min-h-0 bg-white border-l border-slate-200/60 shadow-lg">
           <CartPanel
             onClearCart={handleClearCart}
             onPhoneChange={handlePhoneChange}

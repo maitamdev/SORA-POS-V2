@@ -229,7 +229,14 @@ export async function getCategoriesOffline(): Promise<Category[]> {
  * Lấy toàn bộ khách hàng từ IndexedDB.
  */
 export async function getCustomersOffline(): Promise<Customer[]> {
-  return offlineDB.customers.toArray();
+  const customers = await offlineDB.customers.toArray();
+  // Older local databases may still contain a phone copied by a previous
+  // version. Never return that field to the UI; phone lookup stays server-side.
+  return customers.map(({ phone: _phone, ...customer }) => customer);
+}
+
+export async function clearCustomersOffline(): Promise<void> {
+  await offlineDB.customers.clear();
 }
 
 /* ------------------------------------------------------------------ */

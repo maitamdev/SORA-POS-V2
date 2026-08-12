@@ -48,6 +48,113 @@ export class EmailService {
     }
   }
 
+  static async sendPasswordReset(email: string, fullName: string | null | undefined, resetUrl: string): Promise<boolean> {
+    const safeName = this.escapeHtml(fullName || 'bạn');
+    const safeUrl = this.escapeHtml(resetUrl);
+    const html = `
+      <!DOCTYPE html>
+      <html lang="vi">
+        <body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;padding:24px">
+          <div style="max-width:560px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:28px">
+            <p style="margin:0;color:#2563eb;font-weight:700;letter-spacing:.08em;font-size:12px">SORA POS</p>
+            <h1 style="font-size:22px;margin:12px 0 8px">Khôi phục mật khẩu</h1>
+            <p style="color:#475569;line-height:1.6">Xin chào ${safeName}, chúng tôi nhận được yêu cầu đặt lại mật khẩu tài khoản SORA POS của bạn.</p>
+            <p style="color:#475569;line-height:1.6">Liên kết chỉ có hiệu lực trong 15 phút và chỉ sử dụng được một lần.</p>
+            <p style="margin:24px 0"><a href="${safeUrl}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 18px;border-radius:9px;font-weight:700">Đặt lại mật khẩu</a></p>
+            <p style="color:#64748b;font-size:12px;line-height:1.5">Nếu bạn không yêu cầu thao tác này, hãy bỏ qua email. Không chia sẻ liên kết khôi phục cho người khác.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return this.sendConfiguredEmail(
+      { from: env.smtpFrom || 'Sora POS <noreply@sorapos.com>', to: email.trim(), subject: '[Sora POS] Khôi phục mật khẩu', html },
+      'email khôi phục mật khẩu'
+    );
+  }
+
+  static async sendShiftNotification(
+    email: string,
+    employeeName: string | null | undefined,
+    shift: { shift_date?: string; shift_name?: string | null; shift_code?: string | null }
+  ): Promise<boolean> {
+    const safeName = this.escapeHtml(employeeName || 'nhân viên');
+    const shiftName = this.escapeHtml(shift.shift_name || 'Ca bán hàng');
+    const shiftDate = this.escapeHtml(
+      shift.shift_date
+        ? new Date(`${shift.shift_date}T00:00:00`).toLocaleDateString('vi-VN')
+        : 'Chưa xác định'
+    );
+    const shiftCode = this.escapeHtml(shift.shift_code || '—');
+    const html = `
+      <!DOCTYPE html>
+      <html lang="vi">
+        <body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#0f172a;padding:24px">
+          <div style="max-width:560px;margin:auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden">
+            <div style="background:#0f172a;color:#fff;padding:24px 28px">
+              <p style="margin:0;color:#93c5fd;font-weight:700;letter-spacing:.08em;font-size:12px">SORA POS</p>
+              <h1 style="font-size:22px;margin:10px 0 0">Bạn đã được tạo ca làm</h1>
+            </div>
+            <div style="padding:28px">
+              <p style="color:#475569;line-height:1.6">Xin chào ${safeName}, quản lý đã tạo ca làm cho tài khoản của bạn.</p>
+              <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px">
+                <tr><td style="padding:9px 0;color:#64748b">Ca làm</td><td style="padding:9px 0;text-align:right;font-weight:700">${shiftName}</td></tr>
+                <tr><td style="padding:9px 0;color:#64748b">Ngày</td><td style="padding:9px 0;text-align:right;font-weight:700">${shiftDate}</td></tr>
+                <tr><td style="padding:9px 0;color:#64748b">Mã ca</td><td style="padding:9px 0;text-align:right;font-weight:700;font-family:monospace">${shiftCode}</td></tr>
+              </table>
+              <p style="color:#475569;line-height:1.6">Vui lòng đăng nhập SORA POS, nhận ca và nhập tiền đầu ca trước khi bán hàng.</p>
+            </div>
+            <div style="background:#f1f5f9;padding:18px 28px;color:#64748b;font-size:12px">Email tự động từ hệ thống SORA POS.</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return this.sendConfiguredEmail(
+      {
+        from: env.smtpFrom || 'Sora POS <noreply@sorapos.com>',
+        to: email.trim(),
+        subject: `[Sora POS] Bạn được tạo ${shift.shift_name || 'ca bán hàng'} ngày ${shift.shift_date || ''}`,
+        html,
+      },
+      'email thông báo ca làm'
+    );
+  }
+
+  private static async sendConfiguredEmail(
+    mailOptions: { from: string; to: string; subject: string; html: string },
+    label: string
+  ): Promise<boolean> {
+    if (!env.smtpUser || !env.smtpPass) {
+      console.warn(`⚠️ SMTP config missing. Fallback log ${label} to console in development:`);
+      console.log('----------------------------------------');
+      console.log(`To: ${mailOptions.to}`);
+      console.log(`Subject: ${mailOptions.subject}`);
+      console.log(`Body (HTML length: ${mailOptions.html.length} chars)`);
+      console.log('----------------------------------------');
+      return true;
+    }
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`[EmailService] Gửi ${label} thành công tới ${mailOptions.to}`);
+      return true;
+    } catch (error: any) {
+      console.error(`[EmailService] Lỗi khi gửi ${label}:`, error);
+      throw new AppError(400, error.message || `Lỗi gửi ${label} qua máy chủ SMTP`);
+    }
+  }
+
+  private static escapeHtml(value: string): string {
+    return value.replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;',
+    }[character] || character));
+  }
+
   /**
    * Tạo mẫu HTML hóa đơn thanh toán
    */

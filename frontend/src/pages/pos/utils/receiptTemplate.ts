@@ -25,7 +25,21 @@ interface ReceiptData {
   pointsAfter?: number;
 }
 
-const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+const money = (value: number, currency = 'VND', locale = 'vi-VN') => {
+  const numericValue = Number(value || 0);
+  const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'VND';
+
+  try {
+    return new Intl.NumberFormat(locale || 'vi-VN', {
+      style: 'currency',
+      currency: safeCurrency,
+      currencyDisplay: 'symbol',
+      maximumFractionDigits: safeCurrency === 'VND' ? 0 : 2,
+    }).format(Number.isFinite(numericValue) ? numericValue : 0);
+  } catch {
+    return `${Number.isFinite(numericValue) ? numericValue.toLocaleString('vi-VN') : '0'} ${safeCurrency}`;
+  }
+};
 
 const escapeHtml = (value: unknown) =>
   String(value ?? '').replace(/[&<>"']/g, (char) => {
@@ -49,10 +63,11 @@ export const buildReceiptHtml = (
   const safeAddress = escapeHtml(operationSettings.address || '');
   const safeHotline = escapeHtml(operationSettings.hotline || '');
   const safeTaxCode = escapeHtml(operationSettings.taxCode || '');
+  const safeBusinessHours = escapeHtml(operationSettings.businessHours || '');
   const safeReceiptFooter = escapeHtml(operationSettings.receiptFooter || 'Cảm ơn quý khách đã mua sắm!');
-  
-  const nowStr = data.date || new Date().toLocaleString('vi-VN');
-  const dateStr = nowStr.split(' ')[0] || new Date().toLocaleDateString('vi-VN');
+  const paperWidth = operationSettings.receiptPaperSize === 'a5' ? '148mm' : '80mm';
+  const copyCount = Math.max(1, Math.min(5, Number(operationSettings.receiptCopies) || 1));
+  const nowStr = data.date || new Date().toLocaleString(operationSettings.locale || 'vi-VN');
 
   const cartRowsHtml = data.cart.map((item, idx) => `
     <tr style="background: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
@@ -61,8 +76,8 @@ export const buildReceiptHtml = (
         <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">${escapeHtml(item.product.sku || '')}</div>
       </td>
       <td style="text-align: center; padding: 10px 8px; font-size: 13px; color: #475569; font-weight: 600;">${item.quantity}</td>
-      <td style="text-align: right; padding: 10px 8px; font-size: 13px; color: #475569;">${money(item.product.sell_price)}</td>
-      <td style="text-align: right; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #1e293b;">${money(Number(item.product.sell_price) * item.quantity)}</td>
+      <td style="text-align: right; padding: 10px 8px; font-size: 13px; color: #475569;">${money(item.product.sell_price, operationSettings.currency, operationSettings.locale)}</td>
+      <td style="text-align: right; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #1e293b;">${money(Number(item.product.sell_price) * item.quantity, operationSettings.currency, operationSettings.locale)}</td>
     </tr>
   `).join('');
 
@@ -70,7 +85,7 @@ export const buildReceiptHtml = (
     data.customerName !== 'Khách lẻ' &&
     ((data.pointsBefore ?? 0) > 0 || (data.pointsUsed ?? 0) > 0 || (data.pointsEarned ?? 0) > 0);
 
-  return `
+  const html = `
     <html>
       <head>
         <title>Hóa đơn ${escapeHtml(data.orderNumber)} - ${safeStoreName}</title>
@@ -84,7 +99,7 @@ export const buildReceiptHtml = (
             padding: 10px;
           }
           .invoice-container {
-            max-width: 480px;
+            max-width: ${paperWidth};
             margin: 0 auto;
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -200,7 +215,9 @@ export const buildReceiptHtml = (
           }
           @media print {
             body { padding: 0; }
-            .invoice-container { border: none; width: 100%; max-width: 100%; padding: 0; }
+            .receipt-copy { break-after: page; page-break-after: always; }
+            .receipt-copy:last-of-type { break-after: auto; page-break-after: auto; }
+            .invoice-container { border: none; width: ${paperWidth}; max-width: ${paperWidth}; padding: 0; }
           }
         </style>
       </head>
@@ -212,6 +229,7 @@ export const buildReceiptHtml = (
             ${safeAddress ? `<p>${safeAddress}</p>` : ''}
             ${safeHotline ? `<p>Hotline: ${safeHotline}</p>` : ''}
             ${safeTaxCode ? `<p>MST: ${safeTaxCode}</p>` : ''}
+            ${safeBusinessHours ? `<p>Giờ mở cửa: ${safeBusinessHours}</p>` : ''}
           </div>
 
           <div class="invoice-title">HÓA ĐƠN BÁN HÀNG</div>
@@ -252,17 +270,17 @@ export const buildReceiptHtml = (
           <div class="totals-block">
             <div class="totals-row">
               <span>Tạm tính:</span>
-              <span>${money(data.total)}</span>
+              <span>${money(data.total, operationSettings.currency, operationSettings.locale)}</span>
             </div>
             ${data.discountAmount > 0 ? `
               <div class="totals-row" style="color: #dc2626;">
                 <span>Chiết khấu:</span>
-                <span>-${money(data.discountAmount)}</span>
+                <span>-${money(data.discountAmount, operationSettings.currency, operationSettings.locale)}</span>
               </div>
             ` : ''}
             <div class="totals-row grand-total">
               <span>TỔNG CỘNG:</span>
-              <span>${money(data.finalAmount)}</span>
+              <span>${money(data.finalAmount, operationSettings.currency, operationSettings.locale)}</span>
             </div>
             <div class="totals-row" style="margin-top: 5px;">
               <span>Hình thức thanh toán:</span>
@@ -271,11 +289,11 @@ export const buildReceiptHtml = (
             ${data.paymentMethod === 'cash' ? `
               <div class="totals-row">
                 <span>Khách đưa:</span>
-                <span>${money(data.receivedAmount)}</span>
+                <span>${money(data.receivedAmount, operationSettings.currency, operationSettings.locale)}</span>
               </div>
               <div class="totals-row" style="color: #047857; font-weight: 600;">
                 <span>Tiền trả lại:</span>
-                <span>${money(data.change)}</span>
+                <span>${money(data.change, operationSettings.currency, operationSettings.locale)}</span>
               </div>
             ` : ''}
           </div>
@@ -318,4 +336,16 @@ export const buildReceiptHtml = (
       </body>
     </html>
   `;
+
+  if (copyCount === 1) return html;
+
+  const bodyMatch = html.match(/<body>([\s\S]*?)<\/body>/i);
+  if (!bodyMatch) return html;
+
+  const bodyContent = bodyMatch[1];
+  const printScript = bodyContent.match(/<script>[\s\S]*?<\/script>/i)?.[0] || '';
+  const invoiceContent = bodyContent.replace(printScript, '');
+  const repeatedContent = Array.from({ length: copyCount }, () => `<div class="receipt-copy">${invoiceContent}</div>`).join('');
+
+  return html.replace(bodyMatch[0], `<body>${repeatedContent}${printScript}</body>`);
 };

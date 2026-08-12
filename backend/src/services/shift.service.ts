@@ -44,16 +44,61 @@ const mapShift = (shift: any) => ({
   closing_cash: shift.closing_cash === null ? null : Number(shift.closing_cash || 0),
   expected_cash: shift.expected_cash === null ? null : Number(shift.expected_cash || 0),
   cash_difference: shift.cash_difference === null ? null : Number(shift.cash_difference || 0),
+  total_work_minutes:
+    shift.total_work_minutes === null || shift.total_work_minutes === undefined
+      ? null
+      : Number.isFinite(Number(shift.total_work_minutes))
+        ? Math.max(0, Number(shift.total_work_minutes))
+        : null,
 });
 
+const calculateWorkMinutes = (shift: any, closedAt: string) => {
+  const startedAt = shift.started_at || shift.checked_in_at;
+  if (!startedAt) return 0;
+
+  const startMs = Date.parse(String(startedAt));
+  const closeMs = Date.parse(closedAt);
+  if (!Number.isFinite(startMs) || !Number.isFinite(closeMs)) return 0;
+
+  return Math.max(0, Math.round((closeMs - startMs) / 60_000));
+};
+
 export class ShiftService {
+  private static cashierView(shift: any) {
+    if (!shift) return shift;
+
+    const summary = shift.summary;
+    const cashSales = Number(summary?.payments?.cash || 0);
+    const cashDrawerTxTotal = Number(summary?.cash_drawer_tx_total || 0);
+
+    return {
+      ...shift,
+      summary: summary
+        ? {
+            order_count: Number(summary.order_count || 0),
+            cancelled_count: Number(summary.cancelled_count || 0),
+            cash_drawer_tx_total: cashDrawerTxTotal,
+            cash_expected: Number(shift.opening_cash || 0) + cashSales + cashDrawerTxTotal,
+          }
+        : undefined,
+      orders: Array.isArray(shift.orders)
+        ? shift.orders.map((order: any) => ({
+            id: order.id,
+            order_number: order.order_number,
+            status: order.status,
+            created_at: order.created_at,
+          }))
+        : shift.orders,
+    };
+  }
+
   private static async attachUsers<T extends { employee_id: string; opened_by: string }>(shifts: T[]) {
     if (shifts.length === 0) return shifts;
 
     const userIds = Array.from(new Set(shifts.flatMap((shift) => [shift.employee_id, shift.opened_by]).filter(Boolean)));
     const { data: users, error } = await supabase
       .from('users')
-      .select('id, full_name, email')
+      .select('id, full_name, email, notification_email')
       .in('id', userIds);
 
     if (error) throw new AppError(500, error.message);
@@ -218,7 +263,7 @@ export class ShiftService {
       };
     }));
 
-    return { items, pagination: { page, limit, total: count || 0 } };
+    return { items: items.map((item) => this.cashierView(item)), pagination: { page, limit, total: count || 0 } };
   }
 
   static async getById(id: string) {
@@ -248,7 +293,7 @@ export class ShiftService {
   static async activeForUser(userId: string) {
     const shift = await this.getActiveShift(userId);
     if (!shift) return null;
-    return { ...shift, summary: await this.summary(shift.id) };
+    return this.cashierView({ ...shift, summary: await this.summary(shift.id) });
   }
 
   static async checkIn(userId: string, openingCash: number) {
@@ -269,7 +314,7 @@ export class ShiftService {
       .single();
 
     if (error || !data) throw new AppError(400, error?.message || 'Không nhận được ca');
-    return { ...mapShift(data), summary: await this.summary(data.id) };
+    return this.cashierView({ ...mapShift(data), summary: await this.summary(data.id) });
   }
 
   static async close(userId: string, input: CloseShiftInput) {
@@ -281,6 +326,7 @@ export class ShiftService {
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
     const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash, summary.cash_drawer_tx_total);
+    const closedAt = new Date().toISOString();
 
     const { data, error } = await supabase
       .from('shift_sessions')
@@ -290,14 +336,19 @@ export class ShiftService {
         expected_cash: cashSummary.expected_cash,
         cash_difference: cashSummary.cash_difference,
         note: input.note || null,
-        closed_at: new Date().toISOString(),
+        closed_at: closedAt,
+        total_work_minutes: calculateWorkMinutes(shift, closedAt),
       })
       .eq('id', shift.id)
       .select('*')
       .single();
 
     if (error || !data) throw new AppError(400, error?.message || 'Không chốt được ca');
-    return { ...mapShift(data), summary: await this.summary(data.id), orders: await this.orders(data.id) };
+    return this.cashierView({
+      ...mapShift(data),
+      summary: await this.summary(data.id),
+      orders: await this.orders(data.id),
+    });
   }
 
   static async closeByManager(shiftId: string, input: CloseShiftInput, managerId: string) {
@@ -316,6 +367,7 @@ export class ShiftService {
     const openingCash = Number(shift.opening_cash || 0);
     const closingCash = toNumber(input.closing_cash);
     const cashSummary = calculateShiftCash(openingCash, summary.payments.cash, closingCash, summary.cash_drawer_tx_total);
+    const closedAt = new Date().toISOString();
 
     const notePrefix = shift.status === 'opened' ? 'Chốt bởi quản lý (chưa nhận ca)' : 'Được chốt bởi quản lý';
 
@@ -328,7 +380,8 @@ export class ShiftService {
         cash_difference: cashSummary.cash_difference,
         note: shift.note || notePrefix,
         manager_note: input.note || null,
-        closed_at: new Date().toISOString(),
+        closed_at: closedAt,
+        total_work_minutes: calculateWorkMinutes(shift, closedAt),
       })
       .eq('id', shiftId)
       .select('*')

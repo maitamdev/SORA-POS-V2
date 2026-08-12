@@ -6,6 +6,7 @@ export interface User {
   password_hash: string;
   full_name: string;
   phone?: string;
+  notification_email?: string;
   avatar_url?: string;
   role_id: string;
   is_active: boolean;

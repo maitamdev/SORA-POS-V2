@@ -230,6 +230,7 @@ type AIStockDrawerProps = {
   onRefresh: () => void;
   onGenerate: () => void;
   onUpdateStatus: (id: string, status: 'approved' | 'rejected') => void;
+  onCreateRestock: (productId: string, quantity: number) => void;
 };
 
 const AIStockDrawer = ({
@@ -247,6 +248,7 @@ const AIStockDrawer = ({
   onRefresh,
   onGenerate,
   onUpdateStatus,
+  onCreateRestock,
 }: AIStockDrawerProps) => {
   const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
   const summary = analysis?.summary;
@@ -508,13 +510,23 @@ const AIStockDrawer = ({
                                   {item.manual_review && <span className="border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black text-amber-700">Duyệt tay</span>}
                                   {item.expiring_soon_quantity ? <span className="border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[9px] font-black text-orange-700">HSD gần</span> : null}
                                 </div>
-                                <button
-                                  onClick={() => setExpandedInsight(expandedInsight === item.id ? null : item.id)}
-                                  className="inline-flex items-center gap-1 text-[10px] font-black text-slate-500 hover:text-blue-700"
-                                >
-                                  {expandedInsight === item.id ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
-                                  {expandedInsight === item.id ? 'Thu gọn' : 'Xem phân tích'}
-                                </button>
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => onCreateRestock(item.id, item.recommended_quantity)}
+                                    className="inline-flex h-8 items-center gap-1.5 bg-blue-600 px-2.5 text-[10px] font-black text-white hover:bg-blue-700"
+                                  >
+                                    <FiTruck size={12} />
+                                    {item.recommended_quantity > 0 ? 'Tạo phiếu nhập' : 'Mở tồn kho'}
+                                  </button>
+                                  <button
+                                    onClick={() => setExpandedInsight(expandedInsight === item.id ? null : item.id)}
+                                    className="inline-flex items-center gap-1 text-[10px] font-black text-slate-500 hover:text-blue-700"
+                                  >
+                                    {expandedInsight === item.id ? <FiChevronUp size={12} /> : <FiChevronDown size={12} />}
+                                    {expandedInsight === item.id ? 'Thu gọn' : 'Xem phân tích'}
+                                  </button>
+                                </div>
                               </div>
                               {expandedInsight === item.id && (
                                 <div className="border-t border-slate-200 pt-3">{renderInsight(item.ai_insight)}</div>
@@ -546,7 +558,15 @@ const AIStockDrawer = ({
                               <span className={`border px-1.5 py-0.5 text-[9px] font-black ${priorityClass[item.priority]}`}>{priorityLabel[item.priority]}</span>
                             </div>
                             <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-relaxed text-slate-600">{getInsightPreview(item.ai_insight || item.reason)}</p>
-                            <div className="mt-3 flex justify-end gap-2">
+                            <div className="mt-3 flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => onCreateRestock(item.product_id, item.recommended_quantity)}
+                                className="inline-flex items-center gap-1.5 border border-blue-200 bg-blue-50 px-3 py-1.5 text-[10px] font-black text-blue-700 hover:bg-blue-100"
+                              >
+                                <FiTruck size={12} />
+                                {item.recommended_quantity > 0 ? 'Tạo phiếu nhập' : 'Mở tồn kho'}
+                              </button>
                               <button onClick={() => onUpdateStatus(item.id, 'rejected')} className="border border-slate-200 px-3 py-1.5 text-[10px] font-black text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700">Từ chối</button>
                               <button onClick={() => onUpdateStatus(item.id, 'approved')} className="bg-slate-950 px-3 py-1.5 text-[10px] font-black text-white hover:bg-blue-700">Duyệt</button>
                             </div>
@@ -815,6 +835,14 @@ const StockPage = () => {
       toast.success(status === 'approved' ? 'Đã duyệt gợi ý nhập hàng' : 'Đã từ chối gợi ý');
       await loadAIData();
     } catch { toast.error('Không cập nhật được trạng thái'); }
+  };
+
+  const openAiRestockAction = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      navigate('/stock?tab=inventory');
+      return;
+    }
+    navigate(`/stock/receipts/new?product_id=${encodeURIComponent(productId)}&quantity=${encodeURIComponent(String(quantity))}`);
   };
 
   // Filtered Inventory items based on search, category and stock level filters
@@ -2146,6 +2174,7 @@ const StockPage = () => {
           onRefresh={loadAIData}
           onGenerate={generateRecommendations}
           onUpdateStatus={updateRecommendationStatus}
+          onCreateRestock={openAiRestockAction}
         />
       )}
       {/* 6. QUICK ACTION MODAL */}

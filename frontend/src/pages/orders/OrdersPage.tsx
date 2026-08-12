@@ -467,7 +467,9 @@ const OrdersPage = () => {
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
             <h2 className="text-sm font-black text-slate-900">Dòng hóa đơn</h2>
-            <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Doanh thu: {money(stats.totalRevenue)} | Trung bình: {money(stats.aov)}</p>
+            {user?.role !== 'cashier' && (
+              <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Doanh thu: {money(stats.totalRevenue)} | Trung bình: {money(stats.aov)}</p>
+            )}
           </div>
           <span className="bg-slate-50 px-3 py-1.5 text-[11px] font-extrabold text-slate-600">
             {filteredOrders.length} dòng
@@ -518,8 +520,9 @@ const OrdersPage = () => {
                                 {paymentLabels[paymentMethod]}
                               </span>
                             </div>
-                            <p className="mt-1 truncate text-xs font-extrabold text-slate-700">{order.customers?.name || 'Khách lẻ'}</p>
-                            {order.customers?.phone && <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{order.customers.phone}</p>}
+                            <p className="mt-1 truncate text-xs font-extrabold text-slate-700">
+                              {user?.role === 'cashier' ? 'Thông tin khách hàng ẩn' : (order.customers?.name || 'Khách lẻ')}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -693,8 +696,9 @@ const OrdersPage = () => {
                       <div className="mx-5 grid grid-cols-3 gap-3 border-y border-slate-300 py-3">
                         <div className="min-w-0">
                           <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Khách hàng</p>
-                          <p className="truncate text-[11px] font-bold text-slate-800">{selected.customers?.name || 'Khách lẻ'}</p>
-                          {selected.customers?.phone && <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{selected.customers.phone}</p>}
+                          <p className="truncate text-[11px] font-bold text-slate-800">
+                            {user?.role === 'cashier' ? 'Thông tin khách hàng ẩn' : (selected.customers?.name || 'Khách lẻ')}
+                          </p>
                         </div>
                         <div className="min-w-0">
                           <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-slate-500">Thu ngân</p>

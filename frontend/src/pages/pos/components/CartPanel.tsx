@@ -12,6 +12,7 @@ import { usePOSStore, usePOSFinalAmount, usePOSTotal } from '../../../stores/pos
 import { money, getProductImage } from '../utils/posHelpers';
 import type { CartItem } from '../utils/posHelpers';
 import { promotionAPI } from '../../../services/promotion.api';
+import { useAuthStore } from '../../../stores/auth.store';
 
 interface AutoPromoResult {
   promotion: {
@@ -83,6 +84,8 @@ interface CartPanelProps {
 }
 
 const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
+  const user = useAuthStore((state) => state.user);
+  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
   const cart = usePOSStore((s) => s.cart);
   const customerPhone = usePOSStore((s) => s.customerPhone);
   const matchedCustomer = usePOSStore((s) => s.matchedCustomer);
@@ -315,10 +318,10 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span className="text-sm font-black text-slate-800">
-                    {money(Number(item.product.sell_price) * item.quantity)}
+                    {money(Number(item.product.sell_price) * item.quantity, operationSettings.currency, operationSettings.locale)}
                   </span>
                   <span className="text-xs font-bold text-slate-400">
-                    {money(item.product.sell_price)}
+                      {money(item.product.sell_price, operationSettings.currency, operationSettings.locale)}
                   </span>
                   <button
                     onClick={() => updateQty(item.product.id, 0)}
@@ -381,7 +384,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isApplied ? (
                           <>
-                            <span className="text-xs font-black text-emerald-700">-{money(ap.discount_amount)}</span>
+                            <span className="text-xs font-black text-emerald-700">-{money(ap.discount_amount, operationSettings.currency, operationSettings.locale)}</span>
                             <HiOutlineCheck className="w-3.5 h-3.5 text-emerald-500" />
                           </>
                         ) : (
@@ -397,7 +400,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                 {autoPromos.length > 1 && (
                   <div className="flex justify-end pt-0.5">
                     <span className="text-[10px] font-black text-emerald-700">
-                      Tổng KM: -{money(totalAutoDiscount)}
+                      Tổng KM: -{money(totalAutoDiscount, operationSettings.currency, operationSettings.locale)}
                     </span>
                   </div>
                 )}
@@ -408,8 +411,8 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
 
         {/* Customer & Discount Panel */}
         <div className="p-4 bg-slate-50/50 space-y-3">
-          {/* Customer Phone */}
-          <div className="space-y-2 border-b border-slate-100 pb-3">
+          {/* Customer Phone: manager/admin only. Cashiers do not need customer data. */}
+          {canManageCustomerData && <div className="space-y-2 border-b border-slate-100 pb-3">
             <div className="space-y-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
               <div className="relative">
@@ -417,10 +420,10 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                   <HiOutlinePhone className="w-4 h-4" />
                 </span>
                 <input
-                  type="text"
+                  type="password"
                   value={customerPhone}
                   onChange={(e) => onPhoneChange(e.target.value)}
-                  placeholder="Nhập số điện thoại để tích điểm/đổi điểm"
+                  placeholder="Nhập để tra cứu khách (được che)"
                   className="w-full bg-white border border-slate-200 pl-8 pr-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition"
                 />
               </div>
@@ -467,7 +470,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
                 </div>
               )
             )}
-          </div>
+          </div>}
 
           {/* Discount and Voucher Row */}
           <div className="grid grid-cols-2 gap-3">
@@ -548,7 +551,7 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
               {voucherResult?.valid && (
                 <div className="flex items-center gap-1 mt-0.5">
                   <span className="text-[9px] font-bold text-emerald-600">
-                    ✓ {voucherResult.promoName}: -{money(voucherResult.discountAmount)}
+                    ✓ {voucherResult.promoName}: -{money(voucherResult.discountAmount, operationSettings.currency, operationSettings.locale)}
                   </span>
                 </div>
               )}

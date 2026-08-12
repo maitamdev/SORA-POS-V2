@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email VARCHAR(255) UNIQUE NOT NULL,
+  -- Login identifier; employee shift notifications use notification_email.
+  notification_email VARCHAR(255),
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
   phone VARCHAR(20),
@@ -121,6 +123,7 @@ CREATE TABLE IF NOT EXISTS shift_sessions (
   started_at TIMESTAMP WITH TIME ZONE,
   checked_in_at TIMESTAMP WITH TIME ZONE,
   closed_at TIMESTAMP WITH TIME ZONE,
+  total_work_minutes INTEGER CHECK (total_work_minutes IS NULL OR total_work_minutes >= 0),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -30,7 +30,7 @@ const ProductGridCard = memo(({ product, operationSettings, onAddToCart }: Produ
         Tồn: {product.stock_quantity} {isLowStock && !isOutOfStock && '(Thấp)'} {isOutOfStock && 'Hết'}
       </span>
 
-      <div className="h-40 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-1.5 overflow-hidden flex-shrink-0">
+      <div className="pos-product-card-image h-40 flex items-center justify-center mb-2 bg-slate-50/50 rounded-lg p-1.5 overflow-hidden flex-shrink-0">
         <img
           src={getProductImage(product)}
           alt={product.name}
@@ -49,7 +49,7 @@ const ProductGridCard = memo(({ product, operationSettings, onAddToCart }: Produ
       </div>
 
       <div className="mt-3">
-        <span className="text-base font-black text-blue-600 block">{money(product.sell_price)}</span>
+        <span className="text-base font-black text-blue-600 block">{money(product.sell_price, operationSettings.currency, operationSettings.locale)}</span>
         <button
           onClick={() => onAddToCart(product)}
           disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
@@ -82,7 +82,7 @@ const ProductRowItem = memo(({ product, operationSettings, onAddToCart }: Produc
         }`}>
           Tồn: {product.stock_quantity}
         </span>
-        <span className="text-xs font-black text-slate-800 w-20 text-right">{money(product.sell_price)}</span>
+        <span className="text-xs font-black text-slate-800 w-20 text-right">{money(product.sell_price, operationSettings.currency, operationSettings.locale)}</span>
         <button
           onClick={() => onAddToCart(product)}
           disabled={!product.is_active || (!operationSettings.allowSellOutOfStock && isOutOfStock)}
@@ -134,7 +134,7 @@ const ProductGrid = () => {
   };
 
   return (
-    <section className="flex flex-col h-full min-h-0 overflow-hidden p-3 sm:p-4 space-y-3 sm:space-y-4 bg-slate-50/50">
+    <section className="pos-catalog flex flex-col h-full min-h-0 overflow-hidden p-3 sm:p-4 space-y-3 sm:space-y-4 bg-slate-50/50">
       {/* Category Horizontal Filter Row */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
         <button
@@ -172,7 +172,7 @@ const ProductGrid = () => {
       </div>
 
       {/* Subfilters Row */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
+      <div className="pos-product-toolbar flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
         <p className="w-full sm:w-auto text-[10px] font-bold uppercase tracking-wider text-slate-400">
           Danh sách sản phẩm
         </p>

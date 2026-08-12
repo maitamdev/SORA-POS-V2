@@ -21,12 +21,20 @@ import { recordDemoPromotionUsage } from '../../../utils/promotionUsage';
  */
 export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
   const { user } = useAuthStore();
+  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
   const { refreshPendingCount } = useNetworkStatus();
   const customerPhoneRef = useRef('');
 
   // ─── Customer Phone Handler ───
   const handlePhoneChange = async (value: string) => {
     const store = usePOSStore.getState();
+    if (!canManageCustomerData) {
+      store.setCustomerPhone('');
+      store.setMatchedCustomer(null);
+      store.setCustomerId('');
+      store.setNewCustName('');
+      return;
+    }
     store.setCustomerPhone(value);
     customerPhoneRef.current = value;
     const normalized = value.trim().replace(/[\s.-]/g, '');
@@ -58,14 +66,13 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
     // 2. API search (when >= 9 digits)
     if (normalized.length >= 9) {
       try {
-        const res = await catalogAPI.customers.list({ search: value, limit: 1 });
+        const res = await catalogAPI.customers.lookupByPhone(value);
 
         // Race condition guard
         if (value !== customerPhoneRef.current) return;
 
-        const matched = res.data.data.items[0];
-        const dbPhone = (matched?.phone || '').trim().replace(/[\s.-]/g, '');
-        if (matched && dbPhone === normalized) {
+        const matched = res.data.data;
+        if (matched) {
           store.addCustomer(matched);
           store.setMatchedCustomer(matched);
           store.setCustomerId(matched.id);
@@ -167,8 +174,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
     const checkoutInfo = store.checkoutSuccessInfo;
     const customerName = checkoutInfo?.customerName ??
       (store.customers.find((c) => c.id === store.customerId)?.name || 'Khách lẻ');
-    const customerPhoneStr = checkoutInfo?.customerPhone ??
-      (store.customerPhone || store.customers.find((c) => c.id === store.customerId)?.phone || '');
+    const customerPhoneStr = '';
 
     const printTotal = itemsToRender.reduce(
       (s, i) => s + Number(i.product.sell_price) * i.quantity,
@@ -196,7 +202,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
         customerName,
         customerPhone: customerPhoneStr,
         cashierName: user?.full_name || 'Nhân viên',
-        date: checkoutInfo?.date || new Date().toLocaleString('vi-VN'),
+        date: checkoutInfo?.date || new Date().toLocaleString(store.operationSettings.locale || 'vi-VN'),
         pointsBefore: checkoutInfo?.pointsBefore ?? 0,
         pointsUsed: checkoutInfo?.pointsUsed ?? 0,
         pointsEarned: checkoutInfo?.pointsEarned ?? 0,
@@ -236,7 +242,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       toast.error('Vui lòng nhận ca và nhập tiền đầu ca trước khi bán hàng');
       return;
     }
-    if (operationSettings.requireCustomerPhone && !customerPhone.trim()) {
+    if (operationSettings.requireCustomerPhone && canManageCustomerData && !customerPhone.trim()) {
       toast.error('Vui lòng nhập số điện thoại khách hàng');
       return;
     }
@@ -327,9 +333,9 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
           receivedAmount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
           cart: [...cart],
           customerName: customerObj?.name || 'Khách lẻ',
-          customerPhone: customerPhone || '',
+          customerPhone: '',
           cashierName: user?.full_name || 'Nhân viên',
-          date: new Date().toLocaleString('vi-VN'),
+          date: new Date().toLocaleString(operationSettings.locale || 'vi-VN'),
         });
 
         store.resetCheckout();
@@ -353,7 +359,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       let finalCustomerId = matchedCustomer?.id || null;
 
       // Auto-create new customer
-      if (customerPhone.trim() && !matchedCustomer) {
+      if (customerPhone.trim() && !matchedCustomer && canManageCustomerData) {
         if (!newCustName.trim()) {
           toast.error('Vui lòng nhập Họ và tên khách hàng mới để đăng ký tích điểm');
           store.setLoading(false);
@@ -410,9 +416,9 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
         receivedAmount: paymentMethod === 'cash' ? (receivedAmount || finalAmount) : finalAmount,
         cart: [...cart],
         customerName: (customerObj as any)?.name || 'Khách lẻ',
-        customerPhone: customerPhone || (customerObj as any)?.phone || '',
+        customerPhone: '',
         cashierName: user?.full_name || 'Nhân viên',
-        date: new Date().toLocaleString('vi-VN'),
+        date: new Date().toLocaleString(operationSettings.locale || 'vi-VN'),
         pointsBefore: pBefore,
         pointsUsed: pUsed,
         pointsEarned: pEarned,

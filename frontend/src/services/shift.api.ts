@@ -9,13 +9,17 @@ export interface OpenShiftPayload {
   shift_name?: string | null;
 }
 
+export interface OpenShiftResponse extends ShiftSession {
+  email_notification?: 'sent' | 'skipped' | 'failed';
+}
+
 export const shiftAPI = {
   list: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<ShiftSession>>>(`/shifts${buildQuery(params)}`),
   my: (params?: Record<string, unknown>) =>
     api.get<ApiResponse<ListResponse<ShiftSession>>>(`/shifts/my${buildQuery(params)}`),
   get: (id: string) => api.get<ApiResponse<ShiftSession>>(`/shifts/${id}`),
-  open: (data: OpenShiftPayload) => api.post<ApiResponse<ShiftSession>>('/shifts', data),
+  open: (data: OpenShiftPayload) => api.post<ApiResponse<OpenShiftResponse>>('/shifts', data),
   active: () => api.get<ApiResponse<ShiftSession | null>>('/shifts/active'),
   checkIn: (opening_cash: number) =>
     api.post<ApiResponse<ShiftSession>>('/shifts/active/check-in', { opening_cash }),

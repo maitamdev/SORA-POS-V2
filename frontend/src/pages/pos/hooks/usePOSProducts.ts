@@ -1,9 +1,14 @@
 import { useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { catalogAPI } from '../../../services/catalog.api';
-import { settingsAPI } from '../../../services/settings.api';
-import { defaultOperationSettings } from '../../../services/settings.api';
+import {
+  defaultOperationSettings,
+  normalizeOperationSettings,
+  settingsAPI,
+  subscribeOperationSettings,
+} from '../../../services/settings.api';
 import { usePOSStore } from '../../../stores/pos.store';
+import { useAuthStore } from '../../../stores/auth.store';
 import {
   getProductsOffline,
   getCategoriesOffline,
@@ -27,6 +32,8 @@ export const usePOSProducts = () => {
     setOperationSettings,
     setPaymentMethod,
   } = usePOSStore();
+  const user = useAuthStore((state) => state.user);
+  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
 
   // Load products with Stale-While-Revalidate (IndexedDB first -> network sync)
   const loadProducts = async () => {
@@ -76,8 +83,12 @@ export const usePOSProducts = () => {
     try {
       const offlineCategories = await getCategoriesOffline();
       if (offlineCategories.length > 0) setCategories(offlineCategories);
-      const offlineCustomers = await getCustomersOffline();
-      if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+      if (canManageCustomerData) {
+        const offlineCustomers = await getCustomersOffline();
+        if (offlineCustomers.length > 0) setCustomers(offlineCustomers);
+      } else {
+        setCustomers([]);
+      }
     } catch (err) {
       console.warn('[POS Offline] Lỗi đọc danh mục/khách hàng offline:', err);
     }
@@ -86,12 +97,14 @@ export const usePOSProducts = () => {
     if (!navigator.onLine) return;
 
     try {
-      const [categoryRes, customerRes] = await Promise.all([
-        catalogAPI.categories.list({ is_active: true, limit: 100 }),
-        catalogAPI.customers.list({ is_active: true, limit: 100 }),
-      ]);
+      const categoryRes = await catalogAPI.categories.list({ is_active: true, limit: 100 });
       setCategories(categoryRes.data.data.items);
-      setCustomers(customerRes.data.data.items);
+      if (canManageCustomerData) {
+        const customerRes = await catalogAPI.customers.list({ is_active: true, limit: 100 });
+        setCustomers(customerRes.data.data.items);
+      } else {
+        setCustomers([]);
+      }
     } catch (err) {
       console.warn('[POS Network] Lỗi fetch danh mục/khách hàng từ server:', err);
     }
@@ -102,7 +115,7 @@ export const usePOSProducts = () => {
     loadCategoriesAndCustomers().catch(() =>
       toast.error('Không tải được danh mục và khách hàng')
     );
-  }, []);
+  }, [canManageCustomerData]);
 
   useEffect(() => {
     loadProducts().catch(() => toast.error('Không tải được dữ liệu POS'));
@@ -110,17 +123,25 @@ export const usePOSProducts = () => {
 
   // Load operation settings on mount
   useEffect(() => {
+    const applySettings = (value: unknown) => {
+      const nextSettings = normalizeOperationSettings(value);
+      setOperationSettings(nextSettings);
+      setPaymentMethod(nextSettings.defaultPaymentMethod as 'cash' | 'transfer' | 'card');
+    };
+
+    const unsubscribe = subscribeOperationSettings(applySettings);
+
     settingsAPI
       .getOperation()
       .then((response) => {
-        const nextSettings = { ...defaultOperationSettings, ...response.data.data.settings };
-        setOperationSettings(nextSettings);
-        setPaymentMethod(nextSettings.defaultPaymentMethod as 'cash' | 'transfer' | 'card');
+        applySettings(response.data.data.settings);
       })
       .catch(() => {
-        setOperationSettings(defaultOperationSettings);
+        applySettings(defaultOperationSettings);
       });
-  }, []);
+
+    return unsubscribe;
+  }, [setOperationSettings, setPaymentMethod]);
 
   return { loadProducts, loadCategoriesAndCustomers };
 };

@@ -2,6 +2,32 @@ import api from './api';
 import { ApiResponse } from '../types/user.type';
 import { Category, Customer, ListResponse, Product, Supplier } from '../types/domain.type';
 import { queryCache } from '../utils/queryCache';
+import { useAuthStore } from '../stores/auth.store';
+
+const CUSTOMER_CACHE_VERSION = 'v2';
+
+const stripCustomerPhone = <T extends Customer | null>(customer: T): T => {
+  if (!customer) return customer;
+  const { phone: _phone, ...safeCustomer } = customer;
+  void _phone;
+  return safeCustomer as T;
+};
+
+const sanitizeCustomerResponse = <T extends Customer | ListResponse<Customer> | null>(
+  response: ApiResponse<T>,
+): ApiResponse<T> => {
+  if (response.data && 'items' in response.data) {
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        items: response.data.items.map(stripCustomerPhone),
+      } as T,
+    };
+  }
+
+  return { ...response, data: stripCustomerPhone(response.data) as T };
+};
 
 export const buildQuery = (params: Record<string, unknown> = {}) => {
   const search = new URLSearchParams();
@@ -70,23 +96,29 @@ export const catalogAPI = {
   },
   customers: {
     list: async (params?: Record<string, unknown>) => {
-      const cacheKey = `customers:list:${buildQuery(params)}`;
+      const role = useAuthStore.getState().user?.role || 'anonymous';
+      const cacheKey = `customers:${CUSTOMER_CACHE_VERSION}:list:${role}:${buildQuery(params)}`;
       const cached = queryCache.get<ApiResponse<ListResponse<Customer>>>(cacheKey);
-      if (cached) return { data: cached } as any;
+      if (cached) return { data: sanitizeCustomerResponse(cached) } as any;
 
       const res = await api.get<ApiResponse<ListResponse<Customer>>>(`/customers${buildQuery(params)}`);
-      queryCache.set(cacheKey, res.data, 2 * 60 * 1000);
-      return res;
+      const safeResponse = sanitizeCustomerResponse(res.data);
+      queryCache.set(cacheKey, safeResponse, 2 * 60 * 1000);
+      return { ...res, data: safeResponse };
+    },
+    lookupByPhone: async (phone: string) => {
+      const res = await api.get<ApiResponse<Customer | null>>(`/customers/lookup${buildQuery({ phone })}`);
+      return { ...res, data: sanitizeCustomerResponse(res.data) };
     },
     create: async (data: Partial<Customer>) => {
       const res = await api.post<ApiResponse<Customer>>('/customers', data);
       queryCache.invalidatePrefix('customers:');
-      return res;
+      return { ...res, data: sanitizeCustomerResponse(res.data) };
     },
     update: async (id: string, data: Partial<Customer>) => {
       const res = await api.put<ApiResponse<Customer>>(`/customers/${id}`, data);
       queryCache.invalidatePrefix('customers:');
-      return res;
+      return { ...res, data: sanitizeCustomerResponse(res.data) };
     },
     remove: async (id: string) => {
       const res = await api.delete<ApiResponse<null>>(`/customers/${id}`);

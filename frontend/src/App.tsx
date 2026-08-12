@@ -7,6 +7,9 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { useAuthStore } from './stores/auth.store';
 
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const ChangePasswordPage = lazy(() => import('./pages/auth/ChangePasswordPage'));
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
 const POSPage = lazy(() => import('./pages/pos/POSPage'));
 const ProductsPage = lazy(() => import('./pages/products/ProductsWithTabs'));
@@ -85,6 +88,8 @@ function App() {
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+          <Route path="/forgot-password" element={isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />} />
+          <Route path="/reset-password" element={isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />} />
           <Route
             element={
               <ProtectedRoute>
@@ -94,6 +99,7 @@ function App() {
           >
             <Route path="/" element={<HomePage />} />
             <Route path="/pos" element={<POSPage />} />
+            <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route
               path="/my-shift"
               element={
@@ -121,7 +127,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/customers" element={<CustomersPage />} />
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                  <CustomersPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/suppliers"
               element={

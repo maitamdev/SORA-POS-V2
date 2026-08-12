@@ -10,6 +10,7 @@ type StaffPayload = {
   password?: string;
   full_name?: string;
   phone?: string | null;
+  notification_email?: string | null;
   role?: 'cashier' | 'manager' | 'admin';
   is_active?: boolean;
 };
@@ -24,6 +25,7 @@ const sanitizeUser = (user: any) => ({
   email: user.email,
   full_name: user.full_name,
   phone: user.phone,
+  notification_email: user.notification_email,
   avatar_url: user.avatar_url,
   role: getRoleName(user.roles),
   is_active: user.is_active,
@@ -86,7 +88,7 @@ export class StaffService {
     let query = supabase
       .from('users')
       .select(
-        'id, email, full_name, phone, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)',
+        'id, email, full_name, phone, notification_email, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)',
         { count: 'exact' }
       )
       .order('created_at', { ascending: false })
@@ -94,7 +96,7 @@ export class StaffService {
 
     if (typeof queryParams.search === 'string' && queryParams.search.trim()) {
       const pattern = queryParams.search.trim().replace(/[%_]/g, '');
-      query = query.or(`email.ilike.%${pattern}%,full_name.ilike.%${pattern}%,phone.ilike.%${pattern}%`);
+      query = query.or(`email.ilike.%${pattern}%,full_name.ilike.%${pattern}%,phone.ilike.%${pattern}%,notification_email.ilike.%${pattern}%`);
     }
 
     if (queryParams.is_active !== undefined) {
@@ -120,6 +122,7 @@ export class StaffService {
       password_hash: await bcrypt.hash(password, 10),
       full_name: payload.full_name?.trim(),
       phone: payload.phone,
+      notification_email: payload.notification_email,
       role_id: roleId,
       is_active: payload.is_active ?? true,
     });
@@ -127,7 +130,7 @@ export class StaffService {
     const { data: created, error } = await supabase
       .from('users')
       .insert(data)
-      .select('id, email, full_name, phone, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)')
+      .select('id, email, full_name, phone, notification_email, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)')
       .single();
 
     if (error) throw new AppError(400, error.message);
@@ -140,6 +143,7 @@ export class StaffService {
     const updates: Record<string, unknown> = {};
     if (payload.full_name !== undefined) updates.full_name = payload.full_name.trim();
     if (payload.phone !== undefined) updates.phone = payload.phone;
+    if (payload.notification_email !== undefined) updates.notification_email = payload.notification_email;
     if (payload.is_active !== undefined) updates.is_active = payload.is_active;
     if (payload.password) updates.password_hash = await bcrypt.hash(payload.password, 10);
     if (payload.role) updates.role_id = await this.getRoleId(payload.role);
@@ -152,7 +156,7 @@ export class StaffService {
       .from('users')
       .update(emptyToNull(updates))
       .eq('id', id)
-      .select('id, email, full_name, phone, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)')
+      .select('id, email, full_name, phone, notification_email, avatar_url, is_active, last_login, created_at, updated_at, roles!inner(name)')
       .single();
 
     if (error) throw new AppError(400, error.message);

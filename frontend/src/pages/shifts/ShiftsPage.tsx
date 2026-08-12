@@ -75,6 +75,16 @@ const shiftDuration = (start?: string | null, end?: string | null) => {
   return `${h}h ${m}p`;
 };
 
+const actualWorkDuration = (shift: ShiftSession) => {
+  if (shift.total_work_minutes !== null && shift.total_work_minutes !== undefined) {
+    const minutes = Math.max(0, Number(shift.total_work_minutes));
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h} giờ ${m} phút` : `${m} phút`;
+  }
+  return shiftDuration(shift.started_at || shift.checked_in_at, shift.closed_at);
+};
+
 const getShiftDurationText = (startStr: string, endStr: string) => {
   if (!startStr || !endStr) return { text: '', overnight: false };
   const [sh, sm] = startStr.split(':').map(Number);
@@ -213,12 +223,18 @@ const ShiftsPage = () => {
 
     setSaving(true);
     try {
-      await shiftAPI.open({
+      const response = await shiftAPI.open({
         employee_id: selectedEmployee,
         shift_date: dateFrom === dateTo ? dateFrom : today(),
         shift_name: finalShiftName,
       });
-      toast.success('Đã mở ca cho nhân viên');
+      const emailNotification = response.data.data.email_notification;
+      toast.success(
+        emailNotification === 'sent'
+          ? 'Đã mở ca và gửi thông báo email cho nhân viên'
+          : 'Đã mở ca cho nhân viên (chưa gửi được email)',
+        { duration: 4500 }
+      );
       setSelectedEmployee('');
       setShiftPreset('ca_sang');
       setStartHour('08');
@@ -692,8 +708,11 @@ const ShiftsPage = () => {
                           )}
                           {shift.checked_in_at && (
                             <p className="font-bold text-slate-700">
-                              ⏱ {shiftDuration(shift.checked_in_at, shift.closed_at)}
+                              ⏱ {actualWorkDuration(shift)}
                             </p>
+                          )}
+                          {!shift.checked_in_at && shift.closed_at && (
+                            <p className="font-bold text-slate-700">⏱ {actualWorkDuration(shift)}</p>
                           )}
                         </div>
                       </td>
@@ -835,7 +854,7 @@ const ShiftsPage = () => {
                     </div>
                     <div className="rounded-xl bg-blue-50 p-3.5">
                       <p className="text-xs font-bold text-blue-500">Tổng thời gian</p>
-                      <p className="mt-1 text-sm font-black text-blue-700">{shiftDuration(selectedShift.checked_in_at, selectedShift.closed_at)}</p>
+                      <p className="mt-1 text-sm font-black text-blue-700">{actualWorkDuration(selectedShift)}</p>
                     </div>
                   </div>
 

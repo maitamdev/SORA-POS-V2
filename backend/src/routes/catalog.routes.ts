@@ -36,9 +36,10 @@ supplierRoutes.delete('/:id', roleMiddleware('admin'), SupplierController.delete
 
 export const customerRoutes = Router();
 customerRoutes.use(authMiddleware);
-customerRoutes.get('/', CustomerController.list);
-customerRoutes.post('/', validateMiddleware(customerCreateSchema), CustomerController.create);
-customerRoutes.put('/:id', validateMiddleware(customerUpdateSchema), CustomerController.update);
+customerRoutes.get('/', roleMiddleware('admin', 'manager'), CustomerController.list);
+customerRoutes.get('/lookup', roleMiddleware('admin', 'manager'), CustomerController.lookup);
+customerRoutes.post('/', roleMiddleware('admin', 'manager'), validateMiddleware(customerCreateSchema), CustomerController.create);
+customerRoutes.put('/:id', roleMiddleware('admin', 'manager'), validateMiddleware(customerUpdateSchema), CustomerController.update);
 customerRoutes.delete('/:id', roleMiddleware('admin', 'manager'), CustomerController.delete);
 
 export const productRoutes = Router();

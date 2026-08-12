@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   FiArrowLeft, FiPlus, FiTrash2, FiSearch, FiDollarSign, FiFileText, FiUser, FiInfo, FiCheck, FiLoader
@@ -26,6 +26,10 @@ const createLineId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 
 
 export default function CreateReceiptPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefillProductId = searchParams.get('product_id');
+  const prefillQuantity = Math.max(1, Number(searchParams.get('quantity') || 1));
+  const prefillAppliedRef = useRef(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -153,6 +157,31 @@ export default function CreateReceiptPage() {
     setSearchQuery('');
     setShowDropdown(false);
   };
+
+  useEffect(() => {
+    if (!prefillProductId || prefillAppliedRef.current) return;
+
+    const loadPrefilledProduct = async () => {
+      try {
+        const response = await catalogAPI.products.get(prefillProductId);
+        const product = response.data.data;
+        setSelectedItems([{
+          lineId: createLineId(),
+          product,
+          quantity: prefillQuantity,
+          unit_price: product.cost_price || 0,
+          expiry_date: '',
+          batch_number: '',
+        }]);
+        prefillAppliedRef.current = true;
+        toast.success(`Đã thêm ${product.name} theo đề xuất AI · ${prefillQuantity} ${product.unit}`);
+      } catch {
+        toast.error('Không tải được sản phẩm AI đề xuất để lập phiếu nhập');
+      }
+    };
+
+    loadPrefilledProduct();
+  }, [prefillProductId, prefillQuantity]);
 
   const handleUpdateQty = (lineId: string, qty: number) => {
     if (qty <= 0) return;

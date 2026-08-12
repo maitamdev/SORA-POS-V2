@@ -252,6 +252,7 @@ export interface StaffUser {
   email: string;
   full_name: string;
   phone?: string | null;
+  notification_email?: string | null;
   avatar_url?: string | null;
   role: 'cashier' | 'manager' | 'admin';
   is_active: boolean;
@@ -292,6 +293,7 @@ export interface ShiftSummary {
   hourly: Array<{ hour: string; revenue: number; orders: number }>;
   top_products: Array<{ product_id: string; product_name: string; quantity: number; revenue: number }>;
   cash_drawer_tx_total?: number;
+  cash_expected?: number;
 }
 
 export interface ShiftSession {
@@ -306,6 +308,7 @@ export interface ShiftSession {
   closing_cash?: number | null;
   expected_cash?: number | null;
   cash_difference?: number | null;
+  total_work_minutes?: number | null;
   note?: string | null;
   manager_note?: string | null;
   started_at?: string | null;
@@ -313,8 +316,8 @@ export interface ShiftSession {
   closed_at?: string | null;
   created_at: string;
   updated_at: string;
-  employee?: Pick<StaffUser, 'id' | 'full_name' | 'email'> | null;
-  opener?: Pick<StaffUser, 'id' | 'full_name' | 'email'> | null;
+  employee?: Pick<StaffUser, 'id' | 'full_name' | 'email' | 'notification_email'> | null;
+  opener?: Pick<StaffUser, 'id' | 'full_name' | 'email' | 'notification_email'> | null;
   summary?: ShiftSummary;
   orders?: Order[];
   cash_drawer_transactions?: CashDrawerTransaction[];

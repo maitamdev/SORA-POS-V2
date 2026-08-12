@@ -18,11 +18,11 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
   const showCheckoutConfirm = usePOSStore((s) => s.showCheckoutConfirm);
   const cart = usePOSStore((s) => s.cart);
   const matchedCustomer = usePOSStore((s) => s.matchedCustomer);
-  const customerPhone = usePOSStore((s) => s.customerPhone);
   const newCustName = usePOSStore((s) => s.newCustName);
   const paymentMethod = usePOSStore((s) => s.paymentMethod);
   const isRedeemingPoints = usePOSStore((s) => s.isRedeemingPoints);
   const usedPoints = usePOSStore((s) => s.usedPoints);
+  const operationSettings = usePOSStore((s) => s.operationSettings);
 
   const setShowCheckoutConfirm = usePOSStore((s) => s.setShowCheckoutConfirm);
   const setIsRedeemingPoints = usePOSStore((s) => s.setIsRedeemingPoints);
@@ -64,7 +64,6 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                   {matchedCustomer ? (
                     <div className="space-y-1">
                       <p className="text-sm font-black text-slate-800">{matchedCustomer.name}</p>
-                      <p className="text-slate-500">{customerPhone}</p>
                       <p className="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-extrabold mt-1">
                         Điểm khả dụng: {matchedCustomer.points} điểm
                       </p>
@@ -72,7 +71,6 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                   ) : newCustName.trim() ? (
                     <div className="space-y-1">
                       <p className="text-sm font-black text-slate-800">{newCustName}</p>
-                      <p className="text-slate-500">{customerPhone}</p>
                       <span className="text-[9px] font-black uppercase bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 inline-block mt-1">Đăng ký mới</span>
                     </div>
                   ) : (
@@ -144,7 +142,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                         placeholder="0"
                         className="w-24 bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-black text-slate-800 text-center outline-none focus:border-blue-500 transition"
                       />
-                      <span className="text-xs text-blue-700 font-bold">điểm (giảm {money(usedPoints * 1000)})</span>
+                      <span className="text-xs text-blue-700 font-bold">điểm (giảm {money(usedPoints * 1000, operationSettings.currency, operationSettings.locale)})</span>
                     </div>
                   )}
                 </div>
@@ -179,7 +177,7 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <span className="text-slate-400 font-bold">x{item.quantity}</span>
                         <span className="font-extrabold text-slate-800 w-16 text-right">
-                          {money(Number(item.product.sell_price) * item.quantity)}
+                          {money(Number(item.product.sell_price) * item.quantity, operationSettings.currency, operationSettings.locale)}
                         </span>
                       </div>
                     </div>
@@ -191,23 +189,23 @@ const CheckoutConfirmModal = ({ onCheckout }: CheckoutConfirmModalProps) => {
               <div className="bg-slate-50/80 border border-slate-200/60 rounded-xl p-4 space-y-2 text-xs font-bold text-slate-600">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">Tạm tính:</span>
-                  <span className="text-slate-800 font-extrabold">{money(total)}</span>
+                  <span className="text-slate-800 font-extrabold">{money(total, operationSettings.currency, operationSettings.locale)}</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between items-center text-red-500">
                     <span>Chiết khấu đơn:</span>
-                    <span className="font-extrabold">-{money(discountAmount)}</span>
+                    <span className="font-extrabold">-{money(discountAmount, operationSettings.currency, operationSettings.locale)}</span>
                   </div>
                 )}
                 {pointsDiscount > 0 && (
                   <div className="flex justify-between items-center text-blue-600">
                     <span>Đổi điểm tích lũy:</span>
-                    <span className="font-extrabold">-{money(pointsDiscount)}</span>
+                    <span className="font-extrabold">-{money(pointsDiscount, operationSettings.currency, operationSettings.locale)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center border-t border-slate-200 pt-2 text-sm font-extrabold text-slate-800">
                   <span>Cần thanh toán:</span>
-                  <span className="text-lg font-black text-blue-600">{money(finalAmount)}</span>
+                  <span className="text-lg font-black text-blue-600">{money(finalAmount, operationSettings.currency, operationSettings.locale)}</span>
                 </div>
               </div>
             </div>

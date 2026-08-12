@@ -19,7 +19,13 @@ import {
 } from 'react-icons/hi';
 import { catalogAPI } from '../../services/catalog.api';
 import { aiAPI } from '../../services/ai.api';
-import { defaultOperationSettings, OperationSettings, settingsAPI } from '../../services/settings.api';
+import {
+  defaultOperationSettings,
+  normalizeOperationSettings,
+  OperationSettings,
+  settingsAPI,
+  subscribeOperationSettings,
+} from '../../services/settings.api';
 import { useAuthStore } from '../../stores/auth.store';
 import { Category, Product, Supplier } from '../../types/domain.type';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
@@ -245,14 +251,20 @@ const ProductsPage = () => {
   }, [categoryParam]);
 
   useEffect(() => {
+    const unsubscribe = subscribeOperationSettings((value) => {
+      setOperationSettings(normalizeOperationSettings(value));
+    });
+
     settingsAPI
       .getOperation()
       .then((response) => {
-        const nextSettings = { ...defaultOperationSettings, ...response.data.data.settings };
+        const nextSettings = normalizeOperationSettings(response.data.data.settings);
         setOperationSettings(nextSettings);
         setMinStockLevel(nextSettings.defaultMinStockLevel);
       })
-      .catch(() => setOperationSettings(defaultOperationSettings));
+      .catch(() => setOperationSettings(normalizeOperationSettings(defaultOperationSettings)));
+
+    return unsubscribe;
   }, []);
 
   // SVG Donut chart calculations

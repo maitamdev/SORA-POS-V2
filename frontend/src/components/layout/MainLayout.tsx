@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NetworkStatusBar from '../common/NetworkStatusBar';
 import { useAuthStore } from '../../stores/auth.store';
+import { useSessionTimeout } from '../../hooks/useSessionTimeout';
 import { HiOutlineCalendar } from 'react-icons/hi';
 
 /**
@@ -95,6 +96,8 @@ const TopHeader = () => {
 const MainLayout = () => {
   const location = useLocation();
   const isPosPage = location.pathname === '/pos';
+
+  useSessionTimeout();
 
   // Khởi chạy auto-sync + realtime subscriptions khi mount
   useEffect(() => {

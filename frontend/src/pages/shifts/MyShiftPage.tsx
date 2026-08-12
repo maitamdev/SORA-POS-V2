@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   HiOutlineCash,
-  HiOutlineChartBar,
   HiOutlineClipboardList,
+  HiOutlineClock,
   HiOutlineRefresh,
   HiOutlineShoppingCart,
 } from 'react-icons/hi';
@@ -35,6 +35,23 @@ const statusClass = (status?: ShiftSession['status']) => {
   if (status === 'opened') return 'bg-blue-50 text-blue-700 border-blue-100';
   if (status === 'closed') return 'bg-slate-100 text-slate-700 border-slate-200';
   return 'bg-amber-50 text-amber-700 border-amber-100';
+};
+
+const workDuration = (shift: ShiftSession) => {
+  if (shift.total_work_minutes !== null && shift.total_work_minutes !== undefined) {
+    const minutes = Math.max(0, Number(shift.total_work_minutes));
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return hours > 0 ? `${hours} giờ ${remainder} phút` : `${remainder} phút`;
+  }
+
+  const start = shift.started_at || shift.checked_in_at;
+  if (!start) return 'Chưa nhận ca';
+  const end = shift.closed_at ? new Date(shift.closed_at) : new Date();
+  const minutes = Math.max(0, Math.round((end.getTime() - new Date(start).getTime()) / 60000));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours} giờ ${remainder} phút` : `${remainder} phút`;
 };
 
 const MyShiftPage = () => {
@@ -81,6 +98,7 @@ const MyShiftPage = () => {
   // expectedCash calculated based on opening cash and sales
   const expectedCash = useMemo(() => {
     if (!selectedShift) return 0;
+    if (summary?.cash_expected !== undefined) return Number(summary.cash_expected || 0);
     const opening = Number(selectedShift.opening_cash || 0);
     const cashSales = Number(summary?.payments?.cash || 0);
     return opening + cashSales;
@@ -118,7 +136,7 @@ const MyShiftPage = () => {
           <p className="text-xs font-black uppercase text-blue-600">Nhân viên bán hàng</p>
           <h1 className="text-xl font-black text-slate-900 sm:text-2xl">Ca của tôi</h1>
           <p className="text-sm font-medium text-slate-500">
-            {user?.full_name || 'Nhân viên'} xem doanh thu, đơn hàng và đối soát trong ca làm.
+             {user?.full_name || 'Nhân viên'} nhận ca, chốt ca và đối soát tiền mặt trong ca làm.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -172,6 +190,7 @@ const MyShiftPage = () => {
               <p className="mt-2 text-sm font-semibold text-slate-500">
                 Nhận ca: {selectedShift.checked_in_at ? new Date(selectedShift.checked_in_at).toLocaleString('vi-VN') : 'Chưa nhận ca'}
                 {selectedShift.closed_at ? ` - Chốt ca: ${new Date(selectedShift.closed_at).toLocaleString('vi-VN')}` : ''}
+                {` · Tổng giờ làm: ${workDuration(selectedShift)}`}
               </p>
             </div>
 
@@ -237,11 +256,6 @@ const MyShiftPage = () => {
 
           <section className="grid grid-cols-1 gap-5 md:grid-cols-4">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <HiOutlineChartBar className="mb-2 h-5 w-5 text-blue-600" />
-              <p className="text-xs font-black uppercase text-slate-400">Doanh thu ca</p>
-              <p className="mt-2 text-2xl font-black text-slate-900">{money(summary?.revenue || 0)}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <HiOutlineClipboardList className="mb-2 h-5 w-5 text-emerald-600" />
               <p className="text-xs font-black uppercase text-slate-400">Số đơn</p>
               <p className="mt-2 text-2xl font-black text-slate-900">{summary?.order_count || 0}</p>
@@ -257,45 +271,10 @@ const MyShiftPage = () => {
                 {selectedShift.cash_difference == null ? '-' : money(selectedShift.cash_difference)}
               </p>
             </div>
-          </section>
-
-          <section className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-black uppercase text-slate-700">Thanh toán</h2>
-              <div className="mt-4 space-y-3 text-sm font-bold text-slate-600">
-                <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span>Tiền mặt</span>
-                  <span className="text-slate-900">{money(summary?.payments.cash || 0)}</span>
-                </div>
-                <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span>Chuyển khoản</span>
-                  <span className="text-slate-900">{money(summary?.payments.transfer || 0)}</span>
-                </div>
-                <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                  <span>Thẻ</span>
-                  <span className="text-slate-900">{money(summary?.payments.card || 0)}</span>
-                </div>
-
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-              <h2 className="text-sm font-black uppercase text-slate-700">Sản phẩm đã bán</h2>
-              <div className="mt-4 space-y-2">
-                {(summary?.top_products || []).length === 0 ? (
-                  <p className="py-8 text-center text-sm font-semibold text-slate-400">Chưa có sản phẩm nào trong ca</p>
-                ) : (
-                  summary?.top_products.map((item) => (
-                    <div key={item.product_id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <div>
-                        <p className="font-black text-slate-800">{item.product_name}</p>
-                        <p className="text-xs font-semibold text-slate-400">Số lượng {item.quantity}</p>
-                      </div>
-                      <p className="font-black text-blue-700">{money(item.revenue)}</p>
-                    </div>
-                  ))
-                )}
-              </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-5 shadow-sm">
+              <HiOutlineClock className="mb-2 h-5 w-5 text-blue-600" />
+              <p className="text-xs font-black uppercase text-blue-500">Tổng giờ làm</p>
+              <p className="mt-2 text-2xl font-black text-blue-800">{workDuration(selectedShift)}</p>
             </div>
           </section>
 
@@ -310,13 +289,12 @@ const MyShiftPage = () => {
                     <th className="px-4 py-3 font-black">Hóa đơn</th>
                     <th className="px-4 py-3 font-black">Thời gian</th>
                     <th className="px-4 py-3 font-black">Trạng thái</th>
-                    <th className="px-4 py-3 text-right font-black">Tổng tiền</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(selectedShift.orders || []).length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có đơn hàng</td>
+                      <td colSpan={3} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có đơn hàng</td>
                     </tr>
                   ) : (
                     selectedShift.orders?.map((order) => (
@@ -324,7 +302,6 @@ const MyShiftPage = () => {
                         <td className="px-4 py-3 font-black text-slate-800">{order.order_number}</td>
                         <td className="px-4 py-3 font-semibold text-slate-500">{new Date(order.created_at).toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-3 font-bold text-slate-500">{order.status}</td>
-                        <td className="px-4 py-3 text-right font-black text-slate-900">{money(order.final_amount)}</td>
                       </tr>
                     ))
                   )}

@@ -22,7 +22,8 @@ Chay cac file trong Supabase SQL Editor theo dung thu tu:
 | 12 | `purchase_order_lifecycle.sql` | Vòng đời đơn nhập, duyệt, đang về và nhận hàng từng phần atomic |
 | 13 | `stock_summary_rpc.sql` | Aggregate KPI tồn kho trong PostgreSQL để dashboard không phải tải toàn bộ catalog về Node.js |
 | 14 | `ai_inventory_analyses.sql` | Tạo bảng lưu lịch sử phân tích kho AI |
-| 15 | `seed.sql` | Dữ liệu mẫu, chỉ dùng cho demo/database mới |
+| 15 | `employee_notification_email_and_shift_duration.sql` | Email nhận lịch ca cho nhân viên và tổng giờ làm thực tế khi chốt ca |
+| 16 | `seed.sql` | Dữ liệu mẫu, chỉ dùng cho demo/database mới |
 
 ## Luu Y
 

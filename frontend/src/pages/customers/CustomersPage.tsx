@@ -4,6 +4,7 @@ import {
   FiAward,
   FiEdit2,
   FiMail,
+  FiLock,
   FiMapPin,
   FiPhone,
   FiPlus,
@@ -16,6 +17,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import { catalogAPI } from '../../services/catalog.api';
+import { useAuthStore } from '../../stores/auth.store';
 import { Customer } from '../../types/domain.type';
 
 type TierFilter = 'all' | 'vip' | 'loyal' | 'new';
@@ -33,6 +35,8 @@ const emptyForm: CustomerForm = {
   phone: '',
   address: '',
 };
+
+const CUSTOMER_PHONE_MASK = '***';
 
 const money = (value: number) => `${Number(value || 0).toLocaleString('vi-VN')}đ`;
 
@@ -69,6 +73,8 @@ const getCustomerTier = (customer: Customer) => {
 const normalize = (value: string) => value.toLowerCase().trim();
 
 const CustomersPage = () => {
+  const { user } = useAuthStore();
+  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState('');
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
@@ -113,7 +119,6 @@ const CustomersPage = () => {
       const matchesSearch =
         !term ||
         normalize(customer.name || '').includes(term) ||
-        normalize(customer.phone || '').includes(term) ||
         normalize(customer.email || '').includes(term) ||
         normalize(customer.address || '').includes(term);
 
@@ -128,17 +133,25 @@ const CustomersPage = () => {
   };
 
   const openCreateModal = () => {
+    if (!canManageCustomerData) {
+      toast.error('Chỉ quản lý mới được tạo hoặc thay đổi thông tin khách hàng');
+      return;
+    }
     setForm(emptyForm);
     setEditingCustomer(null);
     setCustomerModalOpen(true);
   };
 
   const startEdit = (customer: Customer) => {
+    if (!canManageCustomerData) {
+      toast.error('Nhân viên chỉ được tra cứu khách hàng');
+      return;
+    }
     setEditingCustomer(customer);
     setForm({
       name: customer.name || '',
       email: customer.email || '',
-      phone: customer.phone || '',
+      phone: '',
       address: customer.address || '',
     });
     setCustomerModalOpen(true);
@@ -146,17 +159,22 @@ const CustomersPage = () => {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!canManageCustomerData) {
+      toast.error('Chỉ quản lý mới được thay đổi thông tin khách hàng');
+      return;
+    }
     if (!form.name.trim()) {
       toast.error('Vui lòng nhập tên khách hàng');
       return;
     }
 
-    const payload = {
+    const payload: Partial<Customer> = {
       name: form.name.trim(),
       email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
       address: form.address.trim() || null,
     };
+    if (!editingCustomer) payload.phone = form.phone.trim() || null;
+    else if (form.phone.trim()) payload.phone = form.phone.trim();
 
     setSaving(true);
     try {
@@ -178,6 +196,10 @@ const CustomersPage = () => {
   };
 
   const removeCustomer = async (customer: Customer) => {
+    if (!canManageCustomerData) {
+      toast.error('Chỉ quản lý mới được xóa khách hàng');
+      return;
+    }
     if (!window.confirm(`Xóa khách hàng "${customer.name}"?`)) return;
 
     try {
@@ -206,6 +228,16 @@ const CustomersPage = () => {
           <p className="text-sm font-medium text-slate-500">
             Quản lý hồ sơ khách mua hàng, điểm tích lũy và mức chi tiêu.
           </p>
+          {!canManageCustomerData && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800">
+              <FiLock size={13} /> Nhân viên chỉ được tra cứu tên và điểm; SĐT và hồ sơ khách hàng được ẩn.
+            </p>
+          )}
+          {canManageCustomerData && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-800">
+              <FiLock size={13} /> SĐT khách hàng luôn được ẩn; Admin/Quản lý có thể nhập số mới khi cần cập nhật.
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative">
@@ -213,7 +245,7 @@ const CustomersPage = () => {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm tên, SĐT, email..."
+              placeholder={canManageCustomerData ? 'Tìm tên, email...' : 'Tìm theo tên khách hàng...'}
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold outline-none transition focus:border-blue-500 sm:w-80"
             />
           </div>
@@ -271,14 +303,20 @@ const CustomersPage = () => {
                 <p className="mt-0.5 text-xs font-medium text-slate-500">Thêm hồ sơ để tích điểm và cá nhân hóa trải nghiệm mua hàng.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="app-modal-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
-            >
-              <FiPlus size={16} />
-              Thêm khách hàng
-            </button>
+            {canManageCustomerData ? (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="app-modal-control inline-flex h-10 items-center justify-center gap-2 bg-blue-600 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <FiPlus size={16} />
+                Thêm khách hàng
+              </button>
+            ) : (
+              <span className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs font-black text-slate-500">
+                <FiLock size={14} /> Chỉ quản lý được chỉnh sửa
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -355,11 +393,11 @@ const CustomersPage = () => {
                             <div className="space-y-1 text-xs">
                               <p className="flex items-center gap-1.5 text-slate-700">
                                 <FiPhone size={12} className="text-slate-400" />
-                                {customer.phone || 'Chưa có SĐT'}
+                                <span className="tracking-[0.25em] text-slate-400">{CUSTOMER_PHONE_MASK}</span>
                               </p>
                               <p className="flex items-center gap-1.5 text-slate-500">
                                 <FiMail size={12} className="text-slate-400" />
-                                {customer.email || 'Chưa có email'}
+                                {canManageCustomerData ? (customer.email || 'Chưa có email') : 'Ẩn theo phân quyền'}
                               </p>
                             </div>
                           </td>
@@ -372,20 +410,28 @@ const CustomersPage = () => {
                           <td className="px-4 py-3 text-right font-black">{Number(customer.points || 0).toLocaleString('vi-VN')}</td>
                           <td className="px-4 py-3 text-right font-black text-slate-900">{money(customer.total_spent || 0)}</td>
                           <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => startEdit(customer)}
-                              className="mr-2 rounded-lg border border-blue-100 bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-100"
-                              title="Sửa khách hàng"
-                            >
-                              <FiEdit2 size={14} />
-                            </button>
-                            <button
-                              onClick={() => removeCustomer(customer)}
-                              className="rounded-lg border border-rose-100 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
-                              title="Xóa khách hàng"
-                            >
-                              <FiTrash2 size={14} />
-                            </button>
+                            {canManageCustomerData ? (
+                              <>
+                                <button
+                                  onClick={() => startEdit(customer)}
+                                  className="mr-2 rounded-lg border border-blue-100 bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-100"
+                                  title="Sửa khách hàng"
+                                >
+                                  <FiEdit2 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => removeCustomer(customer)}
+                                  className="rounded-lg border border-rose-100 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                                  title="Xóa khách hàng"
+                                >
+                                  <FiTrash2 size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400">
+                                <FiLock size={12} /> Chỉ xem
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -418,11 +464,11 @@ const CustomersPage = () => {
                           <div className="mt-1 space-y-1 text-xs font-semibold text-slate-500">
                             <p className="flex items-center gap-1.5">
                               <FiPhone size={12} />
-                              {customer.phone || 'Chưa có SĐT'}
+                              <span className="tracking-[0.25em] text-slate-400">{CUSTOMER_PHONE_MASK}</span>
                             </p>
                             <p className="flex items-center gap-1.5">
                               <FiMail size={12} />
-                              {customer.email || 'Chưa có email'}
+                              {canManageCustomerData ? (customer.email || 'Chưa có email') : 'Ẩn theo phân quyền'}
                             </p>
                           </div>
                         </div>
@@ -443,20 +489,26 @@ const CustomersPage = () => {
                         </div>
                       </div>
 
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => startEdit(customer)}
-                          className="flex-1 rounded-lg border border-blue-100 bg-blue-50 py-2 text-xs font-black text-blue-600"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => removeCustomer(customer)}
-                          className="flex-1 rounded-lg border border-rose-100 bg-rose-50 py-2 text-xs font-black text-rose-600"
-                        >
-                          Xóa
-                        </button>
-                      </div>
+                      {canManageCustomerData ? (
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => startEdit(customer)}
+                            className="flex-1 rounded-lg border border-blue-100 bg-blue-50 py-2 text-xs font-black text-blue-600"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => removeCustomer(customer)}
+                            className="flex-1 rounded-lg border border-rose-100 bg-rose-50 py-2 text-xs font-black text-rose-600"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-3 text-[11px] font-bold text-slate-400">
+                          <FiLock size={12} /> Chỉ quản lý được thay đổi hồ sơ
+                        </div>
+                      )}
                     </article>
                   );
                 })
@@ -516,11 +568,15 @@ const CustomersPage = () => {
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Số điện thoại</span>
                   <input
+                    type="password"
+                    inputMode="tel"
+                    autoComplete="off"
                     value={form.phone}
                     onChange={(event) => setForm((state) => ({ ...state, phone: event.target.value }))}
                     className="app-modal-control w-full border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    placeholder="09xx xxx xxx"
+                    placeholder={editingCustomer ? 'Nhập SĐT mới nếu cần' : '09xx xxx xxx'}
                   />
+                  {editingCustomer && <span className="mt-1.5 block text-[10px] font-semibold text-slate-400">SĐT cũ vẫn được giữ kín. Nhập số mới để thay đổi; để trống nếu giữ nguyên.</span>}
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">Email</span>

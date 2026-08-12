@@ -15,6 +15,26 @@ export class AuthController {
   });
 
   /**
+   * POST /api/auth/forgot-password
+   */
+  static forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+    await AuthService.requestPasswordReset(req.body.email);
+    successResponse(
+      res,
+      null,
+      'Nếu email tồn tại, hướng dẫn khôi phục mật khẩu đã được gửi đến hộp thư'
+    );
+  });
+
+  /**
+   * POST /api/auth/reset-password
+   */
+  static resetPassword = asyncHandler(async (req: Request, res: Response) => {
+    await AuthService.resetPassword(req.body.token, req.body.newPassword);
+    successResponse(res, null, 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại');
+  });
+
+  /**
    * POST /api/auth/logout
    * JWT là stateless nên backend chỉ trả response OK
    * Frontend sẽ xóa token khỏi localStorage
@@ -31,5 +51,14 @@ export class AuthController {
     if (!req.user) throw new AppError(401, 'Chưa xác thực');
     const user = await AuthService.getProfile(req.user.userId);
     successResponse(res, { user }, 'Xác thực thành công');
+  });
+
+  /**
+   * POST /api/auth/change-password
+   */
+  static changePassword = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new AppError(401, 'Chưa xác thực');
+    await AuthService.changePassword(req.user.userId, req.body.currentPassword, req.body.newPassword);
+    successResponse(res, null, 'Đổi mật khẩu thành công');
   });
 }

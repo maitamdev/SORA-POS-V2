@@ -3,6 +3,7 @@ import {
   syncProductsToLocal,
   syncCategoriesToLocal,
   syncCustomersToLocal,
+  clearCustomersOffline,
   getPendingOrders,
   markOrderSyncing,
   markOrderFailed,
@@ -31,10 +32,11 @@ export async function syncAllDataToLocal(): Promise<void> {
   isSyncing = true;
 
   try {
+    const canManageCustomerData = useAuthStore.getState().hasRole('admin', 'manager');
     const [productCount, categoryCount, customerCount] = await Promise.all([
       syncProductsToLocal(),
       syncCategoriesToLocal(),
-      syncCustomersToLocal(),
+      canManageCustomerData ? syncCustomersToLocal() : clearCustomersOffline().then(() => 0),
     ]);
     console.log(
       `[OfflineSync] Đã đồng bộ: ${productCount} sản phẩm, ${categoryCount} danh mục, ${customerCount} khách hàng`

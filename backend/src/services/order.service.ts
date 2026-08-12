@@ -31,7 +31,9 @@ type CreateOrderInput = {
   items: OrderItemInput[];
 };
 
-const orderSelect = '*, customers(*), users!orders_user_id_fkey(id, full_name, email), order_details(*), payments(*)';
+const CASHIER_ORDER_FIELDS = 'id, order_number, user_id, shift_id, shift_code, total_amount, discount_amount, final_amount, status, payment_status, note, loyalty_points_used, loyalty_points_earned, cancelled_at, cancelled_by, created_at, updated_at';
+const orderSelect = '*, customers(id, name, email), users!orders_user_id_fkey(id, full_name, email), order_details(*), payments(*)';
+const orderSelectForCashier: string = `${CASHIER_ORDER_FIELDS}, users!orders_user_id_fkey(id, full_name), order_details(*), payments(*)`;
 
 const mapRpcError = (message?: string) => {
   const text = message || 'Database transaction failed';
@@ -51,9 +53,12 @@ const mapRpcError = (message?: string) => {
 export class OrderService {
   static async list(queryParams: Record<string, unknown>, currentUser?: JwtPayload) {
     const { page, limit, from, to } = parsePagination(queryParams);
+    const select: string = currentUser?.role === 'cashier'
+      ? `${CASHIER_ORDER_FIELDS}, users!orders_user_id_fkey(id, full_name), payments(method, amount)`
+      : '*, customers(id, name), users!orders_user_id_fkey(id, full_name), payments(method, amount)';
     let query = supabase
       .from('orders')
-      .select('*, customers(id, name, phone), users!orders_user_id_fkey(id, full_name), payments(method, amount)', { count: 'exact' })
+      .select(select as any, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -81,9 +86,9 @@ export class OrderService {
   }
 
   static async getById(id: string, currentUser?: JwtPayload) {
-    const { data: order, error } = await supabase
-      .from('orders')
-      .select(orderSelect)
+    const orderQuery: any = supabase.from('orders');
+    const { data: order, error } = await orderQuery
+      .select(currentUser?.role === 'cashier' ? orderSelectForCashier : orderSelect)
       .eq('id', id)
       .single();
 

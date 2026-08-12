@@ -376,7 +376,7 @@ const TransferPaymentModal = ({ onCheckout }: TransferPaymentModalProps) => {
                     </div>
                     <div>
                       <p className="text-[11px] font-semibold text-slate-400">Số tiền thanh toán</p>
-                      <p className="font-black text-blue-600 text-base mt-0.5">{money(finalAmount)}</p>
+                      <p className="font-black text-blue-600 text-base mt-0.5">{money(finalAmount, operationSettings.currency, operationSettings.locale)}</p>
                     </div>
                   </div>
                   <button

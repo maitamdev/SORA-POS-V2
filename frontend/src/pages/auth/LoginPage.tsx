@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import toast from 'react-hot-toast';
@@ -150,12 +150,12 @@ const LoginPage = () => {
                 <label htmlFor="password" className="text-[11px] font-semibold text-slate-600 tracking-wide">
                   Mật khẩu
                 </label>
-                <a
-                  href="#recover"
+                <Link
+                  to="/forgot-password"
                   className="text-[10px] font-semibold text-blue-600 transition-colors duration-200 hover:text-blue-700 hover:underline"
                 >
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">

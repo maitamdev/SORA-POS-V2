@@ -42,7 +42,12 @@ export class SupplierController {
 
 export class CustomerController {
   static list = asyncHandler(async (req: Request, res: Response) => {
-    successResponse(res, await CatalogService.listCustomers(req.query), 'Lấy danh sách khách hàng thành công');
+    successResponse(res, await CatalogService.listCustomers(req.query, req.user), 'Lấy danh sách khách hàng thành công');
+  });
+
+  static lookup = asyncHandler(async (req: Request, res: Response) => {
+    const phone = typeof req.query.phone === 'string' ? req.query.phone : '';
+    successResponse(res, await CatalogService.lookupCustomerByPhone(phone, req.user), 'Tra cứu khách hàng thành công');
   });
 
   static create = asyncHandler(async (req: Request, res: Response) => {

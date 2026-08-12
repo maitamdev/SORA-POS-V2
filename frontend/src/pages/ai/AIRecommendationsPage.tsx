@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { FiCheck, FiRefreshCw, FiX, FiZap, FiTrendingUp, FiTrendingDown, FiMinus, FiAlertTriangle, FiPackage, FiShoppingCart } from 'react-icons/fi';
+import { FiCheck, FiRefreshCw, FiX, FiZap, FiTrendingUp, FiTrendingDown, FiMinus, FiAlertTriangle, FiPackage, FiShoppingCart, FiArrowRight } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import { aiAPI } from '../../services/ai.api';
 import { AIRecommendation, RestockAnalysis } from '../../types/domain.type';
 
@@ -160,6 +161,7 @@ const renderFormattedText = (text: string) => {
 };
 
 const AIRecommendationsPage = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState<AIRecommendation[]>([]);
   const [analysis, setAnalysis] = useState<RestockAnalysis | null>(null);
   const [targetDays, setTargetDays] = useState(14);
@@ -214,6 +216,14 @@ const AIRecommendationsPage = () => {
     } catch {
       toast.error('Không cập nhật được trạng thái');
     }
+  };
+
+  const openRestockAction = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      navigate('/stock?tab=inventory');
+      return;
+    }
+    navigate(`/stock/receipts/new?product_id=${encodeURIComponent(productId)}&quantity=${encodeURIComponent(String(quantity))}`);
   };
 
   const summary = analysis?.summary;
@@ -519,6 +529,23 @@ const AIRecommendationsPage = () => {
                   </td>
                   <td className="max-w-sm px-4 py-3.5">
                     <div className="bg-slate-50/80 rounded-lg p-2.5 border border-slate-100">
+                      <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+                        <button
+                          type="button"
+                          onClick={() => openRestockAction(item.id, item.recommended_quantity)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-[10px] font-black text-white transition hover:bg-blue-700"
+                        >
+                          <FiShoppingCart size={12} />
+                          {item.recommended_quantity > 0 ? 'Tạo phiếu nhập' : 'Mở tồn kho'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/stock?tab=alerts')}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+                        >
+                          Xem cảnh báo <FiArrowRight size={12} />
+                        </button>
+                      </div>
                       {renderFormattedText(item.ai_insight)}
                       {item.assumptions && item.assumptions.length > 0 && (
                         <div className="mt-2 border-t border-slate-200 pt-2 text-[10px] font-semibold text-slate-500">
@@ -577,7 +604,15 @@ const AIRecommendationsPage = () => {
                   </div>
                 </div>
                 {item.status === 'pending' && (
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openRestockAction(item.product_id, item.recommended_quantity)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[11px] font-black text-blue-700 hover:bg-blue-100"
+                    >
+                      <FiShoppingCart size={13} />
+                      {item.recommended_quantity > 0 ? 'Tạo phiếu nhập' : 'Mở tồn kho'}
+                    </button>
                     <button
                       onClick={() => updateStatus(item.id, 'rejected')}
                       className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"

@@ -1,5 +1,6 @@
 import { ShiftSession } from '../../../types/domain.type';
 import { money } from '../utils/posHelpers';
+import { usePOSStore } from '../../../stores/pos.store';
 
 interface ShiftGuardProps {
   activeShift: ShiftSession | null;
@@ -23,6 +24,8 @@ const ShiftGuard = ({
   onOpeningCashChange,
   onCheckIn,
 }: ShiftGuardProps) => {
+  const operationSettings = usePOSStore((state) => state.operationSettings);
+
   if (!isCashierShiftRequired) return null;
 
   // Loading state
@@ -96,20 +99,24 @@ const ShiftGuard = ({
           <h1 className="mt-2 text-2xl font-black text-slate-900">Báo cáo đã gửi quản lý</h1>
           <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-slate-50 p-4">
-              <p className="text-xs font-black uppercase text-slate-400">Doanh thu</p>
-              <p className="text-xl font-black text-slate-900">{money(activeShift.summary?.revenue || 0)}</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-black uppercase text-slate-400">Số đơn</p>
               <p className="text-xl font-black text-slate-900">{activeShift.summary?.order_count || 0}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-black uppercase text-slate-400">Tiền cần có</p>
-              <p className="text-xl font-black text-slate-900">{money(activeShift.expected_cash || 0)}</p>
+              <p className="text-xl font-black text-slate-900">{money(activeShift.expected_cash || 0, operationSettings.currency, operationSettings.locale)}</p>
             </div>
             <div className="rounded-xl bg-slate-50 p-4">
               <p className="text-xs font-black uppercase text-slate-400">Lệch tiền</p>
-              <p className="text-xl font-black text-slate-900">{money(activeShift.cash_difference || 0)}</p>
+              <p className="text-xl font-black text-slate-900">{money(activeShift.cash_difference || 0, operationSettings.currency, operationSettings.locale)}</p>
+            </div>
+            <div className="rounded-xl bg-blue-50 p-4">
+              <p className="text-xs font-black uppercase text-blue-500">Tổng giờ làm</p>
+              <p className="text-xl font-black text-blue-800">
+                {activeShift.total_work_minutes == null
+                  ? 'Đang tính'
+                  : `${Math.floor(activeShift.total_work_minutes / 60)} giờ ${activeShift.total_work_minutes % 60} phút`}
+              </p>
             </div>
           </div>
           <p className="mt-5 text-sm font-semibold text-slate-500">

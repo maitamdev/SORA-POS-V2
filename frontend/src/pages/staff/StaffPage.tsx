@@ -26,6 +26,7 @@ const emptyForm = {
   password: '',
   full_name: '',
   phone: '',
+  notification_email: '',
   role: 'cashier' as const,
   is_active: true,
 };
@@ -162,6 +163,7 @@ const StaffPage = () => {
       password: '',
       full_name: item.full_name,
       phone: item.phone || '',
+      notification_email: item.notification_email || '',
       role: item.role as any,
       is_active: item.is_active,
     });
@@ -188,6 +190,7 @@ const StaffPage = () => {
     const payload: StaffPayload = {
       full_name: form.full_name.trim(),
       phone: form.phone.trim() || null,
+      notification_email: form.notification_email.trim() || null,
       role: form.role as 'cashier' | 'manager' | 'admin',
       is_active: form.is_active,
     };
@@ -370,12 +373,13 @@ const StaffPage = () => {
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
+                <table className="w-full min-w-[900px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                     <tr>
                       <th className="px-4 py-3 font-black">Nhân viên</th>
                       <th className="px-4 py-3 font-black">Mã đăng nhập</th>
                       <th className="px-4 py-3 font-black">Liên hệ</th>
+                      <th className="px-4 py-3 font-black">Email nhận ca</th>
                       <th className="px-4 py-3 font-black">Trạng thái</th>
                       <th className="px-4 py-3 font-black">Đăng nhập gần nhất</th>
                       {canManageStaff && <th className="px-4 py-3 text-right font-black">Thao tác</th>}
@@ -384,11 +388,11 @@ const StaffPage = () => {
                   <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                     {loading ? (
                       <tr>
-                        <td colSpan={canManageStaff ? 6 : 5} className="px-4 py-8 text-center font-semibold text-slate-400">Đang tải...</td>
+                        <td colSpan={canManageStaff ? 7 : 6} className="px-4 py-8 text-center font-semibold text-slate-400">Đang tải...</td>
                       </tr>
                     ) : staff.length === 0 ? (
                       <tr>
-                        <td colSpan={canManageStaff ? 6 : 5} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có nhân viên</td>
+                        <td colSpan={canManageStaff ? 7 : 6} className="px-4 py-8 text-center font-semibold text-slate-400">Chưa có nhân viên</td>
                       </tr>
                     ) : (
                       staff.map((item) => (
@@ -404,6 +408,9 @@ const StaffPage = () => {
                           </td>
                           <td className="px-4 py-3">
                             <p className="text-xs text-slate-400">{item.phone || 'Chưa có SĐT'}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-xs font-semibold text-blue-600">{item.notification_email || 'Chưa cấu hình'}</p>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black ${
@@ -512,6 +519,20 @@ const StaffPage = () => {
                         placeholder="09xx xxx xxx"
                       />
                     </label>
+
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 sm:col-span-2">
+                      <label className="block">
+                        <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-blue-700">Email nhân viên nhận thông báo ca *</span>
+                        <input
+                          type="email"
+                          value={form.notification_email}
+                          onChange={(event) => setForm((state) => ({ ...state, notification_email: event.target.value }))}
+                          className="app-modal-control w-full border border-blue-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          placeholder="nhanvien@example.com"
+                        />
+                        <span className="mt-1.5 block text-[10px] font-semibold text-blue-700">Nhập email ở đây. Khi mở ca cho nhân viên này, hệ thống sẽ gửi thông báo ca vào email này. Đây không phải mã đăng nhập.</span>
+                      </label>
+                    </div>
 
                     <label className="block">
                       <span className="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-500">
@@ -847,12 +868,6 @@ const StaffPage = () => {
                           <span className="text-slate-400">Khách hàng:</span>
                           <span className="text-slate-800 font-extrabold">{selectedOrder.customers?.name || 'Khách lẻ'}</span>
                         </div>
-                        {selectedOrder.customers?.phone && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">Số điện thoại:</span>
-                            <span className="text-slate-800 font-extrabold">{selectedOrder.customers.phone}</span>
-                          </div>
-                        )}
                         <div className="flex justify-between">
                           <span className="text-slate-400">Trạng thái đơn:</span>
                           <span className={`font-black uppercase ${selectedOrder.status === 'completed' ? 'text-emerald-600' : 'text-rose-600'}`}>

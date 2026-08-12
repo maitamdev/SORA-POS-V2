@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { HiOutlineCheck } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 import { usePOSStore } from '../../../stores/pos.store';
@@ -16,6 +17,19 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
   const setCheckoutSuccessInfo = usePOSStore((s) => s.setCheckoutSuccessInfo);
   const setCustomerEmail = usePOSStore((s) => s.setCustomerEmail);
   const setIsSendingEmail = usePOSStore((s) => s.setIsSendingEmail);
+  const autoPrintedOrderRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!checkoutSuccessInfo || !operationSettings.autoPrintReceipt) return undefined;
+    if (autoPrintedOrderRef.current === checkoutSuccessInfo.orderNumber) return undefined;
+
+    autoPrintedOrderRef.current = checkoutSuccessInfo.orderNumber;
+    const timer = window.setTimeout(() => {
+      onPrintInvoice(checkoutSuccessInfo.orderNumber, checkoutSuccessInfo.cart);
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [checkoutSuccessInfo, onPrintInvoice, operationSettings.autoPrintReceipt]);
 
   if (!checkoutSuccessInfo) return null;
 
@@ -140,7 +154,6 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
               <div>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Khách hàng</p>
                 <p className="text-xs font-bold text-slate-800">{info.customerName}</p>
-                {info.customerPhone && <p className="text-[11px] text-slate-500 font-medium mt-0.5">{info.customerPhone}</p>}
               </div>
               <div>
                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Thu ngân</p>
@@ -171,8 +184,8 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
                         {item.product.sku && <p className="text-[9px] text-slate-400 font-medium mt-0.5">{item.product.sku}</p>}
                       </td>
                       <td className="text-center px-3 py-2.5 text-[12px] font-semibold text-slate-700">{item.quantity}</td>
-                      <td className="text-right px-3 py-2.5 text-[12px] text-slate-600">{money(item.product.sell_price)}</td>
-                      <td className="text-right px-7 py-2.5 text-[12px] font-bold text-slate-900">{money(Number(item.product.sell_price) * item.quantity)}</td>
+                      <td className="text-right px-3 py-2.5 text-[12px] text-slate-600">{money(item.product.sell_price, operationSettings.currency, operationSettings.locale)}</td>
+                      <td className="text-right px-7 py-2.5 text-[12px] font-bold text-slate-900">{money(Number(item.product.sell_price) * item.quantity, operationSettings.currency, operationSettings.locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -184,17 +197,17 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
               <div className="w-64 space-y-1.5">
                 <div className="flex justify-between text-[12px]">
                   <span className="text-slate-500 font-semibold">Tạm tính:</span>
-                  <span className="font-bold text-slate-700">{money(info.cart.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0))}</span>
+                  <span className="font-bold text-slate-700">{money(info.cart.reduce((s, i) => s + Number(i.product.sell_price) * i.quantity, 0), operationSettings.currency, operationSettings.locale)}</span>
                 </div>
                 {info.discountAmount > 0 && (
                   <div className="flex justify-between text-[12px]">
                     <span className="text-slate-500 font-semibold">Chiết khấu:</span>
-                    <span className="font-bold text-red-600">-{money(info.discountAmount)}</span>
+                    <span className="font-bold text-red-600">-{money(info.discountAmount, operationSettings.currency, operationSettings.locale)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center border-t border-slate-300 pt-2 mt-1">
                   <span className="text-sm font-bold text-slate-900">Tổng cộng:</span>
-                  <span className="text-base font-bold text-slate-900">{money(info.finalAmount)}</span>
+                  <span className="text-base font-bold text-slate-900">{money(info.finalAmount, operationSettings.currency, operationSettings.locale)}</span>
                 </div>
               </div>
             </div>
@@ -211,12 +224,12 @@ const ReceiptPreview = ({ onPrintInvoice }: ReceiptPreviewProps) => {
                 <>
                   <div className="flex justify-between text-[12px]">
                     <span className="text-slate-500 font-semibold">Khách đưa:</span>
-                    <span className="font-bold text-slate-800">{money(info.receivedAmount)}</span>
+                    <span className="font-bold text-slate-800">{money(info.receivedAmount, operationSettings.currency, operationSettings.locale)}</span>
                   </div>
                   {info.change > 0 && (
                     <div className="flex justify-between text-[12px]">
                       <span className="text-slate-500 font-semibold">Tiền thừa:</span>
-                      <span className="font-bold text-emerald-700">{money(info.change)}</span>
+                      <span className="font-bold text-emerald-700">{money(info.change, operationSettings.currency, operationSettings.locale)}</span>
                     </div>
                   )}
                 </>

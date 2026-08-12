@@ -62,13 +62,16 @@ router.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-import { httpCacheMiddleware } from '../middlewares/cache.middleware';
+import { httpCacheMiddleware, noStoreHttpCacheMiddleware } from '../middlewares/cache.middleware';
 
 router.use('/auth', authRoutes);
 router.use('/products', httpCacheMiddleware(30, 60), productRoutes);
 router.use('/categories', httpCacheMiddleware(60, 120), categoryRoutes);
 router.use('/suppliers', httpCacheMiddleware(60, 120), supplierRoutes);
-router.use('/customers', httpCacheMiddleware(30, 60), customerRoutes);
+// Customer responses are role-sensitive and contain write-only contact data.
+// Always revalidate so a previous manager/admin response cannot be reused after
+// a role switch or deployment.
+router.use('/customers', noStoreHttpCacheMiddleware(), customerRoutes);
 router.use('/orders', orderRoutes);
 router.use('/stock', stockRoutes);
 router.use('/stock/receipts', goodsReceiptRoutes);
@@ -76,7 +79,7 @@ router.use('/stock/purchase-orders', purchaseOrderRoutes);
 router.use('/reports', reportRoutes);
 router.use('/ai', aiRoutes);
 router.use('/staff', staffRoutes);
-router.use('/settings', httpCacheMiddleware(60, 300), settingsRoutes);
+router.use('/settings', noStoreHttpCacheMiddleware(), settingsRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/payos', payosRoutes);

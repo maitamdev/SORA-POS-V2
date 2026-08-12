@@ -34,8 +34,25 @@ export interface CheckoutSuccessInfo {
 /*  Formatters                                                         */
 /* ------------------------------------------------------------------ */
 
-export const money = (value: number | string) =>
-  `${Number(value || 0).toLocaleString('vi-VN')}đ`;
+export const money = (
+  value: number | string,
+  currency = 'VND',
+  locale = 'vi-VN'
+) => {
+  const numericValue = Number(value || 0);
+  const safeCurrency = /^[A-Z]{3}$/.test(currency) ? currency : 'VND';
+
+  try {
+    return new Intl.NumberFormat(locale || 'vi-VN', {
+      style: 'currency',
+      currency: safeCurrency,
+      currencyDisplay: 'symbol',
+      maximumFractionDigits: safeCurrency === 'VND' ? 0 : 2,
+    }).format(Number.isFinite(numericValue) ? numericValue : 0);
+  } catch {
+    return `${Number.isFinite(numericValue) ? numericValue.toLocaleString('vi-VN') : '0'} ${safeCurrency}`;
+  }
+};
 
 export const escapeHtml = (value: unknown) =>
   String(value ?? '').replace(/[&<>"']/g, (char) => {

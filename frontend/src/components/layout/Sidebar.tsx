@@ -17,6 +17,7 @@ import {
   HiOutlineLightBulb,
   HiOutlineLightningBolt,
   HiOutlineCog,
+  HiOutlineLockClosed,
   HiOutlineMenu,
   HiOutlineX,
   HiOutlineDownload,
@@ -110,6 +111,12 @@ const menuItems = [
     icon: HiOutlineCog,
     path: '/settings',
     roles: ['admin'],
+  },
+  {
+    label: 'Đổi mật khẩu',
+    icon: HiOutlineLockClosed,
+    path: '/change-password',
+    roles: ['admin', 'manager', 'cashier'],
   },
 ];
 

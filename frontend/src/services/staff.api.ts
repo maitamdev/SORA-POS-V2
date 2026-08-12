@@ -7,6 +7,7 @@ export interface StaffPayload {
   password?: string;
   full_name?: string;
   phone?: string | null;
+  notification_email?: string | null;
   role?: 'cashier' | 'manager' | 'admin';
   is_active?: boolean;
 }

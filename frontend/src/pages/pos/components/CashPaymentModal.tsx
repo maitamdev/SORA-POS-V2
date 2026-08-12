@@ -11,6 +11,7 @@ const CashPaymentModal = ({ onCheckout }: CashPaymentModalProps) => {
   const receivedAmount = usePOSStore((s) => s.receivedAmount);
   const loading = usePOSStore((s) => s.loading);
   const cart = usePOSStore((s) => s.cart);
+  const operationSettings = usePOSStore((s) => s.operationSettings);
   const setShowCashPayment = usePOSStore((s) => s.setShowCashPayment);
   const setReceivedAmount = usePOSStore((s) => s.setReceivedAmount);
 
@@ -41,14 +42,14 @@ const CashPaymentModal = ({ onCheckout }: CashPaymentModalProps) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-blue-500">Cần thu</p>
-              <p className="text-2xl font-black text-blue-700 mt-1">{money(finalAmount)}</p>
+              <p className="text-2xl font-black text-blue-700 mt-1">{money(finalAmount, operationSettings.currency, operationSettings.locale)}</p>
             </div>
             <div className={`rounded-xl border p-3 ${receivedAmount >= finalAmount ? 'bg-emerald-50 border-emerald-100' : 'bg-amber-50 border-amber-100'}`}>
               <p className={`text-[10px] font-black uppercase tracking-wider ${receivedAmount >= finalAmount ? 'text-emerald-600' : 'text-amber-600'}`}>
                 {receivedAmount >= finalAmount ? 'Tiền trả lại' : 'Còn thiếu'}
               </p>
               <p className={`text-2xl font-black mt-1 ${receivedAmount >= finalAmount ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {money(receivedAmount >= finalAmount ? changeAmount : Math.max(finalAmount - receivedAmount, 0))}
+                {money(receivedAmount >= finalAmount ? changeAmount : Math.max(finalAmount - receivedAmount, 0), operationSettings.currency, operationSettings.locale)}
               </p>
             </div>
           </div>
@@ -74,7 +75,7 @@ const CashPaymentModal = ({ onCheckout }: CashPaymentModalProps) => {
                   onClick={() => setReceivedAmount(amount)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:border-blue-400 hover:bg-blue-50 transition"
                 >
-                  {amount === finalAmount ? 'Đủ tiền' : money(amount)}
+                  {amount === finalAmount ? 'Đủ tiền' : money(amount, operationSettings.currency, operationSettings.locale)}
                 </button>
               ))}
             </div>

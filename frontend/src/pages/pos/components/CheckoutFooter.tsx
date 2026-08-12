@@ -15,6 +15,7 @@ const CheckoutFooter = ({ onCheckout }: CheckoutFooterProps) => {
   const paymentMethod = usePOSStore((s) => s.paymentMethod);
   const loading = usePOSStore((s) => s.loading);
   const cart = usePOSStore((s) => s.cart);
+  const operationSettings = usePOSStore((s) => s.operationSettings);
   const setPaymentMethod = usePOSStore((s) => s.setPaymentMethod);
   const setShowCashPayment = usePOSStore((s) => s.setShowCashPayment);
   const setReceivedAmount = usePOSStore((s) => s.setReceivedAmount);
@@ -29,24 +30,24 @@ const CheckoutFooter = ({ onCheckout }: CheckoutFooterProps) => {
       <div className="space-y-1.5">
         <div className="flex justify-between items-center text-xs font-bold text-slate-500">
           <span>Tạm tính</span>
-          <span>{money(total)}</span>
+          <span>{money(total, operationSettings.currency, operationSettings.locale)}</span>
         </div>
 
         {discountAmount > 0 && (
           <div className="flex justify-between items-center text-xs font-bold text-red-500">
             <span>Chiết khấu</span>
-            <span>-{money(discountAmount)}</span>
+            <span>-{money(discountAmount, operationSettings.currency, operationSettings.locale)}</span>
           </div>
         )}
 
         <div className="flex justify-between items-center text-xs font-bold text-slate-500">
           <span>Tổng tiền hàng</span>
-          <span>{money(total)}</span>
+          <span>{money(total, operationSettings.currency, operationSettings.locale)}</span>
         </div>
 
         <div className="flex justify-between items-center border-t border-slate-100 pt-2 text-sm font-extrabold text-slate-800">
           <span>Thành tiền</span>
-          <span className="text-xl font-black text-blue-600">{money(finalAmount)}</span>
+          <span className="text-xl font-black text-blue-600">{money(finalAmount, operationSettings.currency, operationSettings.locale)}</span>
         </div>
       </div>
 

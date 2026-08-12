@@ -3,12 +3,20 @@ import { supabase } from '../config/supabase';
 import { emptyToNull, parsePagination } from '../utils/query';
 import { appCache, stableCacheKey } from '../utils/cache';
 import { NotificationService } from './notification.service';
+import { JwtPayload } from '../types/user.type';
 
 type Query = Record<string, unknown>;
 type Entity = Record<string, unknown>;
 const CATALOG_CACHE_TTL_MS = 30_000;
 const CATEGORY_CACHE_PREFIX = 'catalog:categories';
 const PRODUCT_CACHE_PREFIX = 'catalog:products';
+const CUSTOMER_SAFE_SELECT = 'id, name, email, address, points, total_spent, is_active, created_at';
+const CUSTOMER_LIMITED_SELECT = 'id, name, points, total_spent, is_active, created_at';
+
+const canManageCustomerData = (currentUser?: JwtPayload) =>
+  currentUser?.role === 'admin' || currentUser?.role === 'manager';
+
+const normalizePhone = (value: string) => value.replace(/\D/g, '');
 
 const applySearch = (
   query: any,
@@ -26,6 +34,14 @@ const stripCustomerSystemFields = (data: Entity): Entity => {
   void total_spent;
   void is_active;
   return safeData;
+};
+
+// Customer phone numbers are write-only. Keep this mapper at the service
+// boundary as a final guard even if a cached/legacy query contains `phone`.
+const stripCustomerPhone = (customer: Entity): Entity => {
+  const { phone: _phone, ...safeCustomer } = customer;
+  void _phone;
+  return safeCustomer;
 };
 
 export class CatalogService {
@@ -236,26 +252,68 @@ export class CatalogService {
     return { message: 'Đã ngưng hợp tác với nhà cung cấp thành công.' };
   }
 
-  static async listCustomers(queryParams: Query) {
-    const cacheKey = stableCacheKey('catalog:customers', queryParams);
-    const cached = appCache.get<{ items: unknown[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
-    if (cached) return cached;
+  static async listCustomers(queryParams: Query, currentUser?: JwtPayload) {
+    const canViewContact = canManageCustomerData(currentUser);
+    // The response shape differs by role, so the role must be part of the cache key.
+    const cacheKey = stableCacheKey('catalog:customers', {
+      ...queryParams,
+      role: currentUser?.role || 'anonymous',
+    });
+    const cached = appCache.get<{ items: Entity[]; pagination: { page: number; limit: number; total: number } }>(cacheKey);
+    if (cached) {
+      return { ...cached, items: cached.items.map(stripCustomerPhone) };
+    }
 
     const { page, limit, from, to } = parsePagination(queryParams);
     let query = supabase
       .from('customers')
-      .select('*', { count: 'exact' })
+      .select(canViewContact ? CUSTOMER_SAFE_SELECT : CUSTOMER_LIMITED_SELECT, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    query = applySearch(query, queryParams.search, ['name', 'email', 'phone']);
+    query = applySearch(query, queryParams.search, ['name', 'email', 'address']);
     if (queryParams.is_active !== undefined) query = query.eq('is_active', queryParams.is_active === 'true');
 
     const { data, error, count } = await query;
     if (error) throw new AppError(500, error.message);
-    const result = { items: data || [], pagination: { page, limit, total: count || 0 } };
+    const result = {
+      items: (data || []).map((customer) => stripCustomerPhone(customer as unknown as Entity)),
+      pagination: { page, limit, total: count || 0 },
+    };
     appCache.set(cacheKey, result, 60_000);
     return result;
+  }
+
+  /**
+   * POS lookup that proves a phone match without exposing the stored phone
+   * number to cashiers. Managers/admins retain the normal full customer view.
+   */
+  static async lookupCustomerByPhone(phone: string, currentUser?: JwtPayload) {
+    const search = phone.trim();
+    if (!search) return null;
+
+    const { data, error } = await supabase
+      .from('customers')
+      // Read the phone only inside the server to verify the POS lookup; never return it.
+      .select('id, name, points, total_spent, is_active, phone')
+      .ilike('phone', `%${search.replace(/[%_]/g, '')}%`)
+      .eq('is_active', true)
+      .limit(25);
+
+    if (error) throw new AppError(500, error.message);
+
+    const normalizedSearch = normalizePhone(search);
+    const candidates = (data || []) as any[];
+    const matched = candidates.find((customer) => normalizePhone(String(customer.phone || '')) === normalizedSearch);
+    if (!matched) return null;
+
+    return {
+      id: matched.id,
+      name: matched.name,
+      points: matched.points,
+      total_spent: matched.total_spent,
+      is_active: matched.is_active,
+    };
   }
 
   static async createCustomer(data: Entity) {
@@ -263,24 +321,27 @@ export class CatalogService {
     const { data: created, error } = await supabase
       .from('customers')
       .insert(emptyToNull(safeData))
-      .select('*')
+      .select(CUSTOMER_SAFE_SELECT)
       .single();
     if (error) throw new AppError(400, error.message);
     appCache.deletePrefix('catalog:customers');
-    return created;
+    return stripCustomerPhone(created as Entity);
   }
 
   static async updateCustomer(id: string, data: Entity) {
-    const safeData = stripCustomerSystemFields(data);
+    const { phone, ...editableData } = stripCustomerSystemFields(data);
+    // Admin/manager routes may replace the phone number, but it is still
+    // excluded from every response by CUSTOMER_SAFE_SELECT/stripCustomerPhone.
+    if (phone !== undefined) editableData.phone = phone;
     const { data: updated, error } = await supabase
       .from('customers')
-      .update(emptyToNull(safeData))
+      .update(emptyToNull(editableData))
       .eq('id', id)
-      .select('*')
+      .select(CUSTOMER_SAFE_SELECT)
       .single();
     if (error) throw new AppError(400, error.message);
     appCache.deletePrefix('catalog:customers');
-    return updated;
+    return stripCustomerPhone(updated as Entity);
   }
 
   static async deleteCustomer(id: string) {

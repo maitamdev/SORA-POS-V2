@@ -113,6 +113,27 @@ export const openApiSpec: OpenApiSpec = {
           password: { type: 'string', example: 'password123' },
         },
       },
+      ChangePasswordRequest: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', format: 'password' },
+          newPassword: { type: 'string', format: 'password', minLength: 8, maxLength: 128 },
+        },
+      },
+      ForgotPasswordRequest: {
+        type: 'object',
+        required: ['email'],
+        properties: { email: { type: 'string', format: 'email' } },
+      },
+      ResetPasswordRequest: {
+        type: 'object',
+        required: ['token', 'newPassword'],
+        properties: {
+          token: { type: 'string' },
+          newPassword: { type: 'string', format: 'password', minLength: 8, maxLength: 128 },
+        },
+      },
       Category: {
         type: 'object',
         required: ['name'],
@@ -142,7 +163,7 @@ export const openApiSpec: OpenApiSpec = {
         properties: {
           name: { type: 'string' },
           email: { type: 'string', nullable: true },
-          phone: { type: 'string', nullable: true },
+          phone: { type: 'string', nullable: true, writeOnly: true, description: 'Chỉ gửi khi tạo hồ sơ lần đầu; không trả về trong response và không cập nhật lại.' },
           address: { type: 'string', nullable: true },
           points: { type: 'integer', minimum: 0 },
           total_spent: { type: 'number', minimum: 0 },
@@ -318,6 +339,32 @@ export const openApiSpec: OpenApiSpec = {
         responses: { '200': ok('Authenticated'), '401': ok('Invalid credentials') },
       },
     },
+    '/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Request password reset email',
+        description: 'Always returns a generic response to avoid account enumeration.',
+        requestBody: refBody('ForgotPasswordRequest'),
+        responses: { '200': ok('Reset instructions requested') },
+      },
+    },
+    '/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Reset password with email token',
+        requestBody: refBody('ResetPasswordRequest'),
+        responses: { '200': ok('Password reset'), '400': ok('Invalid or expired token') },
+      },
+    },
+    '/auth/change-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Change current password',
+        security: auth,
+        requestBody: refBody('ChangePasswordRequest'),
+        responses: { '200': ok('Password changed'), '401': ok('Current password is incorrect') },
+      },
+    },
     '/auth/logout': {
       post: { tags: ['Auth'], summary: 'Logout', security: auth, responses: { '200': ok() } },
     },
@@ -356,11 +403,11 @@ export const openApiSpec: OpenApiSpec = {
       delete: { tags: ['Suppliers'], summary: 'Delete supplier', description: 'Roles: admin only', security: auth, parameters: [idParam()], responses: { '200': ok() } },
     },
     '/customers': {
-      get: { tags: ['Customers'], summary: 'List customers', security: auth, parameters: pagingParams, responses: { '200': ok() } },
-      post: { tags: ['Customers'], summary: 'Create customer', security: auth, requestBody: refBody('Customer'), responses: { '201': ok('Created') } },
+      get: { tags: ['Customers'], summary: 'List customers', description: 'Roles: admin, manager. Phone is never returned.', security: auth, parameters: pagingParams, responses: { '200': ok() } },
+      post: { tags: ['Customers'], summary: 'Create customer', description: 'Roles: admin, manager. Phone is write-only and accepted only on first creation.', security: auth, requestBody: refBody('Customer'), responses: { '201': ok('Created') } },
     },
     '/customers/{id}': {
-      put: { tags: ['Customers'], summary: 'Update customer', security: auth, parameters: [idParam()], requestBody: refBody('Customer'), responses: { '200': ok() } },
+      put: { tags: ['Customers'], summary: 'Update customer', description: 'Roles: admin, manager. Phone is immutable and ignored on update.', security: auth, parameters: [idParam()], requestBody: refBody('Customer'), responses: { '200': ok() } },
       delete: { tags: ['Customers'], summary: 'Delete customer', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
     },
     '/orders': {
