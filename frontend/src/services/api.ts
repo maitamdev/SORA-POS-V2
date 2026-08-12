@@ -59,8 +59,9 @@ api.interceptors.response.use(
       const currentPath = window.location.pathname;
       const isLoginRequest = error.config?.url?.includes('/auth/login');
       const isLoginPage = currentPath === '/login';
+      const isPublicInvoicePage = currentPath.startsWith('/invoice/');
 
-      if (!isLoginRequest && !isLoginPage) {
+      if (!isLoginRequest && !isLoginPage && !isPublicInvoicePage) {
         useAuthStore.getState().logout();
         window.location.href = '/login';
       }

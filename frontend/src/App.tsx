@@ -49,6 +49,9 @@ function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
 
   useEffect(() => {
+    // Customer invoice links are intentionally public. Do not validate a
+    // stale POS session when a customer opens a QR on their phone.
+    if (window.location.pathname.startsWith('/invoice/')) return;
     checkAuth();
   }, [checkAuth]);
 
