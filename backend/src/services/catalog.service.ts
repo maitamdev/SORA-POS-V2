@@ -285,8 +285,8 @@ export class CatalogService {
   }
 
   /**
-   * POS lookup that proves a phone match without exposing the stored phone
-   * number to cashiers. Managers/admins retain the normal full customer view.
+   * POS lookup lets any selling role identify a loyalty customer by phone
+   * without exposing the stored phone number or the customer directory.
    */
   static async lookupCustomerByPhone(phone: string, currentUser?: JwtPayload) {
     const search = phone.trim();

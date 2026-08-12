@@ -85,7 +85,7 @@ interface CartPanelProps {
 
 const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
   const user = useAuthStore((state) => state.user);
-  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
+  const canUseCustomerAtPOS = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'cashier';
   const cart = usePOSStore((s) => Array.isArray(s.cart) ? s.cart : []);
   const customerPhone = usePOSStore((s) => s.customerPhone);
   const matchedCustomer = usePOSStore((s) => s.matchedCustomer);
@@ -411,8 +411,8 @@ const CartPanel = ({ onClearCart, onPhoneChange }: CartPanelProps) => {
 
         {/* Customer & Discount Panel */}
         <div className="p-4 bg-slate-50/50 space-y-3">
-          {/* Customer Phone: manager/admin only. Cashiers do not need customer data. */}
-          {canManageCustomerData && <div className="space-y-2 border-b border-slate-100 pb-3">
+          {/* POS customer lookup is available to all selling roles; the customer directory remains manager/admin-only. */}
+          {canUseCustomerAtPOS && <div className="space-y-2 border-b border-slate-100 pb-3">
             <div className="space-y-1">
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Số điện thoại khách hàng</label>
               <div className="relative">

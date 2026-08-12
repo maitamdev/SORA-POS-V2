@@ -80,7 +80,7 @@ const menuItems = [
     label: 'Khách hàng',
     icon: HiOutlineUserGroup,
     path: '/customers',
-    roles: ['admin', 'manager', 'cashier'],
+    roles: ['admin', 'manager'],
   },
   {
     label: 'Nhà cung cấp',

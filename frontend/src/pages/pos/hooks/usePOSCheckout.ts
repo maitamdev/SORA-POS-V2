@@ -21,14 +21,14 @@ import { recordDemoPromotionUsage } from '../../../utils/promotionUsage';
  */
 export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
   const { user } = useAuthStore();
-  const canManageCustomerData = user?.role === 'admin' || user?.role === 'manager';
+  const canUseCustomerAtPOS = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'cashier';
   const { refreshPendingCount } = useNetworkStatus();
   const customerPhoneRef = useRef('');
 
   // ─── Customer Phone Handler ───
   const handlePhoneChange = async (value: string) => {
     const store = usePOSStore.getState();
-    if (!canManageCustomerData) {
+    if (!canUseCustomerAtPOS) {
       store.setCustomerPhone('');
       store.setMatchedCustomer(null);
       store.setCustomerId('');
@@ -256,7 +256,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       toast.error('Vui lòng nhận ca và nhập tiền đầu ca trước khi bán hàng');
       return;
     }
-    if (operationSettings.requireCustomerPhone && canManageCustomerData && !customerPhone.trim()) {
+    if (operationSettings.requireCustomerPhone && canUseCustomerAtPOS && !customerPhone.trim()) {
       toast.error('Vui lòng nhập số điện thoại khách hàng');
       return;
     }
@@ -373,7 +373,7 @@ export const usePOSCheckout = (loadProducts: () => Promise<void>) => {
       let finalCustomerId = matchedCustomer?.id || null;
 
       // Auto-create new customer
-      if (customerPhone.trim() && !matchedCustomer && canManageCustomerData) {
+      if (customerPhone.trim() && !matchedCustomer && canUseCustomerAtPOS) {
         if (!newCustName.trim()) {
           toast.error('Vui lòng nhập Họ và tên khách hàng mới để đăng ký tích điểm');
           store.setLoading(false);

@@ -404,10 +404,10 @@ export const openApiSpec: OpenApiSpec = {
     },
     '/customers': {
       get: { tags: ['Customers'], summary: 'List customers', description: 'Roles: admin, manager. Phone is never returned.', security: auth, parameters: pagingParams, responses: { '200': ok() } },
-      post: { tags: ['Customers'], summary: 'Create customer', description: 'Roles: admin, manager. Phone is write-only and accepted only on first creation.', security: auth, requestBody: refBody('Customer'), responses: { '201': ok('Created') } },
+      post: { tags: ['Customers'], summary: 'Create customer', description: 'Roles: admin, manager, cashier. Cashiers can create a customer for POS loyalty; phone is write-only.', security: auth, requestBody: refBody('Customer'), responses: { '201': ok('Created') } },
     },
     '/customers/{id}': {
-      put: { tags: ['Customers'], summary: 'Update customer', description: 'Roles: admin, manager. Phone is immutable and ignored on update.', security: auth, parameters: [idParam()], requestBody: refBody('Customer'), responses: { '200': ok() } },
+      put: { tags: ['Customers'], summary: 'Update customer', description: 'Roles: admin, manager. Phone is write-only and may be replaced by admin or manager.', security: auth, parameters: [idParam()], requestBody: refBody('Customer'), responses: { '200': ok() } },
       delete: { tags: ['Customers'], summary: 'Delete customer', description: 'Roles: admin, manager', security: auth, parameters: [idParam()], responses: { '200': ok() } },
     },
     '/orders': {
